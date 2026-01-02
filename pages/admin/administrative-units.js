@@ -60,7 +60,8 @@ export default function AdministrativeUnitsManagement() {
       }
     }
 
-    if (!formData.unitType) {
+    // Only validate unitType if it's not passed as parameter (for region/zone forms)
+    if (!unitType && !formData.unitType) {
       newErrors.unitType = 'Unit Type is required';
     }
 
@@ -77,35 +78,33 @@ export default function AdministrativeUnitsManagement() {
 
   const handleSubmit = (e, unitType) => {
     e.preventDefault();
+    setErrors({}); // Clear previous errors
     
     if (!validateForm(unitType)) {
       return;
     }
 
-    const newUnit = createUnit({
-      officialUnitName: formData.officialUnitName.trim(),
-      unitType: unitType,
-      parentUnitId: formData.parentUnitId || null
-    });
+    try {
+      const newUnit = createUnit({
+        officialUnitName: formData.officialUnitName.trim(),
+        unitType: unitType || formData.unitType,
+        parentUnitId: formData.parentUnitId || null
+      });
 
-    // Refresh units list
-    const updatedUnits = getAllUnits();
-    setUnits(updatedUnits);
-    setSuccessMessage(`${unitType} "${newUnit.officialUnitName}" has been registered successfully!`);
-    
-    // Reset form based on active tab
-    if (activeTab === 'federal') {
+      // Refresh units list
+      const updatedUnits = getAllUnits();
+      setUnits(updatedUnits);
+      setSuccessMessage(`${unitType || formData.unitType} "${newUnit.officialUnitName}" has been registered successfully!`);
+      
+      // Reset form
       setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
-    } else if (activeTab === 'region') {
-      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
-    } else if (activeTab === 'zone') {
-      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
-    } else if (activeTab === 'woreda') {
-      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+      setErrors({});
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      setErrors({ general: error.message || 'An error occurred while creating the unit.' });
     }
-    
-    // Clear success message after 5 seconds
-    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   // Get valid parents based on current unit type and available units
@@ -191,6 +190,13 @@ export default function AdministrativeUnitsManagement() {
         {successMessage && (
           <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
             {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {errors.general && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+            {errors.general}
           </div>
         )}
 
