@@ -1,0 +1,706 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../../components/Layout';
+import Sidebar from '../../../components/Sidebar';
+import ProtectedRoute from '../../../components/ProtectedRoute';
+import { useAuth } from '../../../contexts/AuthContext';
+import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
+import { getResponsesBySubmission } from '../../../data/submissions';
+import { getUnitById } from '../../../data/administrativeUnits';
+import { canPerformAction } from '../../../utils/permissions';
+import { getSubQuestionById, getSubQuestionsByIndicator, getIndicatorsByDimension } from '../../../data/assessmentFramework';
+import { getDimensionsByYear, getAssessmentYearById } from '../../../data/assessmentFramework';
+import { getUserById } from '../../../data/users';
+
+export default function EvaluateSubmission() {
+  const router = useRouter();
+  const { submissionId } = router.query;
+  const { user } = useAuth();
+  const [submissionDetails, setSubmissionDetails] = useState(null);
+  const [rejectionReasons, setRejectionReasons] = useState({});
+  const [regionalNotes, setRegionalNotes] = useState({});
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [openCommentSections, setOpenCommentSections] = useState({});
+
+  useEffect(() => {
+    if (submissionId) {
+      loadSubmissionDetails(parseInt(submissionId));
+    }
+  }, [submissionId]);
+
+  const loadSubmissionDetails = (submissionId) => {
+    const submission = getSubmissionById(submissionId);
+    if (submission) {
+      const responses = getResponsesBySubmission(submissionId);
+      
+      // Get the unit to determine its type
+      const unit = getUnitById(submission.unitId);
+      const unitType = unit ? unit.unitType : null;
+      
+      // Map unit type to applicable unit types (same as data submission page)
+      // Federal Institute and City Administration use Region indicators, Sub-city uses Woreda indicators
+      const getApplicableUnitTypes = (ut) => {
+        if (!ut) return [];
+        if (ut === 'Federal Institute') return ['Region'];
+        if (ut === 'City Administration') return ['Region'];
+        if (ut === 'Sub-city') return ['Woreda'];
+        return [ut];
+      };
+      const applicableUnitTypes = getApplicableUnitTypes(unitType);
+      
+      // Get assessment framework data
+      const assessmentYear = getAssessmentYearById(submission.assessmentYearId);
+      const dimensions = assessmentYear ? getDimensionsByYear(submission.assessmentYearId) : [];
+      
+      // Group responses by dimension and indicator
+      const groupedData = dimensions.map(dimension => {
+        const indicators = getIndicatorsByDimension(dimension.dimensionId);
+        const applicableIndicators = indicators.filter(ind => 
+          !unitType || applicableUnitTypes.includes(ind.applicableUnitType)
+        );
+        return {
+          dimension,
+          indicators: applicableIndicators.map(indicator => {
+            const subQuestions = getSubQuestionsByIndicator(indicator.indicatorId);
+            return {
+              indicator,
+              subQuestions: subQuestions.map(sq => {
+                const response = responses.find(r => r.subQuestionId === sq.subQuestionId);
+                return {
+                  subQuestion: sq,
+                  response: response || null
+                };
+              })
+            };
+          }).filter(ind => ind.subQuestions.length > 0)
+        };
+      }).filter(dim => dim.indicators.length > 0);
+      
+      setSubmissionDetails({
+        submission,
+        responses,
+        groupedData
+      });
+      
+      // Initialize rejection reasons
+      const reasons = {};
+      responses.forEach(r => {
+        if (r.regionalRejectionReason) reasons[r.responseId] = r.regionalRejectionReason;
+      });
+      setRejectionReasons(reasons);
+    }
+  };
+
+  const handleApproveSubmission = () => {
+    if (!user || !submissionDetails) return;
+    
+    if (!canPerformAction(user, 'approve_submission')) {
+      alert('You do not have permission to approve submissions.');
+      return;
+    }
+    
+    try {
+      // Approve all answered questions
+      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      answeredResponses.forEach(response => {
+        if (!response.regionalApprovalStatus || response.regionalApprovalStatus === VALIDATION_STATUS.PENDING) {
+          approveResponseByRegionalApprover(response.responseId, user.userId, null);
+        }
+      });
+      
+      // Submit approval
+      const result = submitRegionalApproval(submissionDetails.submission.submissionId, user.userId);
+      
+      if (result) {
+        setShowApproveModal(false);
+        loadSubmissionDetails(parseInt(submissionId));
+        
+        if (result.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+          setSuccessMessage('✅ Approval submitted successfully! The submission has been sent to the Central Committee for final validation. You will be redirected to the approval queue.');
+          setTimeout(() => {
+            router.push('/approval/queue');
+          }, 3000);
+        } else {
+          setSuccessMessage('⚠️ Approval submitted. The submission has been sent back to the Data Contributor with rejection reasons. You will be redirected to the approval queue.');
+          setTimeout(() => {
+            router.push('/approval/queue');
+          }, 3000);
+        }
+        setTimeout(() => setSuccessMessage(''), 8000);
+      }
+    } catch (error) {
+      setShowApproveModal(false);
+      alert(error.message || 'Error submitting approval. Please try again.');
+    }
+  };
+
+  const handleRejectSubmission = () => {
+    const reason = rejectionReasons['submission'];
+    if (!reason || !reason.trim()) {
+      alert('Please provide a rejection reason.');
+      return;
+    }
+    
+    if (!user || !submissionDetails) return;
+    
+    if (!canPerformAction(user, 'approve_submission')) {
+      alert('You do not have permission to reject submissions.');
+      return;
+    }
+    
+    try {
+      // Reject all answered questions
+      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      answeredResponses.forEach(response => {
+        rejectResponseByRegionalApprover(response.responseId, user.userId, reason);
+      });
+      
+      // Submit rejection
+      const result = submitRegionalApproval(submissionDetails.submission.submissionId, user.userId);
+      
+      if (result) {
+        loadSubmissionDetails(parseInt(submissionId));
+        setShowRejectModal(false);
+        setRejectionReasons(prev => ({ ...prev, ['submission']: '' }));
+        setSuccessMessage('⚠️ Submission rejected. The submission has been sent back to the Data Contributor for revision. You will be redirected to the approval queue.');
+        setTimeout(() => {
+          router.push('/approval/queue');
+        }, 3000);
+        setTimeout(() => setSuccessMessage(''), 8000);
+      }
+    } catch (error) {
+      alert(error.message || 'Error submitting rejection. Please try again.');
+    }
+  };
+
+  const handleSaveComment = (responseId) => {
+    if (!user) return;
+    
+    const note = regionalNotes[responseId] || '';
+    if (!note.trim()) {
+      return;
+    }
+    
+    const response = submissionDetails?.responses.find(r => r.responseId === responseId);
+    if (response) {
+      response.regionalNote = note;
+      response.updatedAt = new Date().toISOString();
+      
+      setRegionalNotes(prev => ({ ...prev, [responseId]: '' }));
+      loadSubmissionDetails(parseInt(submissionId));
+      setSuccessMessage('💬 Comment saved successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  const getUnitName = (unitId) => {
+    const unit = getUnitById(unitId);
+    return unit ? unit.officialUnitName : 'Unknown';
+  };
+
+  // Calculate global question numbers
+  const questionNumberMap = useMemo(() => {
+    if (!submissionDetails || !submissionDetails.groupedData) return {};
+    const map = {};
+    let counter = 1;
+    submissionDetails.groupedData.forEach(({ indicators: dimIndicators }) => {
+      dimIndicators.forEach(({ subQuestions }) => {
+        subQuestions.forEach(({ subQuestion }) => {
+          map[subQuestion.subQuestionId] = counter++;
+        });
+      });
+    });
+    return map;
+  }, [submissionDetails]);
+
+  if (!submissionDetails) {
+    return (
+      <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+        <Layout title="Evaluate Submission">
+          <div className="flex">
+            <Sidebar />
+            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+              <div className="w-full">
+                <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray text-center">
+                  <p className="text-mint-dark-text/70">Loading submission details...</p>
+                </div>
+              </div>
+            </main>
+          </div>
+        </Layout>
+      </ProtectedRoute>
+    );
+  }
+
+  const isSubmitted = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL ||
+                      submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
+
+  return (
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+      <Layout title="Evaluate Submission">
+        <div className="flex">
+          <Sidebar />
+          <div className="flex flex-grow ml-64">
+            {/* Main Content */}
+            <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+              <div className="w-full max-w-5xl mx-auto">
+                {/* Success Message */}
+                {successMessage && (
+                  <div className={`mb-6 p-4 rounded-lg ${
+                    successMessage.includes('✅') ? 'bg-green-100 border border-green-300' : 'bg-yellow-100 border border-yellow-300'
+                  }`}>
+                    <p className={`font-semibold ${
+                      successMessage.includes('✅') ? 'text-green-800' : 'text-yellow-800'
+                    }`}>
+                      {successMessage}
+                    </p>
+                  </div>
+                )}
+
+                {/* Header */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
+                        {submissionDetails.submission.submissionName || getUnitName(submissionDetails.submission.unitId)}
+                      </h1>
+                      {submissionDetails.submission.submissionName && (
+                        <p className="text-sm text-mint-dark-text/60">
+                          {getUnitName(submissionDetails.submission.unitId)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => router.push('/approval/queue')}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
+                    >
+                      ← Back to Queue
+                    </button>
+                  </div>
+                </div>
+
+              {/* Questions and Answers */}
+              {submissionDetails.groupedData && submissionDetails.groupedData.length > 0 ? (
+                <div className="space-y-6">
+                  {submissionDetails.groupedData.map(({ dimension, indicators: dimIndicators }, dimIdx) => {
+                    return (
+                      <div key={dimension.dimensionId} className="bg-white rounded-xl p-6 border-2 border-mint-medium-gray shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-mint-primary-blue">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold text-xl">
+                              {dimIdx + 1}
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold text-mint-primary-blue">
+                                {dimension.dimensionName}
+                              </h4>
+                              <p className="text-sm text-mint-dark-text/70 mt-1">
+                                Dimension Weight: {dimension.dimensionWeight}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {dimIndicators.map(({ indicator, subQuestions: indicatorSubQuestions }, indIdx) => (
+                          <div key={indicator.indicatorId} className="mb-6 last:mb-0">
+                            <div className="mb-4 pb-3 border-b border-mint-medium-gray">
+                              <div className="flex items-center space-x-2">
+                                <h5 className="text-lg font-bold text-mint-dark-text">
+                                  {indicator.indicatorName}
+                                </h5>
+                              </div>
+                              <p className="text-xs text-mint-dark-text/60 mt-1">
+                                Indicator Weight: {indicator.indicatorWeight}%
+                              </p>
+                            </div>
+
+                            <div className="space-y-4">
+                              {indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
+                                const globalQuestionNumber = questionNumberMap[subQuestion.subQuestionId] || 0;
+                                const hasAnswer = response && response.responseValue && response.responseValue.trim() !== '';
+                                return (
+                                  <div 
+                                    key={subQuestion.subQuestionId} 
+                                    className="p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6"
+                                  >
+                                    {/* Question Header */}
+                                    <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">
+                                      <div className="flex items-start space-x-3">
+                                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-mint-primary-blue text-white flex items-center justify-center font-bold text-lg">
+                                          {globalQuestionNumber}
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex items-center space-x-2 mb-3">
+                                            <p className="text-lg font-bold text-mint-dark-text">
+                                              Question {globalQuestionNumber}: {subQuestion.subQuestionText}
+                                            </p>
+                                          </div>
+                                          <div className="flex flex-wrap items-center gap-3 text-xs text-mint-dark-text/60">
+                                            <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
+                                              Type: {subQuestion.responseType}
+                                            </span>
+                                            <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
+                                              Weight: {subQuestion.subWeightPercentage}%
+                                            </span>
+                                            {hasAnswer && (
+                                              <span className="px-2 py-1 bg-[#0d6670]/10 text-[#0d6670] rounded font-semibold">
+                                                ✓ Answered
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Answer Section */}
+                                    {response && hasAnswer ? (
+                                      <div className="space-y-3">
+                                        {/* Answer Display */}
+                                        <div className="bg-white p-4 rounded-lg border border-gray-300">
+                                          <div className="flex items-start justify-between mb-2">
+                                            <label className="block text-sm font-semibold text-gray-700">
+                                              Answer
+                                            </label>
+                                            {/* Comment Button */}
+                                            <button
+                                              onClick={() => setOpenCommentSections(prev => ({ 
+                                                ...prev, 
+                                                [response.responseId]: !prev[response.responseId] 
+                                              }))}
+                                              className="flex items-center space-x-1 text-gray-600 hover:text-mint-primary-blue transition-colors"
+                                              title="Add comment"
+                                            >
+                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                              </svg>
+                                              <span className="text-xs">+</span>
+                                            </button>
+                                          </div>
+                                          <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                            <p className="text-gray-900 whitespace-pre-wrap break-words leading-relaxed text-sm">
+                                              {response.responseValue}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        {response.evidenceLink && (
+                                          <div className="bg-white p-4 rounded-lg border border-gray-300">
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                              Evidence Link
+                                            </label>
+                                            <a
+                                              href={response.evidenceLink}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-sm text-mint-primary-blue hover:underline break-all inline-flex items-center space-x-2"
+                                            >
+                                              <span>{response.evidenceLink}</span>
+                                              <span className="text-xs">↗</span>
+                                            </a>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Comments Section */}
+                                        {isSubmitted && hasAnswer && (
+                                          <div className="mt-3 bg-gray-50 rounded-lg border border-gray-300 p-4">
+                                            <div className="mb-3">
+                                              <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-sm font-bold text-gray-900">Comments</h4>
+                                                <button
+                                                  onClick={() => setOpenCommentSections(prev => ({ 
+                                                    ...prev, 
+                                                    [response.responseId]: !prev[response.responseId] 
+                                                  }))}
+                                                  className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
+                                                >
+                                                  Add Comment
+                                                </button>
+                                              </div>
+                                              
+                                              {/* Existing Comments - Always visible */}
+                                              {response.regionalNote && (
+                                                <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
+                                                  <div className="flex items-start space-x-2 mb-2">
+                                                    <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                    <div className="flex-1">
+                                                      <div className="flex items-start justify-between mb-1">
+                                                        <span className="text-xs font-semibold text-gray-900">
+                                                          {(() => {
+                                                            const approverId = submissionDetails?.submission?.approverUserId;
+                                                            if (approverId) {
+                                                              const approver = getUserById(approverId);
+                                                              if (approver) {
+                                                                return `${approver.fullName} (${approver.role})`;
+                                                              }
+                                                            }
+                                                            if (user) {
+                                                              return `${user.fullName || user.username} (${user.role})`;
+                                                            }
+                                                            return 'Regional Approver';
+                                                          })()}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500 ml-2">
+                                                          {formatDate(response.updatedAt)}
+                                                        </span>
+                                                      </div>
+                                                      <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
+                                                        {response.regionalNote}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                              
+                                              {/* Comment Input - Toggleable */}
+                                              {openCommentSections[response.responseId] && (
+                                                <div className="space-y-2">
+                                                  <textarea
+                                                    value={regionalNotes[response.responseId] || ''}
+                                                    onChange={(e) => setRegionalNotes(prev => ({ ...prev, [response.responseId]: e.target.value }))}
+                                                    rows="3"
+                                                    className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue resize-none"
+                                                    placeholder="Add your comment here..."
+                                                  />
+                                                  <div className="flex justify-end space-x-2">
+                                                    <button
+                                                      onClick={() => setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }))}
+                                                      className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                    <button
+                                                      onClick={() => {
+                                                        handleSaveComment(response.responseId);
+                                                        setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
+                                                      }}
+                                                      disabled={!regionalNotes[response.responseId]?.trim()}
+                                                      className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                      Add Comment
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+                                        <p className="text-yellow-800 text-sm font-semibold mb-2">
+                                          ⚠️ No answer provided for this question yet.
+                                        </p>
+                                        <p className="text-xs text-yellow-700">
+                                          This question should be answered by the Data Contributor. If the submission was already submitted, please contact the contributor to complete this question.
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray text-center">
+                  <p className="text-mint-dark-text/70">No questions available for this submission.</p>
+                </div>
+              )}
+              </div>
+            </main>
+
+            {/* Right Sidebar - Application Status */}
+            {isSubmitted && (
+              <aside className="w-80 bg-gray-50 border-l border-gray-200 p-6 h-screen sticky top-0 overflow-y-auto">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-300 p-6">
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-bold text-gray-900">Application Status</h4>
+                      <span className={`px-4 py-1.5 rounded-full text-sm font-semibold inline-flex items-center gap-2 ${
+                        submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL && (
+                          <>
+                            <span>⏳</span>
+                            <span>Pending</span>
+                          </>
+                        )}
+                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER && (
+                          <>
+                            <span>✗</span>
+                            <span>Rejected</span>
+                          </>
+                        )}
+                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION && (
+                          <>
+                            <span>✓</span>
+                            <span>Approved</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <p><span className="font-semibold">Submission Date:</span> {submissionDetails.submission.submittedDate ? formatDate(submissionDetails.submission.submittedDate) : 'N/A'}</p>
+                      {submissionDetails.submission.approvalDate && (
+                        <p><span className="font-semibold">Reviewed Date:</span> {formatDate(submissionDetails.submission.approvalDate)}</p>
+                      )}
+                      {submissionDetails.submission.approverUserId && (
+                        <p><span className="font-semibold">Reviewer:</span> {(() => {
+                          const approver = getUserById(submissionDetails.submission.approverUserId);
+                          return approver ? `${approver.fullName} (${approver.role})` : 'Regional Approver';
+                        })()}</p>
+                      )}
+                    </div>
+                    <p className="mt-4 text-sm text-gray-700 font-medium">Review and take necessary action.</p>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setShowApproveModal(true)}
+                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => setShowRejectModal(true)}
+                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 font-semibold rounded-lg transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </aside>
+            )}
+          </div>
+        </div>
+
+        {/* Approve Modal */}
+        {showApproveModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div 
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              onClick={() => setShowApproveModal(false)}
+            ></div>
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Approve Submission</h3>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-base leading-relaxed text-gray-700 mb-4">
+                  Are you sure you want to approve this submission? Once approved, it will be sent to the Central Committee for final validation.
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  <strong>Next Step:</strong> The submission will be forwarded to the Central Committee for review and validation.
+                </p>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowApproveModal(false)}
+                  className="px-5 py-2.5 bg-[#E0F2F7] hover:bg-[#B8E6F0] text-[#0d6670] font-semibold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApproveSubmission}
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Confirm Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Modal */}
+        {showRejectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div 
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              onClick={() => setShowRejectModal(false)}
+            ></div>
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Reject Submission</h3>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-base leading-relaxed text-gray-700 mb-4">
+                  Rejecting this submission will send it back to the Data Contributor for revision.
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  <strong>Next Step:</strong> The submission will be returned to the Data Contributor with your feedback for revision.
+                </p>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Rejection Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectionReasons['submission'] || ''}
+                  onChange={(e) => setRejectionReasons(prev => ({ ...prev, ['submission']: e.target.value }))}
+                  rows="4"
+                  className="w-full p-3 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Enter detailed feedback for the Data Contributor..."
+                  required
+                />
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="px-5 py-2.5 bg-[#E0F2F7] hover:bg-[#B8E6F0] text-[#0d6670] font-semibold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejectSubmission}
+                  disabled={!rejectionReasons['submission']?.trim()}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Layout>
+    </ProtectedRoute>
+  );
+}
+

@@ -1,0 +1,151 @@
+export const assessmentYears = [
+  { id: '2024', name: '2024 Assessment' },
+  { id: '2025', name: '2025 Assessment' },
+];
+
+export const maturityLevelThresholds = {
+  low: 0.25,
+  medium: 0.50,
+  high: 0.75,
+  veryHigh: 1.0
+};
+
+export const coreDimensions = [
+  { id: 'IF', name: 'Institutional Framework' },
+  { id: 'CP', name: 'Content Provision' },
+  { id: 'SD', name: 'Service Delivery' },
+  { id: 'PCE', name: 'Participation & Citizen Engagement' },
+  { id: 'TE', name: 'Technology Enablement' },
+  { id: 'DI', name: 'Digital Inclusion' },
+];
+
+export const regionsAndCities = [
+  {
+    id: 'addis-ababa',
+    name: 'Addis Ababa City Administration',
+    scoresByYear: {
+      '2024': 0.78, // Very High
+      '2025': 0.85  // Very High
+    },
+    dimensionsScoresByYear: {
+      '2024': [
+        { dimensionId: 'IF', score: 0.8 },
+        { dimensionId: 'CP', score: 0.75 },
+        { dimensionId: 'SD', score: 0.82 },
+        { dimensionId: 'PCE', score: 0.7 },
+        { dimensionId: 'TE', score: 0.85 },
+        { dimensionId: 'DI', score: 0.65 },
+      ],
+      '2025': [
+        { dimensionId: 'IF', score: 0.85 },
+        { dimensionId: 'CP', score: 0.80 },
+        { dimensionId: 'SD', score: 0.88 },
+        { dimensionId: 'PCE', score: 0.75 },
+        { dimensionId: 'TE', score: 0.90 },
+        { dimensionId: 'DI', score: 0.70 },
+      ]
+    },
+    childUnits: [ // Placeholder for Sub-cities
+      { id: 'subcity1', name: 'Sub-city 1', scoresByYear: { '2024': 0.75, '2025': 0.80 } },
+      { id: 'subcity2', name: 'Sub-city 2', scoresByYear: { '2024': 0.68, '2025': 0.72 } },
+    ]
+  },
+  {
+    id: 'oromia',
+    name: 'Oromia Region',
+    scoresByYear: {
+      '2024': 0.62, // High
+      '2025': 0.68  // High
+    },
+    dimensionsScoresByYear: {
+      '2024': [
+        { dimensionId: 'IF', score: 0.65 },
+        { dimensionId: 'CP', score: 0.60 },
+        { dimensionId: 'SD', score: 0.68 },
+        { dimensionId: 'PCE', score: 0.55 },
+        { dimensionId: 'TE', score: 0.70 },
+        { dimensionId: 'DI', score: 0.50 },
+      ],
+      '2025': [
+        { dimensionId: 'IF', score: 0.70 },
+        { dimensionId: 'CP', score: 0.65 },
+        { dimensionId: 'SD', score: 0.72 },
+        { dimensionId: 'PCE', score: 0.60 },
+        { dimensionId: 'TE', score: 0.75 },
+        { dimensionId: 'DI', score: 0.55 },
+      ]
+    },
+    childUnits: [ // Placeholder for Zones
+      { id: 'zone1_oromia', name: 'West Arsi Zone', scoresByYear: { '2024': 0.60, '2025': 0.65 } },
+      { id: 'zone2_oromia', name: 'East Shewa Zone', scoresByYear: { '2024': 0.64, '2025': 0.70 } },
+    ]
+  },
+  {
+    id: 'amhara',
+    name: 'Amhara Region',
+    scoresByYear: {
+      '2024': 0.55, // Medium
+      '2025': 0.60  // High
+    },
+    dimensionsScoresByYear: {
+      '2024': [
+        { dimensionId: 'IF', score: 0.58 },
+        { dimensionId: 'CP', score: 0.50 },
+        { dimensionId: 'SD', score: 0.60 },
+        { dimensionId: 'PCE', score: 0.45 },
+        { dimensionId: 'TE', score: 0.62 },
+        { dimensionId: 'DI', score: 0.48 },
+      ],
+      '2025': [
+        { dimensionId: 'IF', score: 0.62 },
+        { dimensionId: 'CP', score: 0.55 },
+        { dimensionId: 'SD', score: 0.65 },
+        { dimensionId: 'PCE', score: 0.50 },
+        { dimensionId: 'TE', score: 0.68 },
+        { dimensionId: 'DI', score: 0.52 },
+      ]
+    },
+    childUnits: [
+      { id: 'zone1_amhara', name: 'North Gondar Zone', scoresByYear: { '2024': 0.58, '2025': 0.63 } },
+      { id: 'zone2_amhara', name: 'South Wollo Zone', scoresByYear: { '2024': 0.52, '2025': 0.57 } },
+    ]
+  },
+   {
+    id: 'tigray',
+    name: 'Tigray Region',
+    scoresByYear: {
+      '2024': 0.35, // Medium
+      '2025': 0.40  // Medium
+    },
+    dimensionsScoresByYear: {
+      '2024': [
+        { dimensionId: 'IF', score: 0.40 },
+        { dimensionId: 'CP', score: 0.30 },
+        { dimensionId: 'SD', score: 0.38 },
+        { dimensionId: 'PCE', score: 0.28 },
+        { dimensionId: 'TE', score: 0.42 },
+        { dimensionId: 'DI', score: 0.32 },
+      ],
+      '2025': [
+        { dimensionId: 'IF', score: 0.45 },
+        { dimensionId: 'CP', score: 0.35 },
+        { dimensionId: 'SD', score: 0.42 },
+        { dimensionId: 'PCE', score: 0.32 },
+        { dimensionId: 'TE', score: 0.48 },
+        { dimensionId: 'DI', score: 0.38 },
+      ]
+    },
+    childUnits: [
+      { id: 'zone1_tigray', name: 'Central Tigray Zone', scoresByYear: { '2024': 0.38, '2025': 0.43 } },
+      { id: 'zone2_tigray', name: 'Eastern Tigray Zone', scoresByYear: { '2024': 0.32, '2025': 0.37 } },
+    ]
+  }
+];
+
+export const getMaturityLevel = (score) => {
+  if (score >= maturityLevelThresholds.high) return 'Very High';
+  if (score >= maturityLevelThresholds.medium) return 'High';
+  if (score >= maturityLevelThresholds.low) return 'Medium';
+  return 'Low';
+};
+
