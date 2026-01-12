@@ -2,10 +2,10 @@
 // This will be replaced with a database in production
 
 let administrativeUnits = [
-  // Example pre-populated units
+  // Federal Institutes
   {
     unitId: 1,
-    officialUnitName: 'Ministry of Health',
+    officialUnitName: 'Ministry of Innovation and Technology',
     unitType: 'Federal Institute',
     parentUnitId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -13,7 +13,7 @@ let administrativeUnits = [
   },
   {
     unitId: 2,
-    officialUnitName: 'Ministry of Education',
+    officialUnitName: 'Ministry of Health',
     unitType: 'Federal Institute',
     parentUnitId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -21,6 +21,32 @@ let administrativeUnits = [
   },
   {
     unitId: 3,
+    officialUnitName: 'Ministry of Education',
+    unitType: 'Federal Institute',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 4,
+    officialUnitName: 'Ministry of Finance',
+    unitType: 'Federal Institute',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 5,
+    officialUnitName: 'Ministry of Agriculture',
+    unitType: 'Federal Institute',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // City Administrations
+  {
+    unitId: 10,
     officialUnitName: 'Addis Ababa City Administration',
     unitType: 'City Administration',
     parentUnitId: null,
@@ -28,7 +54,17 @@ let administrativeUnits = [
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 4,
+    unitId: 11,
+    officialUnitName: 'Dire Dawa City Administration',
+    unitType: 'City Administration',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Regions
+  {
+    unitId: 20,
     officialUnitName: 'Oromia Region',
     unitType: 'Region',
     parentUnitId: null,
@@ -36,7 +72,7 @@ let administrativeUnits = [
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 5,
+    unitId: 21,
     officialUnitName: 'Amhara Region',
     unitType: 'Region',
     parentUnitId: null,
@@ -44,58 +80,354 @@ let administrativeUnits = [
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 6,
-    officialUnitName: 'Sub-city 1',
-    unitType: 'Sub-city',
-    parentUnitId: 3, // Addis Ababa
+    unitId: 22,
+    officialUnitName: 'Tigray Region',
+    unitType: 'Region',
+    parentUnitId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 7,
-    officialUnitName: 'Sub-city 2',
-    unitType: 'Sub-city',
-    parentUnitId: 3, // Addis Ababa
+    unitId: 23,
+    officialUnitName: 'Somali Region',
+    unitType: 'Region',
+    parentUnitId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 8,
+    unitId: 24,
+    officialUnitName: 'Southern Nations, Nationalities, and Peoples\' Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 25,
+    officialUnitName: 'Afar Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 26,
+    officialUnitName: 'Benishangul-Gumuz Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 27,
+    officialUnitName: 'Gambela Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 28,
+    officialUnitName: 'Harari Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 29,
+    officialUnitName: 'Sidama Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 30,
+    officialUnitName: 'South West Ethiopia Peoples\' Region',
+    unitType: 'Region',
+    parentUnitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Addis Ababa Sub-cities
+  {
+    unitId: 100,
+    officialUnitName: 'Addis Ketema',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 101,
+    officialUnitName: 'Akaki Kality',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 102,
+    officialUnitName: 'Arada',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 103,
+    officialUnitName: 'Bole',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 104,
+    officialUnitName: 'Gullele',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 105,
+    officialUnitName: 'Kirkos',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 106,
+    officialUnitName: 'Kolfe Keranio',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 107,
+    officialUnitName: 'Lideta',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 108,
+    officialUnitName: 'Nifas Silk-Lafto',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 109,
+    officialUnitName: 'Yeka',
+    unitType: 'Sub-city',
+    parentUnitId: 10, // Addis Ababa
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Oromia Zones
+  {
+    unitId: 200,
     officialUnitName: 'West Arsi Zone',
     unitType: 'Zone',
-    parentUnitId: 4, // Oromia
+    parentUnitId: 20, // Oromia
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 9,
+    unitId: 201,
     officialUnitName: 'East Shewa Zone',
     unitType: 'Zone',
-    parentUnitId: 4, // Oromia
+    parentUnitId: 20, // Oromia
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 10,
-    officialUnitName: 'Woreda 1',
-    unitType: 'Woreda',
-    parentUnitId: 6, // Sub-city 1
+    unitId: 202,
+    officialUnitName: 'North Shewa Zone',
+    unitType: 'Zone',
+    parentUnitId: 20, // Oromia
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 11,
-    officialUnitName: 'Woreda 2',
-    unitType: 'Woreda',
-    parentUnitId: 6, // Sub-city 1
+    unitId: 203,
+    officialUnitName: 'West Shewa Zone',
+    unitType: 'Zone',
+    parentUnitId: 20, // Oromia
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    unitId: 12,
-    officialUnitName: 'Woreda 3',
+    unitId: 204,
+    officialUnitName: 'Jimma Zone',
+    unitType: 'Zone',
+    parentUnitId: 20, // Oromia
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 205,
+    officialUnitName: 'Bale Zone',
+    unitType: 'Zone',
+    parentUnitId: 20, // Oromia
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Amhara Zones
+  {
+    unitId: 300,
+    officialUnitName: 'North Gondar Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 301,
+    officialUnitName: 'South Gondar Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 302,
+    officialUnitName: 'North Wollo Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 303,
+    officialUnitName: 'South Wollo Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 304,
+    officialUnitName: 'East Gojjam Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 305,
+    officialUnitName: 'West Gojjam Zone',
+    unitType: 'Zone',
+    parentUnitId: 21, // Amhara
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Oromia - West Arsi Zone
+  {
+    unitId: 2000,
+    officialUnitName: 'Shashemene',
     unitType: 'Woreda',
-    parentUnitId: 8, // West Arsi Zone
+    parentUnitId: 200, // West Arsi Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 2001,
+    officialUnitName: 'Kofele',
+    unitType: 'Woreda',
+    parentUnitId: 200, // West Arsi Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 2002,
+    officialUnitName: 'Kokosa',
+    unitType: 'Woreda',
+    parentUnitId: 200, // West Arsi Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Oromia - East Shewa Zone
+  {
+    unitId: 2010,
+    officialUnitName: 'Bishoftu',
+    unitType: 'Woreda',
+    parentUnitId: 201, // East Shewa Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 2011,
+    officialUnitName: 'Adama',
+    unitType: 'Woreda',
+    parentUnitId: 201, // East Shewa Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Amhara - North Gondar Zone
+  {
+    unitId: 3000,
+    officialUnitName: 'Gondar',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3001,
+    officialUnitName: 'Debark',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Addis Ababa - Bole Sub-city
+  {
+    unitId: 1030,
+    officialUnitName: 'Bole Sub-city Woreda 1',
+    unitType: 'Woreda',
+    parentUnitId: 103, // Bole Sub-city
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 1031,
+    officialUnitName: 'Bole Sub-city Woreda 2',
+    unitType: 'Woreda',
+    parentUnitId: 103, // Bole Sub-city
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Addis Ababa - Kirkos Sub-city
+  {
+    unitId: 1050,
+    officialUnitName: 'Kirkos Sub-city Woreda 1',
+    unitType: 'Woreda',
+    parentUnitId: 105, // Kirkos Sub-city
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 1051,
+    officialUnitName: 'Kirkos Sub-city Woreda 2',
+    unitType: 'Woreda',
+    parentUnitId: 105, // Kirkos Sub-city
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   }

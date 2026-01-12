@@ -123,7 +123,7 @@ export default function Login() {
               className="w-full flex items-center justify-between text-left"
             >
               <span className="text-sm font-semibold text-[#0d6670]">
-                📋 Test User Credentials (Click to {showTestCredentials ? 'hide' : 'show'})
+                Test User Credentials (Click to {showTestCredentials ? 'hide' : 'show'})
               </span>
               <svg
                 className={`w-5 h-5 text-[#0d6670] transform transition-transform ${showTestCredentials ? 'rotate-180' : ''}`}
@@ -264,9 +264,12 @@ export default function Login() {
           </div>
 
           {/* Footer */}
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center space-y-1">
             <p className="text-mint-dark-text/70 text-sm">
               © 2025 Ministry of Innovation and Technology. All rights reserved.
+            </p>
+            <p className="text-mint-dark-text/70 text-sm">
+              Developed by <span className="font-semibold text-mint-primary-blue">360ground</span>
             </p>
           </div>
         </div>

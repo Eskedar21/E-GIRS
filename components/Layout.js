@@ -64,6 +64,9 @@ export default function Layout({ children, title = 'E-GIRS' }) {
             <p className="text-mint-dark-text">
               © 2025 Ministry of Innovation and Technology. All rights reserved.
             </p>
+            <p className="text-mint-dark-text/70 mt-1">
+              Developed by <span className="font-semibold text-mint-primary-blue">360ground</span>
+            </p>
           </div>
         </footer>
       </div>

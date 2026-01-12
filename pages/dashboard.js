@@ -37,41 +37,29 @@ export default function Dashboard() {
             <h2 className="text-2xl font-bold text-mint-primary-blue">Administrative Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-mint-dark-text/70 uppercase tracking-wide">Total Units</h3>
-                  <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 flex items-center justify-center">
-                    <span className="text-mint-primary-blue text-xl">🏛️</span>
-                  </div>
                 </div>
                 <p className="text-4xl font-bold text-mint-primary-blue mb-1">{stats.totalUnits}</p>
                 <p className="text-xs text-mint-dark-text/60">Administrative units</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-mint-dark-text/70 uppercase tracking-wide">Draft</h3>
-                  <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                    <span className="text-yellow-600 text-xl">📝</span>
-                  </div>
                 </div>
                 <p className="text-4xl font-bold text-yellow-600 mb-1">{stats.draftSubmissions}</p>
                 <p className="text-xs text-mint-dark-text/60">In progress</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-mint-dark-text/70 uppercase tracking-wide">Pending Approval</h3>
-                  <div className="w-10 h-10 rounded-lg bg-[#0d6670]/10 flex items-center justify-center">
-                    <span className="text-[#0d6670] text-xl">⏳</span>
-                  </div>
                 </div>
                 <p className="text-4xl font-bold text-[#0d6670] mb-1">{stats.pendingApproval}</p>
                 <p className="text-xs text-mint-dark-text/60">Awaiting review</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-mint-dark-text/70 uppercase tracking-wide">Pending Validation</h3>
-                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                    <span className="text-orange-600 text-xl">🔍</span>
-                  </div>
                 </div>
                 <p className="text-4xl font-bold text-orange-600 mb-1">{stats.pendingValidation}</p>
                 <p className="text-xs text-mint-dark-text/60">Central committee</p>
@@ -84,11 +72,6 @@ export default function Dashboard() {
                   href="/admin/administrative-units"
                   className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200"
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 group-hover:bg-mint-primary-blue/20 flex items-center justify-center transition-colors">
-                      <span className="text-xl">🏛️</span>
-                    </div>
-                  </div>
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">Manage Administrative Units</h4>
                   <p className="text-sm text-mint-dark-text/70">Register and manage administrative units</p>
                 </a>
@@ -96,11 +79,6 @@ export default function Dashboard() {
                   href="/admin/assessment-framework"
                   className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200"
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 group-hover:bg-mint-primary-blue/20 flex items-center justify-center transition-colors">
-                      <span className="text-xl">📋</span>
-                    </div>
-                  </div>
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">Assessment Framework</h4>
                   <p className="text-sm text-mint-dark-text/70">Configure assessment dimensions and indicators</p>
                 </a>
@@ -108,11 +86,6 @@ export default function Dashboard() {
                   href="/admin/users"
                   className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200"
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 group-hover:bg-mint-primary-blue/20 flex items-center justify-center transition-colors">
-                      <span className="text-xl">👥</span>
-                    </div>
-                  </div>
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">User Management</h4>
                   <p className="text-sm text-mint-dark-text/70">Create and manage user accounts</p>
                 </a>
@@ -204,11 +177,6 @@ export default function Dashboard() {
                   href="/data/submission"
                   className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200"
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 group-hover:bg-mint-primary-blue/20 flex items-center justify-center transition-colors">
-                      <span className="text-xl">📝</span>
-                    </div>
-                  </div>
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">Submit Data</h4>
                   <p className="text-sm text-mint-dark-text/70">Create or edit your data submission</p>
                 </a>
@@ -216,11 +184,6 @@ export default function Dashboard() {
                   href="/public-dashboard"
                   className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200"
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-mint-primary-blue/10 group-hover:bg-mint-primary-blue/20 flex items-center justify-center transition-colors">
-                      <span className="text-xl">🌐</span>
-                    </div>
-                  </div>
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">View Public Dashboard</h4>
                   <p className="text-sm text-mint-dark-text/70">View national e-government performance</p>
                 </a>
