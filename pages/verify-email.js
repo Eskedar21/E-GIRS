@@ -12,11 +12,35 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     if (token && userId && router.isReady) {
-      const verificationResult = verifyEmail(parseInt(userId), token);
-      setResult(verificationResult);
-      setIsVerifying(false);
+      try {
+        // Decode URL parameters (handle both encoded and non-encoded)
+        let decodedToken = token;
+        let decodedUserId = userId;
+        
+        try {
+          decodedToken = decodeURIComponent(token);
+        } catch (e) {
+          // Token might not be encoded
+          decodedToken = token;
+        }
+        
+        try {
+          decodedUserId = decodeURIComponent(userId);
+        } catch (e) {
+          // UserId might not be encoded
+          decodedUserId = userId;
+        }
+        
+        const verificationResult = verifyEmail(decodedUserId, decodedToken);
+        setResult(verificationResult);
+      } catch (error) {
+        console.error('Verification error:', error);
+        setResult({ success: false, error: 'An error occurred during verification. Please try again.' });
+      } finally {
+        setIsVerifying(false);
+      }
     } else if (router.isReady) {
-      setResult({ success: false, error: 'Invalid verification link' });
+      setResult({ success: false, error: 'Invalid verification link. Missing token or user ID.' });
       setIsVerifying(false);
     }
   }, [token, userId, router.isReady]);

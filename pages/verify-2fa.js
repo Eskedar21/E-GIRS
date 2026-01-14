@@ -4,6 +4,8 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { verifyOTP, sendOTP, getUserById } from '../data/users';
 import { getUnitById } from '../data/administrativeUnits';
+import { InputOTP } from '../components/ui/input-otp';
+import { Label } from '../components/ui/label';
 
 export default function Verify2FA() {
   const router = useRouter();
@@ -17,16 +19,75 @@ export default function Verify2FA() {
 
   useEffect(() => {
     if (userId && router.isReady) {
-      const userData = getUserById(parseInt(userId));
-      if (userData) {
-        setUser(userData);
-        // Auto-send OTP on page load
-        handleResendOTP();
-      } else {
+      // Check if there's a pending 2FA session (password was verified)
+      const pendingSession = localStorage.getItem('egirs_pending_2fa');
+      if (!pendingSession) {
+        // No pending session, redirect to login
+        router.push('/login');
+        return;
+      }
+
+      try {
+        const session = JSON.parse(pendingSession);
+        // Check if session is expired (10 minutes)
+        if (Date.now() - session.timestamp > 10 * 60 * 1000) {
+          localStorage.removeItem('egirs_pending_2fa');
+          router.push('/login');
+          return;
+        }
+
+        // Verify userId matches
+        if (parseInt(userId) !== session.userId) {
+          router.push('/login');
+          return;
+        }
+
+        const userData = getUserById(parseInt(userId));
+        if (userData) {
+          // Check if 2FA is actually enabled
+          if (!userData.isTwoFactorEnabled || !userData.phoneNumber) {
+            // If 2FA is not enabled, clear session and redirect to login
+            localStorage.removeItem('egirs_pending_2fa');
+            router.push('/login');
+            return;
+          }
+          
+          setUser(userData);
+        } else {
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('Error checking pending 2FA session:', error);
         router.push('/login');
       }
     }
   }, [userId, router.isReady]);
+
+  // Auto-send OTP when user data is loaded
+  useEffect(() => {
+    if (user && user.phoneNumber && user.isTwoFactorEnabled) {
+      // Send OTP automatically when page loads
+      const sendInitialOTP = async () => {
+        setIsSending(true);
+        setError('');
+        
+        try {
+          const result = sendOTP(user.phoneNumber, user.userId);
+          if (result.success) {
+            setCountdown(60); // 60 second countdown
+            console.log(`OTP sent to ${user.phoneNumber}: ${result.otp}`);
+            alert(`Demo: OTP sent to ${user.phoneNumber}. Check console for OTP: ${result.otp}`);
+          }
+        } catch (err) {
+          setError('Failed to send OTP. Please try again.');
+        } finally {
+          setIsSending(false);
+        }
+      };
+      
+      sendInitialOTP();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -48,8 +109,12 @@ export default function Verify2FA() {
       const result = sendOTP(user.phoneNumber, user.userId);
       if (result.success) {
         setCountdown(60); // 60 second countdown
-        // In demo, show OTP in console (remove in production)
-        alert(`Demo: OTP sent to ${user.phoneNumber}. Check console for OTP: ${result.otp}`);
+        // In demo, show OTP in console and alert (remove alert in production)
+        console.log(`OTP sent to ${user.phoneNumber}: ${result.otp}`);
+        // Show alert only once when page loads, not on every resend
+        if (countdown === 0) {
+          alert(`Demo: OTP sent to ${user.phoneNumber}. Check console for OTP: ${result.otp}`);
+        }
       }
     } catch (err) {
       setError('Failed to send OTP. Please try again.');
@@ -78,6 +143,27 @@ export default function Verify2FA() {
       const result = verifyOTP(user.userId, otp);
       
       if (result.valid) {
+        // Verify user still has 2FA enabled and pending session exists (security check)
+        const currentUser = getUserById(user.userId);
+        const pendingSession = localStorage.getItem('egirs_pending_2fa');
+        
+        if (!currentUser || !currentUser.isTwoFactorEnabled) {
+          setError('2FA is no longer enabled for this account. Please login again.');
+          localStorage.removeItem('egirs_pending_2fa');
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+          return;
+        }
+
+        if (!pendingSession) {
+          setError('Session expired. Please login again.');
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+          return;
+        }
+
         // Complete login session after 2FA verification
         // Get unit information if user has a unit
         let unitInfo = null;
@@ -143,9 +229,13 @@ export default function Verify2FA() {
             </h2>
 
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg mb-6">
+              <p className="text-sm font-semibold mb-1">Two-Factor Authentication Required</p>
               <p className="text-sm">
                 We've sent a 6-digit verification code to <strong>{user.phoneNumber}</strong>. 
                 Please enter it below to complete your login.
+              </p>
+              <p className="text-xs mt-2 text-blue-700">
+                Check your phone for the SMS or check the browser console for the demo OTP.
               </p>
             </div>
 
@@ -157,27 +247,21 @@ export default function Verify2FA() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="otp" className="block text-sm font-semibold text-mint-dark-text mb-2">
+                <Label className="block text-sm font-semibold text-mint-dark-text mb-4 text-center">
                   Verification Code <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="otp"
-                  name="otp"
-                  value={otp}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setOtp(value);
-                    setError('');
-                  }}
-                  className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue transition-all text-center text-2xl tracking-widest font-mono ${
-                    error ? 'border-red-500' : 'border-mint-medium-gray'
-                  }`}
-                  placeholder="000000"
-                  maxLength={6}
-                  autoComplete="off"
-                />
-                <p className="mt-2 text-xs text-mint-dark-text/60 text-center">
+                </Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    value={otp}
+                    onChange={(e) => {
+                      setOtp(e.target.value);
+                      setError('');
+                    }}
+                    maxLength={6}
+                    className={error ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                </div>
+                <p className="mt-4 text-xs text-mint-dark-text/60 text-center">
                   Enter the 6-digit code sent to your phone
                 </p>
               </div>

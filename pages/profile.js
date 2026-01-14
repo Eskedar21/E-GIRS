@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
+import { InputOTP } from '../components/ui/input-otp';
 
 export default function Profile() {
   const router = useRouter();
@@ -325,24 +326,21 @@ export default function Profile() {
                       ) : (
                         <form onSubmit={handleVerifyOTP} className="space-y-4">
                           <div>
-                            <Label htmlFor="otp" className="mb-2">
+                            <Label className="mb-4 block text-center">
                               Verification Code <span className="text-red-500">*</span>
                             </Label>
-                            <Input
-                              type="text"
-                              id="otp"
-                              value={otp}
-                              onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                                setOtp(value);
-                                setError('');
-                              }}
-                              placeholder="000000"
-                              maxLength={6}
-                              className="text-center text-xl tracking-widest font-mono"
-                              autoComplete="off"
-                            />
-                            <p className="mt-1 text-xs text-mint-dark-text/60">
+                            <div className="flex justify-center">
+                              <InputOTP
+                                value={otp}
+                                onChange={(e) => {
+                                  setOtp(e.target.value);
+                                  setError('');
+                                }}
+                                maxLength={6}
+                                className={error ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                              />
+                            </div>
+                            <p className="mt-4 text-xs text-mint-dark-text/60 text-center">
                               Enter the 6-digit code sent to {phoneNumber}
                             </p>
                           </div>

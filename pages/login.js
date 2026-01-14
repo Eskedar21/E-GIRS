@@ -119,9 +119,6 @@ export default function Login() {
                 <p className="text-base font-normal text-mint-primary-blue leading-tight">E-Government Index Reporting System</p>
               </div>
             </div>
-            <div className="text-center">
-              <p className="text-mint-dark-text/70 text-sm">Ministry of Innovation and Technology - Ethiopia</p>
-            </div>
           </div>
 
           {/* Test Credentials Info */}

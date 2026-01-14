@@ -33,7 +33,8 @@ export default function AdministrativeUnitsManagement() {
   const [formData, setFormData] = useState({
     officialUnitName: '',
     unitType: '',
-    parentUnitId: ''
+    parentUnitId: '',
+    pCode: ''
   });
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
@@ -63,15 +64,8 @@ export default function AdministrativeUnitsManagement() {
 
   // Get unit type color for badges
   const getUnitTypeColor = (unitType) => {
-    const colors = {
-      'Federal Institute': 'bg-blue-100 text-blue-800 border-blue-200',
-      'Region': 'bg-green-100 text-green-800 border-green-200',
-      'City Administration': 'bg-purple-100 text-purple-800 border-purple-200',
-      'Zone': 'bg-orange-100 text-orange-800 border-orange-200',
-      'Sub-city': 'bg-pink-100 text-pink-800 border-pink-200',
-      'Woreda': 'bg-gray-100 text-gray-800 border-gray-200'
-    };
-    return colors[unitType] || 'bg-gray-100 text-gray-800 border-gray-200';
+    // Neutral styling for all badges
+    return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   const toggleNode = (unitId) => {
@@ -159,7 +153,8 @@ export default function AdministrativeUnitsManagement() {
       const newUnit = createUnit({
         officialUnitName: formData.officialUnitName.trim(),
         unitType: finalUnitType,
-        parentUnitId: formData.parentUnitId || null
+        parentUnitId: formData.parentUnitId || null,
+        pCode: formData.pCode?.trim() || null
       });
 
       // Refresh units list
@@ -168,7 +163,7 @@ export default function AdministrativeUnitsManagement() {
       setSuccessMessage(`${finalUnitType} "${newUnit.officialUnitName}" has been registered successfully!`);
       
       // Reset form and close modal
-      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '', pCode: '' });
       setSelectedUnitType('');
       setErrors({});
       setShowAddModal(false);
@@ -206,7 +201,8 @@ export default function AdministrativeUnitsManagement() {
     setFormData({
       officialUnitName: unit.officialUnitName,
       unitType: unit.unitType,
-      parentUnitId: unit.parentUnitId || ''
+      parentUnitId: unit.parentUnitId || '',
+      pCode: unit.pCode || ''
     });
     setErrors({});
     setShowEditModal(true);
@@ -225,7 +221,8 @@ export default function AdministrativeUnitsManagement() {
       const updatedUnit = updateUnit(editingUnitId, {
         officialUnitName: formData.officialUnitName.trim(),
         unitType: finalUnitType,
-        parentUnitId: formData.parentUnitId || null
+        parentUnitId: formData.parentUnitId || null,
+        pCode: formData.pCode?.trim() || null
       });
 
       if (updatedUnit) {
@@ -235,7 +232,7 @@ export default function AdministrativeUnitsManagement() {
         setSuccessMessage(`${finalUnitType} "${updatedUnit.officialUnitName}" has been updated successfully!`);
         
         // Reset form and close modal
-        setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+        setFormData({ officialUnitName: '', unitType: '', parentUnitId: '', pCode: '' });
         setSelectedUnitType('');
         setEditingUnitId(null);
         setErrors({});
@@ -279,17 +276,8 @@ export default function AdministrativeUnitsManagement() {
   const TreeNode = ({ node, level = 0, isLast = false, parentPath = [] }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = expandedNodes.has(node.unitId);
-    const indent = level * 32;
+    const indent = level * 40;
     const currentPath = [...parentPath, node.unitId];
-    const levelColors = [
-      'bg-blue-50 border-blue-200',
-      'bg-green-50 border-green-200',
-      'bg-orange-50 border-orange-200',
-      'bg-purple-50 border-purple-200',
-      'bg-pink-50 border-pink-200',
-      'bg-gray-50 border-gray-200'
-    ];
-    const bgColor = levelColors[Math.min(level, levelColors.length - 1)];
 
     return (
       <div className="relative">
@@ -300,14 +288,14 @@ export default function AdministrativeUnitsManagement() {
               {parentPath.slice(0, -1).map((_, idx) => (
                 <div
                   key={idx}
-                  className="w-8 border-l-2 border-mint-primary-blue/30"
-                  style={{ marginLeft: `${idx * 32}px` }}
+                  className="w-10 border-l-2 border-gray-300"
+                  style={{ marginLeft: `${idx * 40}px` }}
                 />
               ))}
               {!isLast && (
                 <div
-                  className="w-8 border-l-2 border-mint-primary-blue/30"
-                  style={{ marginLeft: `${(parentPath.length - 1) * 32}px` }}
+                  className="w-10 border-l-2 border-gray-300"
+                  style={{ marginLeft: `${(parentPath.length - 1) * 40}px` }}
                 />
               )}
             </div>
@@ -316,51 +304,61 @@ export default function AdministrativeUnitsManagement() {
           {/* Enhanced horizontal connector line */}
           {level > 0 && (
             <div
-              className="absolute border-t-2 border-mint-primary-blue/30"
+              className="absolute border-t-2 border-gray-300"
               style={{
-                left: `${(level - 1) * 32 + 16}px`,
-                width: '16px',
+                left: `${(level - 1) * 40 + 20}px`,
+                width: '20px',
                 top: '50%'
               }}
             />
           )}
 
           <div
-            className={`flex items-center py-2.5 px-4 rounded-lg border-l-4 transition-all group-hover:shadow-md ${bgColor} ${
+            className={`flex items-center py-3 px-4 rounded-lg border-l-4 transition-all group-hover:shadow-md group-hover:bg-gray-50 bg-white ${
               level === 0 ? 'border-mint-primary-blue' : 
-              level === 1 ? 'border-green-500' : 
-              level === 2 ? 'border-orange-500' : 
-              'border-gray-400'
+              level === 1 ? 'border-mint-secondary-blue' : 
+              level === 2 ? 'border-mint-primary-blue/60' : 
+              'border-gray-300'
             }`}
-            style={{ paddingLeft: `${indent + 20}px`, marginLeft: level > 0 ? '8px' : '0' }}
+            style={{ paddingLeft: `${indent + 24}px`, marginLeft: level > 0 ? '0' : '0' }}
           >
             {/* Expand/Collapse arrow */}
             {hasChildren ? (
               <button
                 onClick={() => toggleNode(node.unitId)}
-                className="mr-3 w-5 h-5 flex items-center justify-center text-mint-primary-blue hover:text-mint-secondary-blue hover:bg-white rounded flex-shrink-0 transition-all"
+                className="mr-3 w-6 h-6 flex items-center justify-center text-gray-600 hover:text-mint-primary-blue hover:bg-gray-100 rounded flex-shrink-0 transition-all"
               >
                 {isExpanded ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 )}
               </button>
             ) : (
-              <span className="mr-3 w-5 h-5" />
+              <span className="mr-3 w-6 h-6 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+              </span>
             )}
 
             {/* Unit Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
+                {/* P-Code Badge */}
+                {node.pCode && (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-mint-primary-blue text-white border border-mint-primary-blue shadow-sm">
+                      {node.pCode}
+                    </span>
+                  </div>
+                )}
                 <div className="font-semibold text-gray-900 text-base">
                   {node.officialUnitName}
                 </div>
-                <Badge className={`${getUnitTypeColor(node.unitType)} text-xs font-medium px-2.5 py-0.5`}>
+                <Badge className={`${getUnitTypeColor(node.unitType)} text-xs font-medium px-2.5 py-0.5 border`}>
                   {node.unitType}
                 </Badge>
               </div>
@@ -582,7 +580,7 @@ export default function AdministrativeUnitsManagement() {
                       setShowEditModal(false);
                       setEditingUnitId(null);
                       setSelectedUnitType('');
-                      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+                      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '', pCode: '' });
                       setErrors({});
                     }}
                   >
@@ -695,6 +693,24 @@ export default function AdministrativeUnitsManagement() {
                     </div>
 
                     <div className="mb-4">
+                      <Label htmlFor="pcode" className="mb-2">
+                        P-Code (Administrative Unit Code)
+                      </Label>
+                      <Input
+                        type="text"
+                        id="pcode"
+                        name="pCode"
+                        value={formData.pCode}
+                        onChange={handleInputChange}
+                        placeholder="e.g., ET01, ET0101, ET010101"
+                        className="uppercase"
+                      />
+                      <p className="mt-1 text-xs text-mint-dark-text/60">
+                        Unique administrative unit identifier (e.g., ET01 for regions, ET0101 for zones)
+                      </p>
+                    </div>
+
+                    <div className="mb-4">
                       <Label htmlFor="unit-name" className="mb-2">
                         Official Unit Name <span className="text-red-500">*</span>
                       </Label>
@@ -757,9 +773,9 @@ export default function AdministrativeUnitsManagement() {
                         onClick={() => {
                           setShowAddModal(false);
                           setSelectedUnitType('');
-                          setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
-                          setErrors({});
-                        }}
+                      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '', pCode: '' });
+                      setErrors({});
+                    }}
                       >
                         Cancel
                       </Button>

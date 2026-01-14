@@ -50,6 +50,7 @@ let administrativeUnits = [
     officialUnitName: 'Addis Ababa City Administration',
     unitType: 'City Administration',
     parentUnitId: null,
+    pCode: 'ET14',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -58,6 +59,7 @@ let administrativeUnits = [
     officialUnitName: 'Dire Dawa City Administration',
     unitType: 'City Administration',
     parentUnitId: null,
+    pCode: 'ET15',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -68,6 +70,7 @@ let administrativeUnits = [
     officialUnitName: 'Oromia Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET04',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -76,6 +79,7 @@ let administrativeUnits = [
     officialUnitName: 'Amhara Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET03',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -84,6 +88,7 @@ let administrativeUnits = [
     officialUnitName: 'Tigray Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET01',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -92,6 +97,7 @@ let administrativeUnits = [
     officialUnitName: 'Somali Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET05',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -100,6 +106,7 @@ let administrativeUnits = [
     officialUnitName: 'Southern Nations, Nationalities, and Peoples\' Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET07',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -108,6 +115,7 @@ let administrativeUnits = [
     officialUnitName: 'Afar Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET02',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -116,6 +124,7 @@ let administrativeUnits = [
     officialUnitName: 'Benishangul-Gumuz Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET06',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -124,6 +133,7 @@ let administrativeUnits = [
     officialUnitName: 'Gambela Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET12',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -132,6 +142,7 @@ let administrativeUnits = [
     officialUnitName: 'Harari Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET13',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -140,6 +151,7 @@ let administrativeUnits = [
     officialUnitName: 'Sidama Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET16',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -148,6 +160,7 @@ let administrativeUnits = [
     officialUnitName: 'South West Ethiopia Peoples\' Region',
     unitType: 'Region',
     parentUnitId: null,
+    pCode: 'ET11',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -158,6 +171,7 @@ let administrativeUnits = [
     officialUnitName: 'Addis Ketema',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1401',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -166,6 +180,7 @@ let administrativeUnits = [
     officialUnitName: 'Akaki Kality',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1402',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -174,6 +189,7 @@ let administrativeUnits = [
     officialUnitName: 'Arada',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1403',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -182,6 +198,7 @@ let administrativeUnits = [
     officialUnitName: 'Bole',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1404',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -190,6 +207,7 @@ let administrativeUnits = [
     officialUnitName: 'Gullele',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1405',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -198,6 +216,7 @@ let administrativeUnits = [
     officialUnitName: 'Kirkos',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1406',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -206,6 +225,7 @@ let administrativeUnits = [
     officialUnitName: 'Kolfe Keranio',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1407',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -214,6 +234,7 @@ let administrativeUnits = [
     officialUnitName: 'Lideta',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1408',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -222,6 +243,7 @@ let administrativeUnits = [
     officialUnitName: 'Nifas Silk-Lafto',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1409',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -230,6 +252,7 @@ let administrativeUnits = [
     officialUnitName: 'Yeka',
     unitType: 'Sub-city',
     parentUnitId: 10, // Addis Ababa
+    pCode: 'ET1410',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -240,6 +263,7 @@ let administrativeUnits = [
     officialUnitName: 'West Arsi Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0408',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -248,6 +272,7 @@ let administrativeUnits = [
     officialUnitName: 'East Shewa Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0402',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -256,6 +281,7 @@ let administrativeUnits = [
     officialUnitName: 'North Shewa Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0411',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -264,6 +290,7 @@ let administrativeUnits = [
     officialUnitName: 'West Shewa Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0421',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -272,6 +299,7 @@ let administrativeUnits = [
     officialUnitName: 'Jimma Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0710',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -280,6 +308,7 @@ let administrativeUnits = [
     officialUnitName: 'Bale Zone',
     unitType: 'Zone',
     parentUnitId: 20, // Oromia
+    pCode: 'ET0716',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -290,6 +319,7 @@ let administrativeUnits = [
     officialUnitName: 'North Gondar Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0311',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -298,6 +328,7 @@ let administrativeUnits = [
     officialUnitName: 'South Gondar Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0306',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -306,6 +337,7 @@ let administrativeUnits = [
     officialUnitName: 'North Wollo Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0309',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -314,6 +346,7 @@ let administrativeUnits = [
     officialUnitName: 'South Wollo Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0305',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -322,6 +355,7 @@ let administrativeUnits = [
     officialUnitName: 'East Gojjam Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0303',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -330,6 +364,36 @@ let administrativeUnits = [
     officialUnitName: 'West Gojjam Zone',
     unitType: 'Zone',
     parentUnitId: 21, // Amhara
+    pCode: 'ET0304',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Tigray Zones
+  {
+    unitId: 220,
+    officialUnitName: 'North Western Zone',
+    unitType: 'Zone',
+    parentUnitId: 22, // Tigray
+    pCode: 'ET0101',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 221,
+    officialUnitName: 'Central Zone',
+    unitType: 'Zone',
+    parentUnitId: 22, // Tigray
+    pCode: 'ET0102',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 222,
+    officialUnitName: 'Eastern Zone',
+    unitType: 'Zone',
+    parentUnitId: 22, // Tigray
+    pCode: 'ET0103',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -340,6 +404,7 @@ let administrativeUnits = [
     officialUnitName: 'Shashemene',
     unitType: 'Woreda',
     parentUnitId: 200, // West Arsi Zone
+    pCode: 'ET040801',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -348,6 +413,7 @@ let administrativeUnits = [
     officialUnitName: 'Kofele',
     unitType: 'Woreda',
     parentUnitId: 200, // West Arsi Zone
+    pCode: 'ET040802',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -356,6 +422,7 @@ let administrativeUnits = [
     officialUnitName: 'Kokosa',
     unitType: 'Woreda',
     parentUnitId: 200, // West Arsi Zone
+    pCode: 'ET040803',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -366,6 +433,7 @@ let administrativeUnits = [
     officialUnitName: 'Bishoftu',
     unitType: 'Woreda',
     parentUnitId: 201, // East Shewa Zone
+    pCode: 'ET040201',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -374,6 +442,7 @@ let administrativeUnits = [
     officialUnitName: 'Adama',
     unitType: 'Woreda',
     parentUnitId: 201, // East Shewa Zone
+    pCode: 'ET040202',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -384,6 +453,7 @@ let administrativeUnits = [
     officialUnitName: 'Gondar',
     unitType: 'Woreda',
     parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031101',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -392,6 +462,47 @@ let administrativeUnits = [
     officialUnitName: 'Debark',
     unitType: 'Woreda',
     parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031102',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Tigray - North Western Zone
+  {
+    unitId: 2200,
+    officialUnitName: 'Tahtay Adiyabo',
+    unitType: 'Woreda',
+    parentUnitId: 220, // North Western Zone
+    pCode: 'ET010101',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 2201,
+    officialUnitName: 'Laelay Adiabo',
+    unitType: 'Woreda',
+    parentUnitId: 220, // North Western Zone
+    pCode: 'ET010102',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  
+  // Sample Woredas from Tigray - Central Zone
+  {
+    unitId: 2210,
+    officialUnitName: 'Adwa',
+    unitType: 'Woreda',
+    parentUnitId: 221, // Central Zone
+    pCode: 'ET010201',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 2211,
+    officialUnitName: 'Axum',
+    unitType: 'Woreda',
+    parentUnitId: 221, // Central Zone
+    pCode: 'ET010202',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -402,6 +513,7 @@ let administrativeUnits = [
     officialUnitName: 'Bole Sub-city Woreda 1',
     unitType: 'Woreda',
     parentUnitId: 103, // Bole Sub-city
+    pCode: 'ET140401',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -410,6 +522,7 @@ let administrativeUnits = [
     officialUnitName: 'Bole Sub-city Woreda 2',
     unitType: 'Woreda',
     parentUnitId: 103, // Bole Sub-city
+    pCode: 'ET140402',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -420,6 +533,7 @@ let administrativeUnits = [
     officialUnitName: 'Kirkos Sub-city Woreda 1',
     unitType: 'Woreda',
     parentUnitId: 105, // Kirkos Sub-city
+    pCode: 'ET140601',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -428,6 +542,7 @@ let administrativeUnits = [
     officialUnitName: 'Kirkos Sub-city Woreda 2',
     unitType: 'Woreda',
     parentUnitId: 105, // Kirkos Sub-city
+    pCode: 'ET140602',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   }
@@ -482,6 +597,7 @@ export const createUnit = (unitData) => {
     officialUnitName: unitData.officialUnitName,
     unitType: unitData.unitType,
     parentUnitId: unitData.parentUnitId || null,
+    pCode: unitData.pCode || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

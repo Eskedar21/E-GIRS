@@ -42,16 +42,19 @@ export function AuthProvider({ children }) {
       throw new Error('EMAIL_NOT_VERIFIED');
     }
 
-    // Check if 2FA is enabled
+    // Check if 2FA is enabled - MUST verify OTP before login
     if (userData.isTwoFactorEnabled && userData.phoneNumber) {
-      // Store temporary login state for 2FA
+      // Store temporary login state for 2FA verification
+      // This ensures password is correct but login is not complete until OTP is verified
       const tempSession = {
         userId: userData.userId,
         username: userData.username,
         email: userData.email,
         role: userData.role,
         officialUnitId: userData.officialUnitId,
-        pending2FA: true
+        pending2FA: true,
+        passwordVerified: true, // Mark that password was verified
+        timestamp: Date.now() // Store timestamp for security (expire after 10 minutes)
       };
       localStorage.setItem('egirs_pending_2fa', JSON.stringify(tempSession));
       throw new Error('2FA_REQUIRED');

@@ -1,7 +1,10 @@
-// Users Data Store
+// Users Data Store with localStorage persistence
 // This will be replaced with a database in production
 
-let users = [
+const STORAGE_KEY = 'egirs_users';
+
+// Default users (only used if localStorage is empty)
+const defaultUsers = [
   // Example users - In production, passwords would be hashed
   {
     userId: 1,
@@ -14,6 +17,9 @@ let users = [
     isAccountLocked: false,
     isTwoFactorEnabled: false,
     phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -28,6 +34,9 @@ let users = [
     isAccountLocked: false,
     isTwoFactorEnabled: false,
     phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -42,6 +51,9 @@ let users = [
     isAccountLocked: false,
     isTwoFactorEnabled: false,
     phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
@@ -56,10 +68,60 @@ let users = [
     isAccountLocked: false,
     isTwoFactorEnabled: false,
     phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   }
 ];
+
+// Load users from localStorage or use defaults
+const loadUsers = () => {
+  if (typeof window === 'undefined') {
+    // Server-side: return defaults
+    return [...defaultUsers];
+  }
+  
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Ensure all users have required fields
+      return parsed.map(user => ({
+        ...user,
+        emailVerificationToken: user.emailVerificationToken || null,
+        passwordResetToken: user.passwordResetToken || null,
+        passwordResetExpires: user.passwordResetExpires || null,
+        isEmailVerified: user.isEmailVerified !== undefined ? user.isEmailVerified : false,
+        isAccountLocked: user.isAccountLocked !== undefined ? user.isAccountLocked : false,
+        isTwoFactorEnabled: user.isTwoFactorEnabled !== undefined ? user.isTwoFactorEnabled : false,
+      }));
+    }
+  } catch (error) {
+    console.error('Error loading users from localStorage:', error);
+  }
+  
+  // Initialize with defaults if no stored data
+  saveUsers(defaultUsers);
+  return [...defaultUsers];
+};
+
+// Save users to localStorage
+const saveUsers = (usersToSave) => {
+  if (typeof window === 'undefined') {
+    return; // Server-side: skip
+  }
+  
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(usersToSave));
+  } catch (error) {
+    console.error('Error saving users to localStorage:', error);
+  }
+};
+
+// Initialize users array
+let users = loadUsers();
 
 // User Roles
 export const USER_ROLES = {
@@ -117,26 +179,32 @@ export const getRolesForUnitType = (unitType) => {
 
 // Get all users
 export const getAllUsers = () => {
+  // Reload from storage to ensure we have latest data
+  users = loadUsers();
   return [...users];
 };
 
 // Get user by ID
 export const getUserById = (userId) => {
+  users = loadUsers(); // Reload to ensure latest data
   return users.find(user => user.userId === userId);
 };
 
 // Get user by username
 export const getUserByUsername = (username) => {
+  users = loadUsers(); // Reload to ensure latest data
   return users.find(user => user.username === username);
 };
 
 // Get user by email
 export const getUserByEmail = (email) => {
+  users = loadUsers(); // Reload to ensure latest data
   return users.find(user => user.email === email);
 };
 
 // Check if username is unique
 export const isUsernameUnique = (username, excludeUserId = null) => {
+  users = loadUsers(); // Reload to ensure latest data
   const existing = users.find(user => 
     user.username === username && 
     (excludeUserId === null || user.userId !== excludeUserId)
@@ -146,6 +214,7 @@ export const isUsernameUnique = (username, excludeUserId = null) => {
 
 // Check if email is unique
 export const isEmailUnique = (email, excludeUserId = null) => {
+  users = loadUsers(); // Reload to ensure latest data
   const existing = users.find(user => 
     user.email === email && 
     (excludeUserId === null || user.userId !== excludeUserId)
@@ -208,15 +277,23 @@ export const createUser = (userData) => {
   
   users.push(newUser);
   
+  // Save to localStorage
+  saveUsers(users);
+  
   // In production, send verification email
   // For demo, log the verification link
-  console.log(`Email verification link for ${newUser.email}: /verify-email?token=${emailVerificationToken}&userId=${newUser.userId}`);
+  const encodedToken = encodeURIComponent(emailVerificationToken);
+  const link = typeof window !== 'undefined' 
+    ? `${window.location.origin}/verify-email?token=${encodedToken}&userId=${newUser.userId}`
+    : `/verify-email?token=${encodedToken}&userId=${newUser.userId}`;
+  console.log(`Email verification link for ${newUser.email}: ${link}`);
   
   return newUser;
 };
 
 // Update a user
 export const updateUser = (userId, userData) => {
+  users = loadUsers(); // Reload to ensure latest data
   const index = users.findIndex(user => user.userId === userId);
   if (index !== -1) {
     users[index] = {
@@ -224,6 +301,8 @@ export const updateUser = (userId, userData) => {
       ...userData,
       updatedAt: new Date().toISOString()
     };
+    // Save to localStorage
+    saveUsers(users);
     return users[index];
   }
   return null;
@@ -231,9 +310,12 @@ export const updateUser = (userId, userData) => {
 
 // Delete a user
 export const deleteUser = (userId) => {
+  users = loadUsers(); // Reload to ensure latest data
   const index = users.findIndex(user => user.userId === userId);
   if (index !== -1) {
     const deleted = users.splice(index, 1)[0];
+    // Save to localStorage
+    saveUsers(users);
     return deleted;
   }
   return null;
@@ -241,11 +323,13 @@ export const deleteUser = (userId) => {
 
 // Get users by unit
 export const getUsersByUnit = (unitId) => {
+  users = loadUsers(); // Reload to ensure latest data
   return users.filter(user => user.officialUnitId === unitId);
 };
 
 // Get users by role
 export const getUsersByRole = (role) => {
+  users = loadUsers(); // Reload to ensure latest data
   return users.filter(user => user.role === role);
 };
 
@@ -268,12 +352,15 @@ export const getEmailVerificationLink = (userId) => {
     return null;
   }
   
+  // Encode the token for URL
+  const encodedToken = encodeURIComponent(user.emailVerificationToken);
+  
   // In production, this would be the full URL
   // For demo, return relative path
   if (typeof window !== 'undefined') {
-    return `${window.location.origin}/verify-email?token=${user.emailVerificationToken}&userId=${userId}`;
+    return `${window.location.origin}/verify-email?token=${encodedToken}&userId=${userId}`;
   }
-  return `/verify-email?token=${user.emailVerificationToken}&userId=${userId}`;
+  return `/verify-email?token=${encodedToken}&userId=${userId}`;
 };
 
 // Resend email verification (generate new token)
@@ -290,15 +377,23 @@ export const resendEmailVerification = (email) => {
   
   // Generate new verification token
   const newToken = generateEmailVerificationToken();
-  updateUser(user.userId, {
-    emailVerificationToken: newToken
-  });
+  users = loadUsers(); // Reload to ensure latest data
+  const userIndex = users.findIndex(u => u.userId === user.userId);
+  if (userIndex !== -1) {
+    users[userIndex] = {
+      ...users[userIndex],
+      emailVerificationToken: newToken,
+      updatedAt: new Date().toISOString()
+    };
+    saveUsers(users);
+  }
   
   // In production, send email
   // For demo, log the link
+  const encodedToken = encodeURIComponent(newToken);
   const link = typeof window !== 'undefined' 
-    ? `${window.location.origin}/verify-email?token=${newToken}&userId=${user.userId}`
-    : `/verify-email?token=${newToken}&userId=${user.userId}`;
+    ? `${window.location.origin}/verify-email?token=${encodedToken}&userId=${user.userId}`
+    : `/verify-email?token=${encodedToken}&userId=${user.userId}`;
   console.log(`Email verification link for ${email}: ${link}`);
   
   return { success: true, link, userId: user.userId };
@@ -306,29 +401,86 @@ export const resendEmailVerification = (email) => {
 
 // Verify email with token
 export const verifyEmail = (userId, token) => {
-  const user = getUserById(userId);
-  if (!user) {
-    return { success: false, error: 'User not found' };
+  try {
+    // Parse userId to integer
+    const parsedUserId = parseInt(userId);
+    if (isNaN(parsedUserId)) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+    
+    // Decode URL-encoded token if needed
+    let decodedToken = token;
+    try {
+      decodedToken = decodeURIComponent(token);
+    } catch (e) {
+      // Token might not be encoded, use as-is
+      decodedToken = token;
+    }
+    
+    const user = getUserById(parsedUserId);
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+    
+    // Check if already verified
+    if (user.isEmailVerified) {
+      return { success: false, error: 'Email is already verified' };
+    }
+    
+    if (!user.emailVerificationToken) {
+      return { success: false, error: 'No verification token found. Please request a new verification link.' };
+    }
+    
+    // Compare tokens (handle both encoded and decoded, and exact match)
+    const storedToken = user.emailVerificationToken;
+    const tokensMatch = storedToken === decodedToken || storedToken === token;
+    
+    if (!tokensMatch) {
+      // Debug logging (remove in production)
+      console.log('Token mismatch:', {
+        stored: storedToken,
+        received: token,
+        decoded: decodedToken
+      });
+      return { success: false, error: 'Invalid verification token. The link may have been used already or is incorrect.' };
+    }
+    
+    // Check if token is expired (24 hours)
+    // Token format: evt_timestamp_random
+    const tokenParts = decodedToken.split('_');
+    if (tokenParts.length < 2 || tokenParts[0] !== 'evt') {
+      return { success: false, error: 'Invalid token format' };
+    }
+    
+    const tokenTimestamp = parseInt(tokenParts[1]);
+    if (isNaN(tokenTimestamp)) {
+      return { success: false, error: 'Invalid token format' };
+    }
+    
+    const tokenAge = Date.now() - tokenTimestamp;
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    if (tokenAge > maxAge) {
+      return { success: false, error: 'Verification token has expired. Please request a new verification link.' };
+    }
+    
+    // Verify email and save
+    users = loadUsers(); // Reload to ensure latest data
+    const userIndex = users.findIndex(u => u.userId === user.userId);
+    if (userIndex !== -1) {
+      users[userIndex] = {
+        ...users[userIndex],
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        updatedAt: new Date().toISOString()
+      };
+      saveUsers(users);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return { success: false, error: 'An error occurred during verification. Please try again.' };
   }
-  
-  if (user.emailVerificationToken !== token) {
-    return { success: false, error: 'Invalid verification token' };
-  }
-  
-  // Check if token is expired (24 hours)
-  const tokenAge = Date.now() - parseInt(token.split('_')[1]);
-  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-  if (tokenAge > maxAge) {
-    return { success: false, error: 'Verification token has expired' };
-  }
-  
-  // Verify email
-  updateUser(userId, {
-    isEmailVerified: true,
-    emailVerificationToken: null
-  });
-  
-  return { success: true };
 };
 
 // Generate password reset token
