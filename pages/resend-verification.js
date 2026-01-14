@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { generatePasswordResetToken } from '../data/users';
+import { resendEmailVerification } from '../data/users';
 
-export default function ForgotPassword() {
+export default function ResendVerification() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [verificationLink, setVerificationLink] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess(false);
+    setVerificationLink('');
     
     if (!email.trim()) {
       setError('Email is required');
@@ -28,16 +31,20 @@ export default function ForgotPassword() {
     setIsLoading(true);
     
     try {
-      // Generate password reset token and send email
-      const result = generatePasswordResetToken(email);
+      const result = resendEmailVerification(email);
       
-      // Simulate API call delay
       setTimeout(() => {
         setIsLoading(false);
-        // Always show success for security (don't reveal if email exists)
-        setSuccess(true);
+        if (result.success) {
+          setSuccess(true);
+          if (result.link) {
+            setVerificationLink(result.link);
+          }
+        } else {
+          setError(result.error || 'Failed to resend verification email');
+        }
       }, 1000);
-    } catch (error) {
+    } catch (err) {
       setIsLoading(false);
       setError('An error occurred. Please try again.');
     }
@@ -46,30 +53,43 @@ export default function ForgotPassword() {
   return (
     <>
       <Head>
-        <title>Forgot Password | E-GIRS</title>
+        <title>Resend Email Verification | E-GIRS</title>
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-white p-4">
         <div className="w-full max-w-md">
-          {/* Logo/Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-mint-primary-blue mb-2">E-GIRS</h1>
             <p className="text-mint-dark-text text-lg">E-Government Index Reporting System</p>
           </div>
 
-          {/* Password Recovery Card */}
           <div className="bg-white rounded-2xl shadow-2xl p-8 border border-mint-medium-gray">
             <h2 className="text-2xl font-bold text-mint-primary-blue mb-6 text-center">
-              Reset Your Password
+              Resend Email Verification
             </h2>
 
             {success ? (
               <div className="space-y-6">
                 <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
                   <p className="text-sm">
-                    If an account with that email exists, we've sent a password reset link to your email address.
-                    Please check your inbox and follow the instructions to reset your password.
+                    A new verification link has been generated. {verificationLink ? 'Click the link below to verify your email.' : 'Please check your email for the verification link.'}
                   </p>
                 </div>
+                
+                {verificationLink && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-xs font-semibold text-blue-800 mb-2">Verification Link (Demo):</p>
+                    <a 
+                      href={verificationLink}
+                      className="text-sm text-blue-600 hover:text-blue-800 break-all underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {verificationLink}
+                    </a>
+                    <p className="text-xs text-blue-600 mt-2">Note: In production, this link would be sent via email.</p>
+                  </div>
+                )}
+                
                 <Link
                   href="/login"
                   className="block w-full text-center bg-mint-primary-blue hover:bg-mint-secondary-blue text-white font-bold py-3 px-4 rounded-lg transition-colors"
@@ -80,7 +100,7 @@ export default function ForgotPassword() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <p className="text-sm text-mint-dark-text/70 text-center mb-4">
-                  Enter your email address and we'll send you a link to reset your password.
+                  Enter your email address to receive a new verification link.
                 </p>
 
                 <div>
@@ -92,7 +112,10 @@ export default function ForgotPassword() {
                     id="email"
                     name="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError('');
+                    }}
                     className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue transition-all ${
                       error ? 'border-red-500' : 'border-mint-medium-gray'
                     }`}
@@ -117,7 +140,7 @@ export default function ForgotPassword() {
                       Sending...
                     </span>
                   ) : (
-                    'Send Reset Link'
+                    'Resend Verification Link'
                   )}
                 </button>
 
@@ -130,7 +153,6 @@ export default function ForgotPassword() {
             )}
           </div>
 
-          {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-mint-dark-text/70 text-sm">
               © 2025 Ministry of Innovation and Technology. All rights reserved.

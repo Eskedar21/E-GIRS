@@ -14,7 +14,9 @@ import {
   getAllUnits, 
   getUnitsByType, 
   getValidParents, 
-  createUnit, 
+  createUnit,
+  updateUnit,
+  getUnitById,
   isUnitNameUnique,
   getChildUnits,
   UNIT_TYPES 
@@ -25,6 +27,8 @@ export default function AdministrativeUnitsManagement() {
   const [units, setUnits] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUnitId, setEditingUnitId] = useState(null);
   const [selectedUnitType, setSelectedUnitType] = useState('');
   const [formData, setFormData] = useState({
     officialUnitName: '',
@@ -39,21 +43,36 @@ export default function AdministrativeUnitsManagement() {
     setUnits(getAllUnits());
   }, [successMessage]);
 
-  // Build tree structure
+  // Build tree structure with breadcrumb paths
   const treeStructure = useMemo(() => {
     const allUnits = getAllUnits();
     const rootUnits = allUnits.filter(unit => !unit.parentUnitId);
     
-    const buildTree = (unit) => {
+    const buildTree = (unit, breadcrumb = []) => {
       const children = getChildUnits(unit.unitId);
+      const currentBreadcrumb = [...breadcrumb, { unitId: unit.unitId, name: unit.officialUnitName, type: unit.unitType }];
       return {
         ...unit,
-        children: children.map(child => buildTree(child))
+        breadcrumb: currentBreadcrumb,
+        children: children.map(child => buildTree(child, currentBreadcrumb))
       };
     };
     
     return rootUnits.map(unit => buildTree(unit));
   }, [units]);
+
+  // Get unit type color for badges
+  const getUnitTypeColor = (unitType) => {
+    const colors = {
+      'Federal Institute': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Region': 'bg-green-100 text-green-800 border-green-200',
+      'City Administration': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Zone': 'bg-orange-100 text-orange-800 border-orange-200',
+      'Sub-city': 'bg-pink-100 text-pink-800 border-pink-200',
+      'Woreda': 'bg-gray-100 text-gray-800 border-gray-200'
+    };
+    return colors[unitType] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
 
   const toggleNode = (unitId) => {
     setExpandedNodes(prev => {
@@ -95,19 +114,19 @@ export default function AdministrativeUnitsManagement() {
     }
   };
 
-  const validateForm = (unitType) => {
+  const validateForm = (unitType, excludeUnitId = null) => {
     const newErrors = {};
     const finalUnitType = unitType || formData.unitType || selectedUnitType;
 
     if (!formData.officialUnitName.trim()) {
       newErrors.officialUnitName = 'Official Unit Name is required';
     } else {
-      // Check uniqueness
+      // Check uniqueness (exclude current unit when editing)
       const parentId = (finalUnitType === UNIT_TYPES.ZONE || finalUnitType === UNIT_TYPES.SUB_CITY || finalUnitType === UNIT_TYPES.WOREDA) 
         ? formData.parentUnitId || null 
         : null;
       
-      if (!isUnitNameUnique(formData.officialUnitName, finalUnitType, parentId)) {
+      if (!isUnitNameUnique(formData.officialUnitName, finalUnitType, parentId, excludeUnitId)) {
         newErrors.officialUnitName = 'This unit name already exists for this type and parent';
       }
     }
@@ -181,90 +200,202 @@ export default function AdministrativeUnitsManagement() {
     }
   };
 
-  // Get valid parents based on selected unit type
-  const validParents = selectedUnitType 
-    ? getValidParents(selectedUnitType)
-    : [];
+  const handleEditClick = (unit) => {
+    setEditingUnitId(unit.unitId);
+    setSelectedUnitType(unit.unitType);
+    setFormData({
+      officialUnitName: unit.officialUnitName,
+      unitType: unit.unitType,
+      parentUnitId: unit.parentUnitId || ''
+    });
+    setErrors({});
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    setErrors({});
+    
+    const finalUnitType = selectedUnitType || formData.unitType;
+    if (!validateForm(finalUnitType, editingUnitId)) {
+      return;
+    }
+
+    try {
+      const updatedUnit = updateUnit(editingUnitId, {
+        officialUnitName: formData.officialUnitName.trim(),
+        unitType: finalUnitType,
+        parentUnitId: formData.parentUnitId || null
+      });
+
+      if (updatedUnit) {
+        // Refresh units list
+        const updatedUnits = getAllUnits();
+        setUnits(updatedUnits);
+        setSuccessMessage(`${finalUnitType} "${updatedUnit.officialUnitName}" has been updated successfully!`);
+        
+        // Reset form and close modal
+        setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+        setSelectedUnitType('');
+        setEditingUnitId(null);
+        setErrors({});
+        setShowEditModal(false);
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => setSuccessMessage(''), 5000);
+      } else {
+        setErrors({ general: 'Unit not found or could not be updated.' });
+      }
+    } catch (error) {
+      setErrors({ general: error.message || 'An error occurred while updating the unit.' });
+    }
+  };
+
+  // Get valid parents based on selected unit type (exclude current unit and its descendants when editing)
+  const validParents = useMemo(() => {
+    if (!selectedUnitType) return [];
+    
+    let parents = getValidParents(selectedUnitType);
+    
+    // When editing, exclude the current unit and its descendants from parent options
+    if (editingUnitId) {
+      const excludeIds = new Set([editingUnitId]);
+      const collectDescendants = (parentId) => {
+        const children = getChildUnits(parentId);
+        children.forEach(child => {
+          excludeIds.add(child.unitId);
+          collectDescendants(child.unitId);
+        });
+      };
+      collectDescendants(editingUnitId);
+      parents = parents.filter(parent => !excludeIds.has(parent.unitId));
+    }
+    
+    return parents;
+  }, [selectedUnitType, editingUnitId]);
 
 
-  // Tree node component
+  // Tree node component with enhanced hierarchy visualization
   const TreeNode = ({ node, level = 0, isLast = false, parentPath = [] }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = expandedNodes.has(node.unitId);
-    const indent = level * 20;
+    const indent = level * 32;
     const currentPath = [...parentPath, node.unitId];
+    const levelColors = [
+      'bg-blue-50 border-blue-200',
+      'bg-green-50 border-green-200',
+      'bg-orange-50 border-orange-200',
+      'bg-purple-50 border-purple-200',
+      'bg-pink-50 border-pink-200',
+      'bg-gray-50 border-gray-200'
+    ];
+    const bgColor = levelColors[Math.min(level, levelColors.length - 1)];
 
     return (
       <div className="relative">
         <div className="flex items-center group">
-          {/* Vertical connector lines */}
+          {/* Enhanced vertical connector lines */}
           {level > 0 && (
             <div className="absolute left-0 top-0 bottom-0 flex" style={{ width: `${indent}px` }}>
               {parentPath.slice(0, -1).map((_, idx) => (
                 <div
                   key={idx}
-                  className="w-5 border-l border-gray-300"
-                  style={{ marginLeft: `${idx * 20}px` }}
+                  className="w-8 border-l-2 border-mint-primary-blue/30"
+                  style={{ marginLeft: `${idx * 32}px` }}
                 />
               ))}
               {!isLast && (
                 <div
-                  className="w-5 border-l border-gray-300"
-                  style={{ marginLeft: `${(parentPath.length - 1) * 20}px` }}
+                  className="w-8 border-l-2 border-mint-primary-blue/30"
+                  style={{ marginLeft: `${(parentPath.length - 1) * 32}px` }}
                 />
               )}
             </div>
           )}
           
-          {/* Horizontal connector line */}
+          {/* Enhanced horizontal connector line */}
           {level > 0 && (
             <div
-              className="absolute border-t border-gray-300"
+              className="absolute border-t-2 border-mint-primary-blue/30"
               style={{
-                left: `${(level - 1) * 20 + 10}px`,
-                width: '10px',
+                left: `${(level - 1) * 32 + 16}px`,
+                width: '16px',
                 top: '50%'
               }}
             />
           )}
 
           <div
-            className="flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors"
-            style={{ paddingLeft: `${indent + 12}px` }}
+            className={`flex items-center py-2.5 px-4 rounded-lg border-l-4 transition-all group-hover:shadow-md ${bgColor} ${
+              level === 0 ? 'border-mint-primary-blue' : 
+              level === 1 ? 'border-green-500' : 
+              level === 2 ? 'border-orange-500' : 
+              'border-gray-400'
+            }`}
+            style={{ paddingLeft: `${indent + 20}px`, marginLeft: level > 0 ? '8px' : '0' }}
           >
             {/* Expand/Collapse arrow */}
             {hasChildren ? (
               <button
                 onClick={() => toggleNode(node.unitId)}
-                className="mr-1.5 w-4 h-4 flex items-center justify-center text-gray-600 hover:text-gray-900 flex-shrink-0"
+                className="mr-3 w-5 h-5 flex items-center justify-center text-mint-primary-blue hover:text-mint-secondary-blue hover:bg-white rounded flex-shrink-0 transition-all"
               >
                 {isExpanded ? (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
                 ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                   </svg>
                 )}
               </button>
             ) : (
-              <span className="mr-1.5 w-4 h-4" />
+              <span className="mr-3 w-5 h-5" />
             )}
 
-
-            {/* Unit Name */}
+            {/* Unit Info */}
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-gray-900">
-                {node.officialUnitName}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="font-semibold text-gray-900 text-base">
+                  {node.officialUnitName}
+                </div>
+                <Badge className={`${getUnitTypeColor(node.unitType)} text-xs font-medium px-2.5 py-0.5`}>
+                  {node.unitType}
+                </Badge>
               </div>
+              {/* Breadcrumb path */}
+              {node.breadcrumb && node.breadcrumb.length > 1 && (
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500">
+                  <span className="text-gray-400">Path:</span>
+                  {node.breadcrumb.slice(0, -1).map((crumb, idx) => (
+                    <span key={idx} className="flex items-center">
+                      <span className="text-mint-primary-blue font-medium">{crumb.name}</span>
+                      {idx < node.breadcrumb.length - 2 && (
+                        <svg className="w-3 h-3 mx-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Edit Button */}
+            <button
+              onClick={() => handleEditClick(node)}
+              className="ml-3 px-3 py-1.5 text-xs font-medium text-mint-primary-blue hover:text-white hover:bg-mint-primary-blue border border-mint-primary-blue rounded-md transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+              title="Edit unit"
+            >
+              Edit
+            </button>
           </div>
         </div>
 
         {/* Children */}
         {hasChildren && isExpanded && (
-          <div>
+          <div className="mt-1">
             {node.children.map((child, index) => (
               <TreeNode
                 key={child.unitId}
@@ -360,7 +491,7 @@ export default function AdministrativeUnitsManagement() {
                 <p className="text-sm text-mint-dark-text/70">Click "Add Unit" to get started</p>
               </div>
             ) : (
-              <div className="space-y-0.5">
+              <div className="space-y-2">
                 {treeStructure.map((rootNode, index) => (
                   <TreeNode
                     key={rootNode.unitId}
@@ -374,6 +505,100 @@ export default function AdministrativeUnitsManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Unit Modal */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-mint-primary-blue">
+                Edit Administrative Unit
+              </DialogTitle>
+              <DialogDescription>
+                Update the information for this administrative unit.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit}>
+              <div>
+                <div className="mb-4">
+                  <div className="p-3 bg-mint-primary-blue/10 rounded-lg">
+                    <span className="text-sm font-semibold text-mint-primary-blue">Unit Type: {selectedUnitType}</span>
+                    <p className="text-xs text-mint-dark-text/70 mt-1">Unit type cannot be changed</p>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <Label htmlFor="edit-unit-name" className="mb-2">
+                    Official Unit Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    id="edit-unit-name"
+                    name="officialUnitName"
+                    value={formData.officialUnitName}
+                    onChange={handleInputChange}
+                    className={errors.officialUnitName ? 'border-red-500' : ''}
+                    placeholder="Enter official unit name"
+                  />
+                  {errors.officialUnitName && (
+                    <p className="mt-1 text-sm text-red-500">{errors.officialUnitName}</p>
+                  )}
+                </div>
+
+                {(selectedUnitType === UNIT_TYPES.ZONE || selectedUnitType === UNIT_TYPES.SUB_CITY || selectedUnitType === UNIT_TYPES.WOREDA) && (
+                  <div className="mb-4">
+                    <Label htmlFor="edit-unit-parent" className="mb-2">
+                      Parent Unit <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      id="edit-unit-parent"
+                      name="parentUnitId"
+                      value={formData.parentUnitId}
+                      onChange={handleInputChange}
+                      className={errors.parentUnitId ? 'border-red-500' : ''}
+                    >
+                      <option value="">Select Parent Unit</option>
+                      {validParents.map((parent) => (
+                        <option key={parent.unitId} value={parent.unitId}>
+                          {parent.officialUnitName} ({parent.unitType})
+                        </option>
+                      ))}
+                    </Select>
+                    {errors.parentUnitId && (
+                      <p className="mt-1 text-sm text-red-500">{errors.parentUnitId}</p>
+                    )}
+                    {validParents.length === 0 && (
+                      <p className="mt-1 text-sm text-yellow-600">
+                        No valid parent units available.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <DialogFooter className="mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingUnitId(null);
+                      setSelectedUnitType('');
+                      setFormData({ officialUnitName: '', unitType: '', parentUnitId: '' });
+                      setErrors({});
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
+                  >
+                    Update Unit
+                  </Button>
+                </DialogFooter>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Unit Modal */}
         <Dialog open={showAddModal} onOpenChange={setShowAddModal}>

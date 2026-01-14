@@ -515,11 +515,12 @@ export const deleteUnit = (unitId) => {
 };
 
 // Check if unit name is unique (within parent for child units)
-export const isUnitNameUnique = (unitName, unitType, parentUnitId = null) => {
+export const isUnitNameUnique = (unitName, unitType, parentUnitId = null, excludeUnitId = null) => {
   const existing = administrativeUnits.find(unit => 
     unit.officialUnitName === unitName && 
     unit.unitType === unitType &&
-    unit.parentUnitId === parentUnitId
+    unit.parentUnitId === parentUnitId &&
+    (excludeUnitId === null || unit.unitId !== excludeUnitId)
   );
   return !existing;
 };

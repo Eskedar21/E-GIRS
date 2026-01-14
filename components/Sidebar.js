@@ -56,6 +56,11 @@ export default function Sidebar() {
       title: 'Public Dashboard',
       path: '/public-dashboard',
       roles: ['all']
+    },
+    {
+      title: 'My Profile',
+      path: '/profile',
+      roles: ['all']
     }
   ];
 

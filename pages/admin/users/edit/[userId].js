@@ -1,29 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Layout from '../../../components/Layout';
-import Sidebar from '../../../components/Sidebar';
-import ProtectedRoute from '../../../components/ProtectedRoute';
-import { useAuth } from '../../../contexts/AuthContext';
-import { getAllUnits } from '../../../data/administrativeUnits';
+import Layout from '../../../../components/Layout';
+import Sidebar from '../../../../components/Sidebar';
+import ProtectedRoute from '../../../../components/ProtectedRoute';
+import { useAuth } from '../../../../contexts/AuthContext';
+import { getAllUnits } from '../../../../data/administrativeUnits';
 import {
-  createUser,
+  getUserById,
+  updateUser,
   isUsernameUnique,
   isEmailUnique,
   validatePassword,
   getRolesForUnitType,
-  getEmailVerificationLink,
   USER_ROLES
-} from '../../../data/users';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Select } from '../../../components/ui/select';
+} from '../../../../data/users';
+import { Button } from '../../../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
+import { Input } from '../../../../components/ui/input';
+import { Label } from '../../../../components/ui/label';
+import { Select } from '../../../../components/ui/select';
 
-export default function CreateUser() {
+export default function EditUser() {
   const router = useRouter();
+  const { userId } = router.query;
   const { user } = useAuth();
   const [units, setUnits] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -35,10 +37,31 @@ export default function CreateUser() {
   });
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [changePassword, setChangePassword] = useState(false);
 
   useEffect(() => {
     setUnits(getAllUnits());
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      const userData = getUserById(parseInt(userId));
+      if (userData) {
+        setFormData({
+          username: userData.username || '',
+          email: userData.email || '',
+          password: '',
+          confirmPassword: '',
+          officialUnitId: userData.officialUnitId ? String(userData.officialUnitId) : '',
+          role: userData.role || '',
+          phoneNumber: userData.phoneNumber || ''
+        });
+        setLoading(false);
+      } else {
+        router.push('/admin/users');
+      }
+    }
+  }, [userId, router]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -80,11 +103,12 @@ export default function CreateUser() {
 
   const validateForm = () => {
     const newErrors = {};
+    const currentUserId = parseInt(userId);
 
     // Username validation
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
-    } else if (!isUsernameUnique(formData.username)) {
+    } else if (!isUsernameUnique(formData.username, currentUserId)) {
       newErrors.username = 'Username already exists';
     }
 
@@ -93,23 +117,25 @@ export default function CreateUser() {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
-    } else if (!isEmailUnique(formData.email)) {
+    } else if (!isEmailUnique(formData.email, currentUserId)) {
       newErrors.email = 'Email already exists';
     }
 
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else {
-      const passwordValidation = validatePassword(formData.password);
-      if (!passwordValidation.isValid) {
-        newErrors.password = passwordValidation.errors[0];
+    // Password validation (only if user wants to change password)
+    if (changePassword) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required when changing password';
+      } else {
+        const passwordValidation = validatePassword(formData.password);
+        if (!passwordValidation.isValid) {
+          newErrors.password = passwordValidation.errors[0];
+        }
       }
-    }
 
-    // Confirm password
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      // Confirm password
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
     }
 
     // Unit validation (required for non-central roles)
@@ -136,37 +162,59 @@ export default function CreateUser() {
       return;
     }
 
-    const newUser = createUser({
+    const updateData = {
       username: formData.username.trim(),
       email: formData.email.trim(),
-      password: formData.password, // In production, hash this
       officialUnitId: formData.officialUnitId ? parseInt(formData.officialUnitId) : null,
       role: formData.role,
       phoneNumber: formData.phoneNumber || null
-      // emailVerificationToken is auto-generated by createUser
-    });
+    };
 
-    // Get verification link for display (demo only)
-    const verificationLink = getEmailVerificationLink(newUser.userId);
-    const linkMessage = verificationLink 
-      ? `\n\nEmail Verification Link (Demo):\n${verificationLink}\n\nNote: In production, this link would be sent via email.`
-      : '';
-    
-    setSuccessMessage(`User "${newUser.username}" has been created successfully! An email verification link has been sent.${linkMessage}`);
-    
-    // Redirect to users list after 2 seconds
-    setTimeout(() => {
-      router.push('/admin/users');
-    }, 2000);
+    // Only include password if user wants to change it
+    if (changePassword && formData.password) {
+      // In production, hash the password here
+      // For demo purposes, storing plain password (matching existing user structure)
+      updateData.password = formData.password;
+    }
+
+    const updatedUser = updateUser(parseInt(userId), updateData);
+
+    if (updatedUser) {
+      setSuccessMessage(`User "${updatedUser.username}" has been updated successfully!`);
+      
+      // Redirect to users list after 2 seconds
+      setTimeout(() => {
+        router.push('/admin/users');
+      }, 2000);
+    } else {
+      setErrors({ general: 'Failed to update user. Please try again.' });
+    }
   };
 
   const handleCancel = () => {
     router.push('/admin/users');
   };
 
+  if (loading) {
+    return (
+      <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
+        <Layout title="Edit User">
+          <div className="flex">
+            <Sidebar />
+            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
+              <div className="max-w-4xl mx-auto">
+                <p>Loading...</p>
+              </div>
+            </main>
+          </div>
+        </Layout>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
-      <Layout title="Create New User">
+      <Layout title="Edit User">
         <div className="flex">
           <Sidebar />
           <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
@@ -176,7 +224,7 @@ export default function CreateUser() {
                   <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                     User Management
                   </h1>
-                  <p className="text-mint-dark-text/70">Create and manage user accounts with role-based access</p>
+                  <p className="text-mint-dark-text/70">Edit user account information</p>
                 </div>
                 <Button
                   variant="outline"
@@ -194,14 +242,21 @@ export default function CreateUser() {
                 </div>
               )}
 
-              {/* Create User Form */}
+              {/* Error Message */}
+              {errors.general && (
+                <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                  {errors.general}
+                </div>
+              )}
+
+              {/* Edit User Form */}
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-2xl text-mint-primary-blue">
-                    Create New User
+                    Edit User
                   </CardTitle>
                   <CardDescription>
-                    Fill in the required information to create a new user account
+                    Update user account information. Leave password fields empty to keep the current password.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -244,45 +299,67 @@ export default function CreateUser() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <Label htmlFor="password" className="mb-2">
-                          Password <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          type="password"
-                          id="password"
-                          name="password"
-                          value={formData.password}
-                          onChange={handleInputChange}
-                          className={errors.password ? 'border-red-500' : ''}
-                          placeholder="Enter password"
-                        />
-                        {errors.password && (
-                          <p className="mt-1 text-sm text-red-500">{errors.password}</p>
-                        )}
-                        <p className="mt-1 text-xs text-mint-dark-text/60">
-                          Must be at least 8 characters with uppercase, lowercase, number, and special character
+                    {/* Password Change Section */}
+                    <div className="border-t pt-6">
+                      <div className="mb-4">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={changePassword}
+                            onChange={(e) => setChangePassword(e.target.checked)}
+                            className="w-4 h-4 text-mint-primary-blue border-gray-300 rounded focus:ring-mint-primary-blue"
+                          />
+                          <span className="text-sm font-medium text-mint-dark-text">
+                            Change Password
+                          </span>
+                        </label>
+                        <p className="text-xs text-mint-dark-text/60 mt-1 ml-6">
+                          Check this box if you want to change the user's password
                         </p>
                       </div>
 
-                      <div>
-                        <Label htmlFor="confirmPassword" className="mb-2">
-                          Confirm Password <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          type="password"
-                          id="confirmPassword"
-                          name="confirmPassword"
-                          value={formData.confirmPassword}
-                          onChange={handleInputChange}
-                          className={errors.confirmPassword ? 'border-red-500' : ''}
-                          placeholder="Confirm password"
-                        />
-                        {errors.confirmPassword && (
-                          <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>
-                        )}
-                      </div>
+                      {changePassword && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <Label htmlFor="password" className="mb-2">
+                              New Password <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              type="password"
+                              id="password"
+                              name="password"
+                              value={formData.password}
+                              onChange={handleInputChange}
+                              className={errors.password ? 'border-red-500' : ''}
+                              placeholder="Enter new password"
+                            />
+                            {errors.password && (
+                              <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                            )}
+                            <p className="mt-1 text-xs text-mint-dark-text/60">
+                              Must be at least 8 characters with uppercase, lowercase, number, and special character
+                            </p>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="confirmPassword" className="mb-2">
+                              Confirm New Password <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              type="password"
+                              id="confirmPassword"
+                              name="confirmPassword"
+                              value={formData.confirmPassword}
+                              onChange={handleInputChange}
+                              className={errors.confirmPassword ? 'border-red-500' : ''}
+                              placeholder="Confirm new password"
+                            />
+                            {errors.confirmPassword && (
+                              <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -372,7 +449,7 @@ export default function CreateUser() {
                         type="submit"
                         className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
                       >
-                        Save User
+                        Update User
                       </Button>
                     </div>
                   </form>

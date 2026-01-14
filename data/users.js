@@ -181,26 +181,37 @@ export const validatePassword = (password) => {
 
 // Create a new user
 export const createUser = (userData) => {
+  // Generate email verification token if not provided
+  const emailVerificationToken = userData.emailVerificationToken || generateEmailVerificationToken();
+  
   const newUser = {
     userId: users.length > 0 
       ? Math.max(...users.map(u => u.userId)) + 1 
       : 1,
     username: userData.username,
     email: userData.email,
+    password: userData.password || userData.passwordHash, // Store password (in production, hash it)
     officialUnitId: userData.officialUnitId || null,
     role: userData.role,
     passwordHash: userData.passwordHash || 'hashed_password_placeholder', // In real app, hash the password
-    emailVerificationToken: userData.emailVerificationToken || null,
+    emailVerificationToken: emailVerificationToken,
     isEmailVerified: false,
     isAccountLocked: false,
     isTwoFactorEnabled: false,
     phoneNumber: userData.phoneNumber || null,
     twoFactorSecret: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
   
   users.push(newUser);
+  
+  // In production, send verification email
+  // For demo, log the verification link
+  console.log(`Email verification link for ${newUser.email}: /verify-email?token=${emailVerificationToken}&userId=${newUser.userId}`);
+  
   return newUser;
 };
 
@@ -242,5 +253,225 @@ export const getUsersByRole = (role) => {
 export const checkPassword = (inputPassword, userPassword) => {
   // In production, this would compare hashed passwords
   return inputPassword === userPassword;
+};
+
+// Generate email verification token
+export const generateEmailVerificationToken = () => {
+  // Generate a secure random token
+  return `evt_${Date.now()}_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+};
+
+// Get email verification link for a user
+export const getEmailVerificationLink = (userId) => {
+  const user = getUserById(userId);
+  if (!user || !user.emailVerificationToken) {
+    return null;
+  }
+  
+  // In production, this would be the full URL
+  // For demo, return relative path
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/verify-email?token=${user.emailVerificationToken}&userId=${userId}`;
+  }
+  return `/verify-email?token=${user.emailVerificationToken}&userId=${userId}`;
+};
+
+// Resend email verification (generate new token)
+export const resendEmailVerification = (email) => {
+  const user = getUserByEmail(email);
+  if (!user) {
+    // Don't reveal if user exists for security
+    return { success: true };
+  }
+  
+  if (user.isEmailVerified) {
+    return { success: false, error: 'Email is already verified' };
+  }
+  
+  // Generate new verification token
+  const newToken = generateEmailVerificationToken();
+  updateUser(user.userId, {
+    emailVerificationToken: newToken
+  });
+  
+  // In production, send email
+  // For demo, log the link
+  const link = typeof window !== 'undefined' 
+    ? `${window.location.origin}/verify-email?token=${newToken}&userId=${user.userId}`
+    : `/verify-email?token=${newToken}&userId=${user.userId}`;
+  console.log(`Email verification link for ${email}: ${link}`);
+  
+  return { success: true, link, userId: user.userId };
+};
+
+// Verify email with token
+export const verifyEmail = (userId, token) => {
+  const user = getUserById(userId);
+  if (!user) {
+    return { success: false, error: 'User not found' };
+  }
+  
+  if (user.emailVerificationToken !== token) {
+    return { success: false, error: 'Invalid verification token' };
+  }
+  
+  // Check if token is expired (24 hours)
+  const tokenAge = Date.now() - parseInt(token.split('_')[1]);
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  if (tokenAge > maxAge) {
+    return { success: false, error: 'Verification token has expired' };
+  }
+  
+  // Verify email
+  updateUser(userId, {
+    isEmailVerified: true,
+    emailVerificationToken: null
+  });
+  
+  return { success: true };
+};
+
+// Generate password reset token
+export const generatePasswordResetToken = (email) => {
+  const user = getUserByEmail(email);
+  if (!user) {
+    // Don't reveal if user exists for security
+    return { success: true };
+  }
+  
+  const token = `prt_${Date.now()}_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+  
+  updateUser(user.userId, {
+    passwordResetToken: token,
+    passwordResetExpires: expiresAt
+  });
+  
+  // In production, send email with reset link
+  // For demo, we'll log it (in real app, send via email service)
+  console.log(`Password reset link for ${email}: /reset-password?token=${token}&userId=${user.userId}`);
+  
+  return { success: true, token, userId: user.userId };
+};
+
+// Validate password reset token
+export const validatePasswordResetToken = (userId, token) => {
+  const user = getUserById(userId);
+  if (!user || !user.passwordResetToken) {
+    return { valid: false, error: 'Invalid reset token' };
+  }
+  
+  if (user.passwordResetToken !== token) {
+    return { valid: false, error: 'Invalid reset token' };
+  }
+  
+  // Check if token is expired
+  if (new Date(user.passwordResetExpires) < new Date()) {
+    return { valid: false, error: 'Reset token has expired' };
+  }
+  
+  return { valid: true };
+};
+
+// Reset password with token
+export const resetPassword = (userId, token, newPassword) => {
+  const validation = validatePasswordResetToken(userId, token);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+  
+  // Validate password complexity
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.isValid) {
+    return { success: false, error: passwordValidation.errors[0] };
+  }
+  
+  // Update password and clear reset token
+  updateUser(userId, {
+    password: newPassword, // In production, hash this
+    passwordResetToken: null,
+    passwordResetExpires: null
+  });
+  
+  return { success: true };
+};
+
+// Generate OTP for 2FA
+export const generateOTP = () => {
+  // Generate 6-digit OTP
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Store OTP for user (in production, use Redis or similar with expiration)
+const otpStore = new Map(); // userId -> { otp, expiresAt }
+
+// Send OTP via SMS (mock implementation)
+export const sendOTP = (phoneNumber, userId) => {
+  const otp = generateOTP();
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+  
+  otpStore.set(userId, { otp, expiresAt });
+  
+  // In production, integrate with SMS gateway
+  // For demo, log the OTP
+  console.log(`OTP for user ${userId} (${phoneNumber}): ${otp}`);
+  
+  return { success: true, otp }; // In production, don't return OTP
+};
+
+// Verify OTP
+export const verifyOTP = (userId, inputOTP) => {
+  const stored = otpStore.get(userId);
+  if (!stored) {
+    return { valid: false, error: 'No OTP found. Please request a new one.' };
+  }
+  
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(userId);
+    return { valid: false, error: 'OTP has expired. Please request a new one.' };
+  }
+  
+  if (stored.otp !== inputOTP) {
+    return { valid: false, error: 'Invalid OTP' };
+  }
+  
+  // OTP is valid, remove it
+  otpStore.delete(userId);
+  return { valid: true };
+};
+
+// Enable 2FA for user
+export const enable2FA = (userId, phoneNumber) => {
+  const user = getUserById(userId);
+  if (!user) {
+    return { success: false, error: 'User not found' };
+  }
+  
+  // Validate phone number format (basic validation)
+  if (!phoneNumber || phoneNumber.trim().length < 10) {
+    return { success: false, error: 'Invalid phone number' };
+  }
+  
+  updateUser(userId, {
+    isTwoFactorEnabled: true,
+    phoneNumber: phoneNumber.trim()
+  });
+  
+  return { success: true };
+};
+
+// Disable 2FA for user
+export const disable2FA = (userId) => {
+  const user = getUserById(userId);
+  if (!user) {
+    return { success: false, error: 'User not found' };
+  }
+  
+  updateUser(userId, {
+    isTwoFactorEnabled: false,
+    twoFactorSecret: null
+  });
+  
+  return { success: true };
 };
 

@@ -74,7 +74,16 @@ export default function Login() {
       await login(formData.username, formData.password);
       router.push('/dashboard');
     } catch (error) {
-      setLoginError(error.message || 'Login failed. Please check your credentials.');
+      if (error.message === 'EMAIL_NOT_VERIFIED') {
+        setLoginError('Your email address has not been verified. Please check your email for the verification link.');
+      } else if (error.message === '2FA_REQUIRED') {
+        // Redirect to 2FA verification page
+        const tempSession = JSON.parse(localStorage.getItem('egirs_pending_2fa') || '{}');
+        router.push(`/verify-2fa?userId=${tempSession.userId}`);
+        return;
+      } else {
+        setLoginError(error.message || 'Login failed. Please check your credentials.');
+      }
       setIsSubmitting(false);
     }
   };
@@ -173,6 +182,13 @@ export default function Login() {
               {loginError && (
                 <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
                   {loginError}
+                  {loginError.includes('email address has not been verified') && (
+                    <div className="mt-2">
+                      <Link href="/resend-verification" className="text-blue-600 hover:text-blue-800 underline text-sm">
+                        Resend verification email
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
               <div>
