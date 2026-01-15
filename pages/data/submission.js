@@ -3,10 +3,14 @@ import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAllAssessmentYears, getAssessmentYearById } from '../../data/assessmentFramework';
-import { getDimensionsByYear } from '../../data/assessmentFramework';
-import { getIndicatorsByDimension } from '../../data/assessmentFramework';
-import { getSubQuestionsByIndicator } from '../../data/assessmentFramework';
+import { 
+  getAllAssessmentYears, 
+  getAssessmentYearById,
+  getDimensionsByYear,
+  getIndicatorsByDimension,
+  getSubQuestionsByIndicator,
+  RESPONSE_TYPES
+} from '../../data/assessmentFramework';
 import { getAllUnits, getUnitById } from '../../data/administrativeUnits';
 import { canPerformAction } from '../../utils/permissions';
 import {
@@ -55,6 +59,7 @@ export default function DataSubmission() {
   const [errorMessage, setErrorMessage] = useState('');
   const [activeSection, setActiveSection] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
 
   // Check if user has unit assigned
   if (!user.officialUnitId) {
@@ -138,13 +143,41 @@ export default function DataSubmission() {
   }, [selectedYear, user, currentUser.unitId, currentUser.userId]);
 
   useEffect(() => {
-    setAssessmentYears(getAllAssessmentYears());
-    // Auto-select active year
-    const activeYear = getAllAssessmentYears().find(y => y.status === 'Active');
-    if (activeYear) {
-      setSelectedYear(activeYear);
+    // Reload assessment years to get newly created ones
+    const years = getAllAssessmentYears();
+    setAssessmentYears(years);
+    // Auto-select active year if no year is selected
+    if (!selectedYear) {
+      const activeYear = years.find(y => y.status === 'Active');
+      if (activeYear) {
+        setSelectedYear(activeYear);
+      }
     }
   }, []);
+
+  // Listen for assessment framework updates
+  useEffect(() => {
+    const handleFrameworkUpdate = () => {
+      // Reload assessment years
+      const years = getAllAssessmentYears();
+      setAssessmentYears(years);
+      
+      // If a year is selected, reload its dimensions and questions
+      if (selectedYear) {
+        const updatedYear = years.find(y => y.assessmentYearId === selectedYear.assessmentYearId);
+        if (updatedYear) {
+          setSelectedYear(updatedYear);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('assessmentFrameworkUpdated', handleFrameworkUpdate);
+      return () => {
+        window.removeEventListener('assessmentFrameworkUpdated', handleFrameworkUpdate);
+      };
+    }
+  }, [selectedYear]);
 
   useEffect(() => {
     if (selectedYear && currentUser.unitType) {
@@ -437,7 +470,8 @@ export default function DataSubmission() {
       submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
 
     switch (subQuestion.responseType) {
-      case 'Yes/No':
+      case RESPONSE_TYPES.YES_NO:
+      case 'Yes/No': // Fallback for backward compatibility
         return (
           <div className="space-y-2">
             <div className="flex space-x-6">
@@ -483,7 +517,8 @@ export default function DataSubmission() {
           </div>
         );
 
-      case 'MultipleSelectCheckbox':
+      case RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX:
+      case 'MultipleSelectCheckbox': // Fallback for backward compatibility
         const options = subQuestion.checkboxOptions ? subQuestion.checkboxOptions.split(',').map(o => o.trim()) : [];
         const selectedOptions = responseValue ? responseValue.split(',').map(v => v.trim()).filter(v => v) : [];
         return (
@@ -524,7 +559,8 @@ export default function DataSubmission() {
           </div>
         );
 
-      case 'TextExplanation':
+      case RESPONSE_TYPES.TEXT_EXPLANATION:
+      case 'TextExplanation': // Fallback for backward compatibility
         return (
           <div className="space-y-4">
             <div>
@@ -579,14 +615,53 @@ export default function DataSubmission() {
   const totalQuestions = subQuestions.length;
   const progressPercentage = totalQuestions > 0 ? (totalAnsweredQuestions / totalQuestions) * 100 : 0;
 
-  // Scroll to section when clicked
-  const scrollToSection = (dimensionId) => {
-    setActiveSection(dimensionId);
-    const element = document.getElementById(`dimension-${dimensionId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Navigate to dimension by index
+  const goToDimension = (index) => {
+    if (index >= 0 && index < groupedQuestions.length) {
+      setCurrentDimensionIndex(index);
+      const dimension = groupedQuestions[index].dimension;
+      setActiveSection(dimension.dimensionId);
+      // Scroll to top of main content
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  // Navigate to next dimension
+  const goToNextDimension = () => {
+    if (currentDimensionIndex < groupedQuestions.length - 1) {
+      goToDimension(currentDimensionIndex + 1);
+    }
+  };
+
+  // Navigate to previous dimension
+  const goToPreviousDimension = () => {
+    if (currentDimensionIndex > 0) {
+      goToDimension(currentDimensionIndex - 1);
+    }
+  };
+
+  // Scroll to section when clicked (for sidebar navigation)
+  const scrollToSection = (dimensionId) => {
+    const index = groupedQuestions.findIndex(g => g.dimension.dimensionId === dimensionId);
+    if (index !== -1) {
+      goToDimension(index);
+    }
+  };
+
+  // Update active section when dimension index changes
+  useEffect(() => {
+    if (groupedQuestions.length > 0 && currentDimensionIndex >= 0 && currentDimensionIndex < groupedQuestions.length) {
+      const dimension = groupedQuestions[currentDimensionIndex].dimension;
+      setActiveSection(dimension.dimensionId);
+    }
+  }, [currentDimensionIndex, groupedQuestions]);
+
+  // Reset to first dimension when year or questions change
+  useEffect(() => {
+    if (groupedQuestions.length > 0) {
+      setCurrentDimensionIndex(0);
+    }
+  }, [selectedYear?.assessmentYearId]);
 
   return (
     <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
@@ -960,10 +1035,14 @@ export default function DataSubmission() {
             )}
 
 
-            {/* Questions Form - Dimensions as Sections */}
+            {/* Questions Form - Dimensions as Pages */}
             {selectedYear && groupedQuestions.length > 0 ? (
               <div className="space-y-6">
-                {groupedQuestions.map(({ dimension, indicators: dimIndicators }, dimIndex) => (
+                {groupedQuestions.map(({ dimension, indicators: dimIndicators }, dimIndex) => {
+                  // Only show the current dimension
+                  if (dimIndex !== currentDimensionIndex) return null;
+                  
+                  return (
                   <div key={dimension.dimensionId} id={`dimension-${dimension.dimensionId}`} className="scroll-mt-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                     <div className="mb-6 pb-4 border-b border-gray-200">
                       <div className="flex items-center mb-2">
@@ -1015,8 +1094,39 @@ export default function DataSubmission() {
                       </div>
                     ))}
                   </div>
-                ))}
-
+                  );
+                })}
+                
+                {/* Navigation Buttons */}
+                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-6 shadow-sm mt-6">
+                  <button
+                    onClick={goToPreviousDimension}
+                    disabled={currentDimensionIndex === 0}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                      currentDimensionIndex === 0
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#0d6670] hover:bg-[#0a4f57] text-white'
+                    }`}
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="text-sm text-gray-600">
+                    Dimension {currentDimensionIndex + 1} of {groupedQuestions.length}
+                  </div>
+                  
+                  <button
+                    onClick={goToNextDimension}
+                    disabled={currentDimensionIndex === groupedQuestions.length - 1}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                      currentDimensionIndex === groupedQuestions.length - 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#0d6670] hover:bg-[#0a4f57] text-white'
+                    }`}
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
             ) : selectedYear ? (
               <div className="bg-white rounded-lg shadow p-6 border border-gray-300 text-center">

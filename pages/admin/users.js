@@ -61,12 +61,12 @@ export default function UserManagement() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)']}>
       <Layout title="User Management">
         <div className="flex">
           <Sidebar />
         <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-          <div className="w-full mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="mb-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -95,28 +95,28 @@ export default function UserManagement() {
                   <p className="text-mint-dark-text">No users registered yet.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full divide-y divide-mint-medium-gray" style={{ minWidth: '1400px' }}>
+                    <table className="w-full divide-y divide-mint-medium-gray">
                       <thead className="bg-mint-primary-blue">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             User ID
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Username
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Email
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Administrative Unit
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Role
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style={{ minWidth: '160px' }}>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style={{ minWidth: '120px' }}>
                             Status
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -124,22 +124,22 @@ export default function UserManagement() {
                       <tbody className="bg-white divide-y divide-mint-medium-gray">
                         {users.map((user) => (
                           <tr key={user.userId} className="hover:bg-mint-light-gray">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
                               {user.userId}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mint-dark-text">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-mint-dark-text">
                               {user.username}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
                               {user.email}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
                               {getUnitName(user.officialUnitId)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
                               {user.role}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ minWidth: '160px' }}>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm" style={{ minWidth: '120px' }}>
                               <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${
                                 user.isEmailVerified
                                   ? 'bg-green-100 text-green-800'
@@ -148,7 +148,7 @@ export default function UserManagement() {
                                 {user.isEmailVerified ? 'Verified' : 'Pending'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm">
                               <div className="flex items-center gap-2">
                                 <Button
                                   onClick={() => handleEditClick(user)}

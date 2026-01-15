@@ -1,7 +1,15 @@
-// Assessment Framework Data Store
+// Assessment Framework Data Store with localStorage persistence
 // This will be replaced with a database in production
 
-let assessmentYears = [
+const STORAGE_KEYS = {
+  ASSESSMENT_YEARS: 'egirs_assessment_years',
+  DIMENSIONS: 'egirs_dimensions',
+  INDICATORS: 'egirs_indicators',
+  SUB_QUESTIONS: 'egirs_sub_questions'
+};
+
+// Default assessment years (only used if localStorage is empty)
+const defaultAssessmentYears = [
   // Example data
   {
     assessmentYearId: 1,
@@ -19,7 +27,8 @@ let assessmentYears = [
   }
 ];
 
-let dimensions = [
+// Default dimensions (only used if localStorage is empty)
+const defaultDimensions = [
   // Dimensions for 2024 Assessment (based on UN EGDI)
   {
     dimensionId: 1,
@@ -71,7 +80,8 @@ let dimensions = [
   }
 ];
 
-let indicators = [
+// Default indicators (only used if localStorage is empty)
+const defaultIndicators = [
   // Institutional Framework Indicators
   {
     indicatorId: 1,
@@ -328,7 +338,8 @@ let indicators = [
   }
 ];
 
-let subQuestions = [
+// Default sub questions (only used if localStorage is empty)
+const defaultSubQuestions = [
   // E-Government Policy and Strategy (Indicator 1)
   {
     subQuestionId: 1,
@@ -1184,6 +1195,98 @@ let subQuestions = [
   }
 ];
 
+// Load functions for localStorage
+const loadAssessmentYears = () => {
+  if (typeof window === 'undefined') return [...defaultAssessmentYears];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.ASSESSMENT_YEARS);
+    if (stored) return JSON.parse(stored);
+  } catch (error) {
+    console.error('Error loading assessment years from localStorage:', error);
+  }
+  saveAssessmentYears(defaultAssessmentYears);
+  return [...defaultAssessmentYears];
+};
+
+const loadDimensions = () => {
+  if (typeof window === 'undefined') return [...defaultDimensions];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.DIMENSIONS);
+    if (stored) return JSON.parse(stored);
+  } catch (error) {
+    console.error('Error loading dimensions from localStorage:', error);
+  }
+  saveDimensions(defaultDimensions);
+  return [...defaultDimensions];
+};
+
+const loadIndicators = () => {
+  if (typeof window === 'undefined') return [...defaultIndicators];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.INDICATORS);
+    if (stored) return JSON.parse(stored);
+  } catch (error) {
+    console.error('Error loading indicators from localStorage:', error);
+  }
+  saveIndicators(defaultIndicators);
+  return [...defaultIndicators];
+};
+
+const loadSubQuestions = () => {
+  if (typeof window === 'undefined') return [...defaultSubQuestions];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.SUB_QUESTIONS);
+    if (stored) return JSON.parse(stored);
+  } catch (error) {
+    console.error('Error loading sub questions from localStorage:', error);
+  }
+  saveSubQuestions(defaultSubQuestions);
+  return [...defaultSubQuestions];
+};
+
+// Save functions for localStorage
+const saveAssessmentYears = (yearsToSave) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.ASSESSMENT_YEARS, JSON.stringify(yearsToSave));
+  } catch (error) {
+    console.error('Error saving assessment years to localStorage:', error);
+  }
+};
+
+const saveDimensions = (dimensionsToSave) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.DIMENSIONS, JSON.stringify(dimensionsToSave));
+  } catch (error) {
+    console.error('Error saving dimensions to localStorage:', error);
+  }
+};
+
+const saveIndicators = (indicatorsToSave) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.INDICATORS, JSON.stringify(indicatorsToSave));
+  } catch (error) {
+    console.error('Error saving indicators to localStorage:', error);
+  }
+};
+
+const saveSubQuestions = (subQuestionsToSave) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.SUB_QUESTIONS, JSON.stringify(subQuestionsToSave));
+  } catch (error) {
+    console.error('Error saving sub questions to localStorage:', error);
+  }
+};
+
+// Initialize arrays from localStorage
+let assessmentYears = loadAssessmentYears();
+let dimensions = loadDimensions();
+let indicators = loadIndicators();
+let subQuestions = loadSubQuestions();
+
 // Assessment Year Status
 export const ASSESSMENT_STATUS = {
   DRAFT: 'Draft',
@@ -1209,9 +1312,16 @@ export const APPLICABLE_UNIT_TYPES = [
 ];
 
 // Assessment Years
-export const getAllAssessmentYears = () => [...assessmentYears];
-export const getAssessmentYearById = (id) => assessmentYears.find(y => y.assessmentYearId === id);
+export const getAllAssessmentYears = () => {
+  assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
+  return [...assessmentYears];
+};
+export const getAssessmentYearById = (id) => {
+  assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
+  return assessmentYears.find(y => y.assessmentYearId === id);
+};
 export const createAssessmentYear = (yearData) => {
+  assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
   const newYear = {
     assessmentYearId: assessmentYears.length > 0 
       ? Math.max(...assessmentYears.map(y => y.assessmentYearId)) + 1 
@@ -1222,9 +1332,11 @@ export const createAssessmentYear = (yearData) => {
     updatedAt: new Date().toISOString()
   };
   assessmentYears.push(newYear);
+  saveAssessmentYears(assessmentYears);
   return newYear;
 };
 export const updateAssessmentYear = (id, yearData) => {
+  assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
   const index = assessmentYears.findIndex(y => y.assessmentYearId === id);
   if (index !== -1) {
     assessmentYears[index] = {
@@ -1232,20 +1344,29 @@ export const updateAssessmentYear = (id, yearData) => {
       ...yearData,
       updatedAt: new Date().toISOString()
     };
+    saveAssessmentYears(assessmentYears);
     return assessmentYears[index];
   }
   return null;
 };
 
 // Dimensions
-export const getDimensionsByYear = (yearId) => dimensions.filter(d => d.assessmentYearId === yearId);
-export const getDimensionById = (id) => dimensions.find(d => d.dimensionId === id);
+export const getDimensionsByYear = (yearId) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
+  return dimensions.filter(d => d.assessmentYearId === yearId);
+};
+export const getDimensionById = (id) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
+  return dimensions.find(d => d.dimensionId === id);
+};
 export const getTotalDimensionWeight = (yearId) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
   return dimensions
     .filter(d => d.assessmentYearId === yearId)
     .reduce((sum, d) => sum + d.dimensionWeight, 0);
 };
 export const createDimension = (dimensionData) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
   const newDimension = {
     dimensionId: dimensions.length > 0 
       ? Math.max(...dimensions.map(d => d.dimensionId)) + 1 
@@ -1257,9 +1378,11 @@ export const createDimension = (dimensionData) => {
     updatedAt: new Date().toISOString()
   };
   dimensions.push(newDimension);
+  saveDimensions(dimensions);
   return newDimension;
 };
 export const updateDimension = (id, dimensionData) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
   const index = dimensions.findIndex(d => d.dimensionId === id);
   if (index !== -1) {
     dimensions[index] = {
@@ -1268,27 +1391,39 @@ export const updateDimension = (id, dimensionData) => {
       dimensionWeight: parseFloat(dimensionData.dimensionWeight || dimensions[index].dimensionWeight),
       updatedAt: new Date().toISOString()
     };
+    saveDimensions(dimensions);
     return dimensions[index];
   }
   return null;
 };
 export const deleteDimension = (id) => {
+  dimensions = loadDimensions(); // Reload to ensure latest data
   const index = dimensions.findIndex(d => d.dimensionId === id);
   if (index !== -1) {
-    return dimensions.splice(index, 1)[0];
+    const deleted = dimensions.splice(index, 1)[0];
+    saveDimensions(dimensions);
+    return deleted;
   }
   return null;
 };
 
 // Indicators
-export const getIndicatorsByDimension = (dimensionId) => indicators.filter(i => i.dimensionId === dimensionId);
-export const getIndicatorById = (id) => indicators.find(i => i.indicatorId === id);
+export const getIndicatorsByDimension = (dimensionId) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
+  return indicators.filter(i => i.dimensionId === dimensionId);
+};
+export const getIndicatorById = (id) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
+  return indicators.find(i => i.indicatorId === id);
+};
 export const getTotalIndicatorWeight = (dimensionId) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
   return indicators
     .filter(i => i.dimensionId === dimensionId)
     .reduce((sum, i) => sum + i.indicatorWeight, 0);
 };
 export const createIndicator = (indicatorData) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
   const newIndicator = {
     indicatorId: indicators.length > 0 
       ? Math.max(...indicators.map(i => i.indicatorId)) + 1 
@@ -1301,9 +1436,11 @@ export const createIndicator = (indicatorData) => {
     updatedAt: new Date().toISOString()
   };
   indicators.push(newIndicator);
+  saveIndicators(indicators);
   return newIndicator;
 };
 export const updateIndicator = (id, indicatorData) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
   const index = indicators.findIndex(i => i.indicatorId === id);
   if (index !== -1) {
     indicators[index] = {
@@ -1312,27 +1449,39 @@ export const updateIndicator = (id, indicatorData) => {
       indicatorWeight: parseFloat(indicatorData.indicatorWeight || indicators[index].indicatorWeight),
       updatedAt: new Date().toISOString()
     };
+    saveIndicators(indicators);
     return indicators[index];
   }
   return null;
 };
 export const deleteIndicator = (id) => {
+  indicators = loadIndicators(); // Reload to ensure latest data
   const index = indicators.findIndex(i => i.indicatorId === id);
   if (index !== -1) {
-    return indicators.splice(index, 1)[0];
+    const deleted = indicators.splice(index, 1)[0];
+    saveIndicators(indicators);
+    return deleted;
   }
   return null;
 };
 
 // Sub-Questions
-export const getSubQuestionsByIndicator = (indicatorId) => subQuestions.filter(sq => sq.parentIndicatorId === indicatorId);
-export const getSubQuestionById = (id) => subQuestions.find(sq => sq.subQuestionId === id);
+export const getSubQuestionsByIndicator = (indicatorId) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
+  return subQuestions.filter(sq => sq.parentIndicatorId === indicatorId);
+};
+export const getSubQuestionById = (id) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
+  return subQuestions.find(sq => sq.subQuestionId === id);
+};
 export const getTotalSubQuestionWeight = (indicatorId) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
   return subQuestions
     .filter(sq => sq.parentIndicatorId === indicatorId)
     .reduce((sum, sq) => sum + sq.subWeightPercentage, 0);
 };
 export const createSubQuestion = (subQuestionData) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
   const newSubQuestion = {
     subQuestionId: subQuestions.length > 0 
       ? Math.max(...subQuestions.map(sq => sq.subQuestionId)) + 1 
@@ -1346,9 +1495,11 @@ export const createSubQuestion = (subQuestionData) => {
     updatedAt: new Date().toISOString()
   };
   subQuestions.push(newSubQuestion);
+  saveSubQuestions(subQuestions);
   return newSubQuestion;
 };
 export const updateSubQuestion = (id, subQuestionData) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
   const index = subQuestions.findIndex(sq => sq.subQuestionId === id);
   if (index !== -1) {
     subQuestions[index] = {
@@ -1357,14 +1508,18 @@ export const updateSubQuestion = (id, subQuestionData) => {
       subWeightPercentage: parseFloat(subQuestionData.subWeightPercentage || subQuestions[index].subWeightPercentage),
       updatedAt: new Date().toISOString()
     };
+    saveSubQuestions(subQuestions);
     return subQuestions[index];
   }
   return null;
 };
 export const deleteSubQuestion = (id) => {
+  subQuestions = loadSubQuestions(); // Reload to ensure latest data
   const index = subQuestions.findIndex(sq => sq.subQuestionId === id);
   if (index !== -1) {
-    return subQuestions.splice(index, 1)[0];
+    const deleted = subQuestions.splice(index, 1)[0];
+    saveSubQuestions(subQuestions);
+    return deleted;
   }
   return null;
 };

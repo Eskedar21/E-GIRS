@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -38,6 +38,9 @@ export default function AdministrativeUnitsManagement() {
   });
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
+  const parentUnitSelectRef = useRef(null);
+  const editParentUnitSelectRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Refresh units list whenever it changes
   useEffect(() => {
@@ -64,11 +67,25 @@ export default function AdministrativeUnitsManagement() {
 
   // Get unit type color for badges
   const getUnitTypeColor = (unitType) => {
-    // Neutral styling for all badges
-    return 'bg-gray-100 text-gray-800 border-gray-200';
+    const colors = {
+      'Federal Institute': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Region': 'bg-blue-100 text-blue-800 border-blue-200',
+      'City Administration': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Zone': 'bg-green-100 text-green-800 border-green-200',
+      'Sub-city': 'bg-green-100 text-green-800 border-green-200',
+      'Woreda': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'Kebele': 'bg-orange-100 text-orange-800 border-orange-200'
+    };
+    return colors[unitType] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  const toggleNode = (unitId) => {
+  const toggleNode = (unitId, event) => {
+    // Prevent scroll when expanding/collapsing
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
       if (newSet.has(unitId)) {
@@ -78,6 +95,15 @@ export default function AdministrativeUnitsManagement() {
       }
       return newSet;
     });
+    
+    // Maintain scroll position
+    const scrollY = window.scrollY;
+    setTimeout(() => {
+      window.scrollTo({
+        top: scrollY,
+        behavior: 'instant'
+      });
+    }, 0);
   };
 
   const handleAddClick = () => {
@@ -272,135 +298,104 @@ export default function AdministrativeUnitsManagement() {
   }, [selectedUnitType, editingUnitId]);
 
 
-  // Tree node component with enhanced hierarchy visualization
-  const TreeNode = ({ node, level = 0, isLast = false, parentPath = [] }) => {
+  // Filter tree structure based on search query
+  const filteredTreeStructure = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return treeStructure;
+    }
+    
+    const filterTree = (nodes) => {
+      return nodes
+        .map(node => {
+          const matchesSearch = node.officialUnitName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                               (node.pCode && node.pCode.toLowerCase().includes(searchQuery.toLowerCase()));
+          
+          const filteredChildren = node.children ? filterTree(node.children) : [];
+          const hasMatchingChildren = filteredChildren.length > 0;
+          
+          if (matchesSearch || hasMatchingChildren) {
+            return {
+              ...node,
+              children: filteredChildren.length > 0 ? filteredChildren : node.children
+            };
+          }
+          return null;
+        })
+        .filter(node => node !== null);
+    };
+    
+    return filterTree(treeStructure);
+  }, [treeStructure, searchQuery]);
+
+  // Tree node component with simplified hierarchy style
+  const TreeNode = ({ node, level = 0, isLast = false, hasNextSibling = false }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = expandedNodes.has(node.unitId);
-    const indent = level * 40;
-    const currentPath = [...parentPath, node.unitId];
+    const indent = level * 24;
 
     return (
-      <div className="relative">
-        <div className="flex items-center group">
-          {/* Enhanced vertical connector lines */}
-          {level > 0 && (
-            <div className="absolute left-0 top-0 bottom-0 flex" style={{ width: `${indent}px` }}>
-              {parentPath.slice(0, -1).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="w-10 border-l-2 border-gray-300"
-                  style={{ marginLeft: `${idx * 40}px` }}
-                />
-              ))}
-              {!isLast && (
-                <div
-                  className="w-10 border-l-2 border-gray-300"
-                  style={{ marginLeft: `${(parentPath.length - 1) * 40}px` }}
-                />
-              )}
-            </div>
-          )}
-          
-          {/* Enhanced horizontal connector line */}
-          {level > 0 && (
-            <div
-              className="absolute border-t-2 border-gray-300"
-              style={{
-                left: `${(level - 1) * 40 + 20}px`,
-                width: '20px',
-                top: '50%'
-              }}
-            />
-          )}
-
-          <div
-            className={`flex items-center py-3 px-4 rounded-lg border-l-4 transition-all group-hover:shadow-md group-hover:bg-gray-50 bg-white ${
-              level === 0 ? 'border-mint-primary-blue' : 
-              level === 1 ? 'border-mint-secondary-blue' : 
-              level === 2 ? 'border-mint-primary-blue/60' : 
-              'border-gray-300'
-            }`}
-            style={{ paddingLeft: `${indent + 24}px`, marginLeft: level > 0 ? '0' : '0' }}
-          >
-            {/* Expand/Collapse arrow */}
+      <div>
+        <div className="flex items-center py-3 px-4 border-b border-gray-200">
+          {/* Expand/Collapse icon */}
+          <div className="mr-3 w-6 h-6 flex items-center justify-center flex-shrink-0">
             {hasChildren ? (
               <button
-                onClick={() => toggleNode(node.unitId)}
-                className="mr-3 w-6 h-6 flex items-center justify-center text-gray-600 hover:text-mint-primary-blue hover:bg-gray-100 rounded flex-shrink-0 transition-all"
+                onClick={(e) => toggleNode(node.unitId, e)}
+                className="w-5 h-5 flex items-center justify-center text-gray-600 hover:text-mint-primary-blue transition-colors"
               >
                 {isExpanded ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                   </svg>
                 ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 )}
               </button>
             ) : (
-              <span className="mr-3 w-6 h-6 flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-              </span>
+              <div className="w-5 h-5" />
             )}
+          </div>
 
-            {/* Unit Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* P-Code Badge */}
-                {node.pCode && (
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-mint-primary-blue text-white border border-mint-primary-blue shadow-sm">
-                      {node.pCode}
-                    </span>
-                  </div>
-                )}
-                <div className="font-semibold text-gray-900 text-base">
-                  {node.officialUnitName}
-                </div>
-                <Badge className={`${getUnitTypeColor(node.unitType)} text-xs font-medium px-2.5 py-0.5 border`}>
-                  {node.unitType}
-                </Badge>
-              </div>
-              {/* Breadcrumb path */}
-              {node.breadcrumb && node.breadcrumb.length > 1 && (
-                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className="text-gray-400">Path:</span>
-                  {node.breadcrumb.slice(0, -1).map((crumb, idx) => (
-                    <span key={idx} className="flex items-center">
-                      <span className="text-mint-primary-blue font-medium">{crumb.name}</span>
-                      {idx < node.breadcrumb.length - 2 && (
-                        <svg className="w-3 h-3 mx-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      )}
-                    </span>
-                  ))}
-                </div>
+          {/* Indentation spacer */}
+          <div style={{ width: `${indent}px` }} className="flex-shrink-0" />
+
+          {/* Unit Type Badge */}
+          <Badge className={`${getUnitTypeColor(node.unitType)} text-xs font-medium px-2.5 py-1 border mr-3 flex-shrink-0 hover:!bg-opacity-100 hover:!text-opacity-100`}>
+            {node.unitType}
+          </Badge>
+
+          {/* Unit Name */}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900">
+              {node.officialUnitName}
+              {node.pCode && (
+                <span className="ml-2 text-xs text-gray-500 font-normal">({node.pCode})</span>
               )}
             </div>
-
-            {/* Edit Button */}
-            <button
-              onClick={() => handleEditClick(node)}
-              className="ml-3 px-3 py-1.5 text-xs font-medium text-mint-primary-blue hover:text-white hover:bg-mint-primary-blue border border-mint-primary-blue rounded-md transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
-              title="Edit unit"
-            >
-              Edit
-            </button>
           </div>
+
+          {/* Edit Button */}
+          <button
+            onClick={() => handleEditClick(node)}
+            className="ml-3 px-3 py-1.5 text-xs font-medium text-mint-primary-blue hover:text-white hover:bg-mint-primary-blue border border-mint-primary-blue rounded-md transition-all flex-shrink-0"
+            title="Edit unit"
+          >
+            Edit
+          </button>
         </div>
 
         {/* Children */}
         {hasChildren && isExpanded && (
-          <div className="mt-1">
+          <div>
             {node.children.map((child, index) => (
               <TreeNode
                 key={child.unitId}
                 node={child}
                 level={level + 1}
-                isLast={index === node.children.length - 1}
-                parentPath={currentPath}
+                isLast={isLast && index === node.children.length - 1}
+                hasNextSibling={index < node.children.length - 1 || hasNextSibling}
               />
             ))}
           </div>
@@ -419,13 +414,32 @@ export default function AdministrativeUnitsManagement() {
             <div className="mb-6 flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
-                  Administrative Unit Management
+                  Administrative Units
                 </h1>
-                <p className="text-mint-dark-text/70">Register and manage administrative units in the hierarchy</p>
               </div>
-              <Button onClick={handleAddClick} size="lg" className="bg-mint-primary-blue hover:bg-mint-secondary-blue">
-                Add Unit
-              </Button>
+              <div className="flex items-center gap-3">
+                {/* Search Bar */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent"
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <Button onClick={handleAddClick} size="lg" className="bg-mint-primary-blue hover:bg-mint-secondary-blue">
+                  Add Unit
+                </Button>
+              </div>
             </div>
 
         {/* Success Message */}
@@ -443,66 +457,28 @@ export default function AdministrativeUnitsManagement() {
         )}
 
         {/* Tree View */}
-        <Card className="shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-mint-primary-blue/5 to-mint-secondary-blue/5 border-b">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl text-mint-primary-blue">
-                  Administrative Units Hierarchy
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  {units.length} {units.length === 1 ? 'unit' : 'units'} in {treeStructure.length} {treeStructure.length === 1 ? 'root branch' : 'root branches'}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (expandedNodes.size === 0) {
-                      // Expand all
-                      const allNodeIds = new Set();
-                      const collectIds = (nodes) => {
-                        nodes.forEach(node => {
-                          if (node.children && node.children.length > 0) {
-                            allNodeIds.add(node.unitId);
-                            collectIds(node.children);
-                          }
-                        });
-                      };
-                      collectIds(treeStructure);
-                      setExpandedNodes(allNodeIds);
-                    } else {
-                      // Collapse all
-                      setExpandedNodes(new Set());
-                    }
-                  }}
-                >
-                  {expandedNodes.size === 0 ? 'Expand All' : 'Collapse All'}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            {treeStructure.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-lg text-mint-dark-text font-semibold mb-2">No administrative units registered yet</p>
-                <p className="text-sm text-mint-dark-text/70">Click "Add Unit" to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {treeStructure.map((rootNode, index) => (
-                  <TreeNode
-                    key={rootNode.unitId}
-                    node={rootNode}
-                    level={0}
-                    isLast={index === treeStructure.length - 1}
-                    parentPath={[]}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {filteredTreeStructure.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-lg text-mint-dark-text font-semibold mb-2">
+              {searchQuery ? 'No units found matching your search' : 'No administrative units registered yet'}
+            </p>
+            <p className="text-sm text-mint-dark-text/70">
+              {searchQuery ? 'Try a different search term' : 'Click "Add Unit" to get started'}
+            </p>
+          </div>
+        ) : (
+          <div>
+            {filteredTreeStructure.map((rootNode, index) => (
+              <TreeNode
+                key={rootNode.unitId}
+                node={rootNode}
+                level={0}
+                isLast={index === filteredTreeStructure.length - 1}
+                hasNextSibling={index < filteredTreeStructure.length - 1}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Edit Unit Modal */}
         <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
@@ -548,10 +524,26 @@ export default function AdministrativeUnitsManagement() {
                       Parent Unit <span className="text-red-500">*</span>
                     </Label>
                     <Select
+                      ref={editParentUnitSelectRef}
                       id="edit-unit-parent"
                       name="parentUnitId"
                       value={formData.parentUnitId}
                       onChange={handleInputChange}
+                      onMouseDown={(e) => {
+                        // Store current scroll position
+                        const scrollY = window.scrollY;
+                        // Prevent default to stop immediate scroll
+                        const select = e.target;
+                        if (select instanceof HTMLSelectElement) {
+                          // Allow the select to open, but restore scroll position
+                          setTimeout(() => {
+                            window.scrollTo({
+                              top: scrollY,
+                              behavior: 'instant'
+                            });
+                          }, 0);
+                        }
+                      }}
                       className={errors.parentUnitId ? 'border-red-500' : ''}
                     >
                       <option value="">Select Parent Unit</option>
@@ -742,10 +734,26 @@ export default function AdministrativeUnitsManagement() {
                           Parent Unit <span className="text-red-500">*</span>
                         </Label>
                         <Select
+                          ref={parentUnitSelectRef}
                           id="unit-parent"
                           name="parentUnitId"
                           value={formData.parentUnitId}
                           onChange={handleInputChange}
+                          onMouseDown={(e) => {
+                            // Store current scroll position
+                            const scrollY = window.scrollY;
+                            // Prevent default to stop immediate scroll
+                            const select = e.target;
+                            if (select instanceof HTMLSelectElement) {
+                              // Allow the select to open, but restore scroll position
+                              setTimeout(() => {
+                                window.scrollTo({
+                                  top: scrollY,
+                                  behavior: 'instant'
+                                });
+                              }, 0);
+                            }
+                          }}
                           className={errors.parentUnitId ? 'border-red-500' : ''}
                         >
                           <option value="">Select Parent Unit</option>

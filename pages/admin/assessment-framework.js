@@ -53,8 +53,9 @@ export default function AssessmentFramework() {
     subQuestionText: '', 
     subWeightPercentage: '', 
     responseType: RESPONSE_TYPES.YES_NO,
-    checkboxOptions: ''
+    checkboxOptions: []
   });
+  const [newCheckboxOption, setNewCheckboxOption] = useState('');
   
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
@@ -96,6 +97,10 @@ export default function AssessmentFramework() {
     setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
     setSuccessMessage('Assessment Year created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
+    // Dispatch event to notify other pages
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
   };
 
   // Dimension Management
@@ -137,6 +142,10 @@ export default function AssessmentFramework() {
     setErrors({});
     setSuccessMessage('Dimension created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
+    // Dispatch event to notify other pages
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
   };
 
   // Indicator Management
@@ -182,6 +191,10 @@ export default function AssessmentFramework() {
     setErrors({});
     setSuccessMessage('Indicator created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
+    // Dispatch event to notify other pages
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
   };
 
   // Sub-Question Management
@@ -211,6 +224,13 @@ export default function AssessmentFramework() {
       newErrors.responseType = 'Response Type is required';
     }
     
+    // Validate checkbox options for Multiple-Select Checkbox type
+    if (subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX) {
+      if (!Array.isArray(subQuestionForm.checkboxOptions) || subQuestionForm.checkboxOptions.length === 0) {
+        newErrors.checkboxOptions = 'At least one checkbox option is required';
+      }
+    }
+    
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -221,7 +241,9 @@ export default function AssessmentFramework() {
       parentIndicatorId: selectedIndicator.indicatorId,
       subWeightPercentage: parseFloat(subQuestionForm.subWeightPercentage),
       checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX 
-        ? subQuestionForm.checkboxOptions 
+        ? (Array.isArray(subQuestionForm.checkboxOptions) 
+            ? subQuestionForm.checkboxOptions.join(',') 
+            : subQuestionForm.checkboxOptions)
         : null
     });
     refreshData();
@@ -230,11 +252,16 @@ export default function AssessmentFramework() {
       subQuestionText: '', 
       subWeightPercentage: '', 
       responseType: RESPONSE_TYPES.YES_NO,
-      checkboxOptions: ''
+      checkboxOptions: []
     });
+    setNewCheckboxOption('');
     setErrors({});
     setSuccessMessage('Sub-Question created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
+    // Dispatch event to notify other pages
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
   };
 
   const dimensionTotalWeight = selectedYear ? getTotalDimensionWeight(selectedYear.assessmentYearId) : 0;
@@ -690,7 +717,7 @@ export default function AssessmentFramework() {
                               <Select
                                 id="responseType"
                                 value={subQuestionForm.responseType}
-                                onChange={(e) => setSubQuestionForm({ ...subQuestionForm, responseType: e.target.value, checkboxOptions: '' })}
+                                onChange={(e) => setSubQuestionForm({ ...subQuestionForm, responseType: e.target.value, checkboxOptions: [] })}
                                 className={errors.responseType ? 'border-red-500' : ''}
                               >
                                 <option value={RESPONSE_TYPES.YES_NO}>Yes/No</option>
@@ -702,19 +729,91 @@ export default function AssessmentFramework() {
                           </div>
                           {subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX && (
                             <div>
-                              <Label htmlFor="checkboxOptions" className="mb-2">
-                                Checkbox Options (comma-separated) <span className="text-red-500">*</span>
+                              <Label className="mb-2 block">
+                                Checkbox Options <span className="text-red-500">*</span>
                               </Label>
-                              <Input
-                                type="text"
-                                id="checkboxOptions"
-                                value={subQuestionForm.checkboxOptions}
-                                onChange={(e) => setSubQuestionForm({ ...subQuestionForm, checkboxOptions: e.target.value })}
-                                placeholder="e.g., Option 1, Option 2, Option 3"
-                              />
-                              <p className="mt-1 text-xs text-mint-dark-text/60">
-                                Separate multiple options with commas
-                              </p>
+                              <div className="space-y-2">
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="text"
+                                    value={newCheckboxOption}
+                                    onChange={(e) => setNewCheckboxOption(e.target.value)}
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if (newCheckboxOption.trim()) {
+                                          const currentOptions = Array.isArray(subQuestionForm.checkboxOptions) 
+                                            ? subQuestionForm.checkboxOptions 
+                                            : [];
+                                          setSubQuestionForm({
+                                            ...subQuestionForm,
+                                            checkboxOptions: [...currentOptions, newCheckboxOption.trim()]
+                                          });
+                                          setNewCheckboxOption('');
+                                        }
+                                      }
+                                    }}
+                                    placeholder="Enter option text"
+                                    className="flex-1"
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() => {
+                                      if (newCheckboxOption.trim()) {
+                                        const currentOptions = Array.isArray(subQuestionForm.checkboxOptions) 
+                                          ? subQuestionForm.checkboxOptions 
+                                          : [];
+                                        setSubQuestionForm({
+                                          ...subQuestionForm,
+                                          checkboxOptions: [...currentOptions, newCheckboxOption.trim()]
+                                        });
+                                        setNewCheckboxOption('');
+                                      }
+                                    }}
+                                    className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                  </Button>
+                                </div>
+                                {Array.isArray(subQuestionForm.checkboxOptions) && subQuestionForm.checkboxOptions.length > 0 && (
+                                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                    <div className="space-y-2">
+                                      {subQuestionForm.checkboxOptions.map((option, index) => (
+                                        <div key={index} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200">
+                                          <span className="text-sm text-gray-900">{option}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const currentOptions = Array.isArray(subQuestionForm.checkboxOptions) 
+                                                ? subQuestionForm.checkboxOptions 
+                                                : [];
+                                              setSubQuestionForm({
+                                                ...subQuestionForm,
+                                                checkboxOptions: currentOptions.filter((_, i) => i !== index)
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 ml-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {(!Array.isArray(subQuestionForm.checkboxOptions) || subQuestionForm.checkboxOptions.length === 0) && (
+                                  <p className="text-xs text-mint-dark-text/60 italic">
+                                    No options added yet. Add options using the input above.
+                                  </p>
+                                )}
+                                {errors.checkboxOptions && (
+                                  <p className="mt-1 text-sm text-red-500">{errors.checkboxOptions}</p>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>

@@ -1,7 +1,10 @@
-// Administrative Units Data Store
+// Administrative Units Data Store with localStorage persistence
 // This will be replaced with a database in production
 
-let administrativeUnits = [
+const STORAGE_KEY = 'egirs_administrative_units';
+
+// Default administrative units (only used if localStorage is empty)
+const defaultAdministrativeUnits = [
   // Federal Institutes
   {
     unitId: 1,
@@ -548,6 +551,44 @@ let administrativeUnits = [
   }
 ];
 
+// Load administrative units from localStorage or use defaults
+const loadAdministrativeUnits = () => {
+  if (typeof window === 'undefined') {
+    // Server-side: return defaults
+    return [...defaultAdministrativeUnits];
+  }
+  
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error loading administrative units from localStorage:', error);
+  }
+  
+  // Initialize with defaults if no stored data
+  saveAdministrativeUnits(defaultAdministrativeUnits);
+  return [...defaultAdministrativeUnits];
+};
+
+// Save administrative units to localStorage
+const saveAdministrativeUnits = (unitsToSave) => {
+  if (typeof window === 'undefined') {
+    return; // Server-side: skip
+  }
+  
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(unitsToSave));
+  } catch (error) {
+    console.error('Error saving administrative units to localStorage:', error);
+  }
+};
+
+// Initialize administrative units array
+let administrativeUnits = loadAdministrativeUnits();
+
 // Unit Types
 export const UNIT_TYPES = {
   FEDERAL_INSTITUTE: 'Federal Institute',
@@ -560,16 +601,19 @@ export const UNIT_TYPES = {
 
 // Get all units
 export const getAllUnits = () => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   return [...administrativeUnits];
 };
 
 // Get units by type
 export const getUnitsByType = (unitType) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   return administrativeUnits.filter(unit => unit.unitType === unitType);
 };
 
 // Get units that can be parents for a given child type
 export const getValidParents = (childUnitType) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   if (childUnitType === UNIT_TYPES.ZONE || childUnitType === UNIT_TYPES.SUB_CITY) {
     return administrativeUnits.filter(unit => 
       unit.unitType === UNIT_TYPES.REGION || unit.unitType === UNIT_TYPES.CITY_ADMINISTRATION
@@ -585,11 +629,13 @@ export const getValidParents = (childUnitType) => {
 
 // Get unit by ID
 export const getUnitById = (unitId) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   return administrativeUnits.find(unit => unit.unitId === unitId);
 };
 
 // Create a new unit
 export const createUnit = (unitData) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   const newUnit = {
     unitId: administrativeUnits.length > 0 
       ? Math.max(...administrativeUnits.map(u => u.unitId)) + 1 
@@ -603,11 +649,13 @@ export const createUnit = (unitData) => {
   };
   
   administrativeUnits.push(newUnit);
+  saveAdministrativeUnits(administrativeUnits);
   return newUnit;
 };
 
 // Update a unit
 export const updateUnit = (unitId, unitData) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   const index = administrativeUnits.findIndex(unit => unit.unitId === unitId);
   if (index !== -1) {
     administrativeUnits[index] = {
@@ -615,6 +663,7 @@ export const updateUnit = (unitId, unitData) => {
       ...unitData,
       updatedAt: new Date().toISOString()
     };
+    saveAdministrativeUnits(administrativeUnits);
     return administrativeUnits[index];
   }
   return null;
@@ -622,9 +671,11 @@ export const updateUnit = (unitId, unitData) => {
 
 // Delete a unit
 export const deleteUnit = (unitId) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   const index = administrativeUnits.findIndex(unit => unit.unitId === unitId);
   if (index !== -1) {
     const deleted = administrativeUnits.splice(index, 1)[0];
+    saveAdministrativeUnits(administrativeUnits);
     return deleted;
   }
   return null;
@@ -632,6 +683,7 @@ export const deleteUnit = (unitId) => {
 
 // Check if unit name is unique (within parent for child units)
 export const isUnitNameUnique = (unitName, unitType, parentUnitId = null, excludeUnitId = null) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   const existing = administrativeUnits.find(unit => 
     unit.officialUnitName === unitName && 
     unit.unitType === unitType &&
@@ -643,6 +695,7 @@ export const isUnitNameUnique = (unitName, unitType, parentUnitId = null, exclud
 
 // Get child units
 export const getChildUnits = (parentUnitId) => {
+  administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   return administrativeUnits.filter(unit => unit.parentUnitId === parentUnitId);
 };
 
