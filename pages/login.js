@@ -8,7 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 const TEST_USERS = [
   { username: 'admin', password: 'Admin123!', role: 'MInT Admin' },
   { username: 'contributor1', password: 'Contributor123!', role: 'Data Contributor' },
-  { username: 'approver1', password: 'Approver123!', role: 'Regional Approver' },
+  { username: 'approver1', password: 'Approver123!', role: 'Regional Approver (Addis Ababa)' },
+  { username: 'amhara_approver', password: 'Amhara123!', role: 'Regional Approver (Amhara)' },
   { username: 'committee1', password: 'Committee123!', role: 'Central Committee Member' }
 ];
 

@@ -52,7 +52,7 @@ let submissions = [
   {
     submissionId: 3,
     submissionName: 'Addis Ababa City Administration - Digital Transformation 2024',
-    unitId: 3, // Addis Ababa City Administration
+    unitId: 10, // Addis Ababa City Administration
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
@@ -67,7 +67,7 @@ let submissions = [
   {
     submissionId: 4,
     submissionName: 'Addis Ababa City Administration - Q4 2024 Submission',
-    unitId: 3, // Addis Ababa City Administration
+    unitId: 10, // Addis Ababa City Administration
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
@@ -80,8 +80,8 @@ let submissions = [
   },
   {
     submissionId: 5,
-    submissionName: 'Sub-city 1 - 2024 Assessment',
-    unitId: 6, // Sub-city 1 (under Addis Ababa)
+    submissionName: 'Addis Ketema Sub-city - 2024 Assessment',
+    unitId: 100, // Addis Ketema Sub-city (under Addis Ababa)
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
@@ -94,8 +94,8 @@ let submissions = [
   },
   {
     submissionId: 6,
-    submissionName: 'Sub-city 2 - 2024 Assessment',
-    unitId: 7, // Sub-city 2 (under Addis Ababa)
+    submissionName: 'Akaki Kality Sub-city - 2024 Assessment',
+    unitId: 101, // Akaki Kality Sub-city (under Addis Ababa)
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
@@ -109,7 +109,7 @@ let submissions = [
   {
     submissionId: 7,
     submissionName: 'Oromia Region - 2024 Annual Assessment',
-    unitId: 4, // Oromia Region
+    unitId: 20, // Oromia Region
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
@@ -124,7 +124,7 @@ let submissions = [
   {
     submissionId: 8,
     submissionName: 'Addis Ababa City Administration - 2024 Q3 Assessment',
-    unitId: 3, // Addis Ababa City Administration (within approver's scope)
+    unitId: 10, // Addis Ababa City Administration
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
@@ -138,8 +138,8 @@ let submissions = [
   // Sample validated submission
   {
     submissionId: 9,
-    submissionName: 'Sub-city 1 - 2024 Q2 Assessment',
-    unitId: 6, // Sub-city 1 (under Addis Ababa, within approver's scope)
+    submissionName: 'Arada Sub-city - 2024 Q2 Assessment',
+    unitId: 102, // Arada Sub-city (under Addis Ababa)
     assessmentYearId: 1, // 2024 Assessment
     contributorUserId: 2, // contributor1
     submissionStatus: SUBMISSION_STATUS.VALIDATED,
@@ -149,6 +149,459 @@ let submissions = [
     rejectionReason: null,
     createdAt: '2024-10-10T08:00:00.000Z',
     updatedAt: '2024-10-25T16:00:00.000Z'
+  },
+  // Region submissions with different statuses
+  {
+    submissionId: 10,
+    submissionName: 'Oromia Region - 2024 Q4 Assessment',
+    unitId: 20, // Oromia Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-23T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-18T08:00:00.000Z',
+    updatedAt: '2024-12-23T10:00:00.000Z'
+  },
+  {
+    submissionId: 11,
+    submissionName: 'Amhara Region - 2024 Annual Assessment',
+    unitId: 21, // Amhara Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-20T11:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-21T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-15T08:00:00.000Z',
+    updatedAt: '2024-12-21T15:00:00.000Z'
+  },
+  {
+    submissionId: 12,
+    submissionName: 'Oromia Region - 2024 Q3 Assessment',
+    unitId: 20, // Oromia Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-30T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-05T14:00:00.000Z',
+    rejectionReason: 'Central Committee requires additional evidence for service delivery indicators.',
+    createdAt: '2024-11-25T08:00:00.000Z',
+    updatedAt: '2024-12-10T10:00:00.000Z'
+  },
+  {
+    submissionId: 13,
+    submissionName: 'Amhara Region - 2024 Q2 Assessment',
+    unitId: 21, // Amhara Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-10-20T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-10-25T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-10-15T08:00:00.000Z',
+    updatedAt: '2024-10-30T16:00:00.000Z'
+  },
+  {
+    submissionId: 14,
+    submissionName: 'Tigray Region - 2024 Assessment',
+    unitId: 22, // Tigray Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-24T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-24T08:00:00.000Z'
+  },
+  // Zone submissions with different statuses
+  {
+    submissionId: 15,
+    submissionName: 'West Arsi Zone - 2024 Annual Assessment',
+    unitId: 200, // West Arsi Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-20T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-15T08:00:00.000Z',
+    updatedAt: '2024-12-20T09:00:00.000Z'
+  },
+  {
+    submissionId: 16,
+    submissionName: 'East Shewa Zone - 2024 Q4 Assessment',
+    unitId: 201, // East Shewa Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-18T11:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-19T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-12T08:00:00.000Z',
+    updatedAt: '2024-12-19T15:00:00.000Z'
+  },
+  {
+    submissionId: 17,
+    submissionName: 'North Gondar Zone - 2024 Assessment',
+    unitId: 300, // North Gondar Zone (under Amhara Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-25T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-28T14:00:00.000Z',
+    rejectionReason: 'Central Committee found insufficient evidence for several responses.',
+    createdAt: '2024-11-20T08:00:00.000Z',
+    updatedAt: '2024-12-05T10:00:00.000Z'
+  },
+  {
+    submissionId: 18,
+    submissionName: 'Jimma Zone - 2024 Assessment',
+    unitId: 204, // Jimma Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-10T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-15T13:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-05T08:00:00.000Z',
+    updatedAt: '2024-11-20T16:00:00.000Z'
+  },
+  {
+    submissionId: 19,
+    submissionName: 'North Shewa Zone - 2024 Assessment',
+    unitId: 202, // North Shewa Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-24T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-24T08:00:00.000Z'
+  },
+  {
+    submissionId: 20,
+    submissionName: 'West Shewa Zone - 2024 Q4 Assessment',
+    unitId: 203, // West Shewa Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-21T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-22T13:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-16T08:00:00.000Z',
+    updatedAt: '2024-12-22T13:00:00.000Z'
+  },
+  {
+    submissionId: 21,
+    submissionName: 'Bale Zone - 2024 Assessment',
+    unitId: 205, // Bale Zone (under Oromia Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-01T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-06T11:00:00.000Z',
+    rejectionReason: 'Insufficient documentation for technology enablement dimension.',
+    createdAt: '2024-11-28T08:00:00.000Z',
+    updatedAt: '2024-12-10T10:00:00.000Z'
+  },
+  {
+    submissionId: 22,
+    submissionName: 'South Gondar Zone - 2024 Assessment',
+    unitId: 301, // South Gondar Zone (under Amhara Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-25T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-20T08:00:00.000Z',
+    updatedAt: '2024-12-25T09:00:00.000Z'
+  },
+  {
+    submissionId: 23,
+    submissionName: 'North Wollo Zone - 2024 Q4 Assessment',
+    unitId: 302, // North Wollo Zone (under Amhara Region)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-15T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-20T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-10T08:00:00.000Z',
+    updatedAt: '2024-11-25T16:00:00.000Z'
+  },
+  // Woreda submissions with different statuses
+  {
+    submissionId: 24,
+    submissionName: 'Shashemene Woreda - 2024 Assessment',
+    unitId: 2000, // Shashemene Woreda (under West Arsi Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-21T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-16T08:00:00.000Z',
+    updatedAt: '2024-12-21T08:00:00.000Z'
+  },
+  {
+    submissionId: 25,
+    submissionName: 'Kofele Woreda - 2024 Q4 Assessment',
+    unitId: 2001, // Kofele Woreda (under West Arsi Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-19T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-20T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-14T08:00:00.000Z',
+    updatedAt: '2024-12-20T14:00:00.000Z'
+  },
+  {
+    submissionId: 26,
+    submissionName: 'Gondar Woreda - 2024 Assessment',
+    unitId: 3000, // Gondar Woreda (under North Gondar Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-28T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-01T11:00:00.000Z',
+    rejectionReason: 'Central Committee requires additional documentation for policy framework questions.',
+    createdAt: '2024-11-25T08:00:00.000Z',
+    updatedAt: '2024-12-05T10:00:00.000Z'
+  },
+  {
+    submissionId: 27,
+    submissionName: 'Bishoftu Woreda - 2024 Assessment',
+    unitId: 2010, // Bishoftu Woreda (under East Shewa Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-12T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-18T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-08T08:00:00.000Z',
+    updatedAt: '2024-11-25T16:00:00.000Z'
+  },
+  {
+    submissionId: 28,
+    submissionName: 'Adama Woreda - 2024 Q4 Assessment',
+    unitId: 2011, // Adama Woreda (under East Shewa Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-22T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-17T08:00:00.000Z',
+    updatedAt: '2024-12-22T09:00:00.000Z'
+  },
+  {
+    submissionId: 29,
+    submissionName: 'Kokosa Woreda - 2024 Assessment',
+    unitId: 2002, // Kokosa Woreda (under West Arsi Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-26T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-21T08:00:00.000Z',
+    updatedAt: '2024-12-26T08:00:00.000Z'
+  },
+  {
+    submissionId: 30,
+    submissionName: 'Debark Woreda - 2024 Assessment',
+    unitId: 3001, // Debark Woreda (under North Gondar Zone)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-02T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-07T12:00:00.000Z',
+    rejectionReason: 'Policy framework documentation needs to be more comprehensive.',
+    createdAt: '2024-11-29T08:00:00.000Z',
+    updatedAt: '2024-12-10T10:00:00.000Z'
+  },
+  // City Administration submissions with different statuses
+  {
+    submissionId: 31,
+    submissionName: 'Addis Ababa City Administration - 2024 Q1 Assessment',
+    unitId: 10, // Addis Ababa City Administration
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-29T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-24T08:00:00.000Z',
+    updatedAt: '2024-12-29T09:00:00.000Z'
+  },
+  {
+    submissionId: 32,
+    submissionName: 'Addis Ababa City Administration - 2024 Q2 Assessment',
+    unitId: 10, // Addis Ababa City Administration
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-25T11:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-26T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-20T08:00:00.000Z',
+    updatedAt: '2024-12-26T15:00:00.000Z'
+  },
+  {
+    submissionId: 33,
+    submissionName: 'Addis Ababa City Administration - 2024 Annual Report',
+    unitId: 10, // Addis Ababa City Administration
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-25T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-30T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-20T08:00:00.000Z',
+    updatedAt: '2024-12-05T16:00:00.000Z'
+  },
+  {
+    submissionId: 34,
+    submissionName: 'Dire Dawa City Administration - 2024 Assessment',
+    unitId: 11, // Dire Dawa City Administration
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-27T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-22T08:00:00.000Z',
+    updatedAt: '2024-12-27T08:00:00.000Z'
+  },
+  // Sub-city submissions with different statuses
+  {
+    submissionId: 35,
+    submissionName: 'Bole Sub-city - 2024 Assessment',
+    unitId: 103, // Bole Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-28T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-23T08:00:00.000Z',
+    updatedAt: '2024-12-28T08:00:00.000Z'
+  },
+  {
+    submissionId: 36,
+    submissionName: 'Gullele Sub-city - 2024 Q4 Assessment',
+    unitId: 104, // Gullele Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-24T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-25T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-25T14:00:00.000Z'
+  },
+  {
+    submissionId: 37,
+    submissionName: 'Kirkos Sub-city - 2024 Assessment',
+    unitId: 105, // Kirkos Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-03T09:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-08T12:00:00.000Z',
+    rejectionReason: 'Central Committee found gaps in digital inclusion documentation.',
+    createdAt: '2024-11-30T08:00:00.000Z',
+    updatedAt: '2024-12-10T10:00:00.000Z'
+  },
+  {
+    submissionId: 38,
+    submissionName: 'Kolfe Keranio Sub-city - 2024 Assessment',
+    unitId: 106, // Kolfe Keranio Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-20T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-25T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-15T08:00:00.000Z',
+    updatedAt: '2024-11-30T16:00:00.000Z'
+  },
+  {
+    submissionId: 39,
+    submissionName: 'Lideta Sub-city - 2024 Assessment',
+    unitId: 107, // Lideta Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-30T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-25T08:00:00.000Z',
+    updatedAt: '2024-12-30T08:00:00.000Z'
+  },
+  {
+    submissionId: 40,
+    submissionName: 'Nifas Silk-Lafto Sub-city - 2024 Q4 Assessment',
+    unitId: 108, // Nifas Silk-Lafto Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-26T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-12-27T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-21T08:00:00.000Z',
+    updatedAt: '2024-12-27T14:00:00.000Z'
+  },
+  {
+    submissionId: 41,
+    submissionName: 'Yeka Sub-city - 2024 Assessment',
+    unitId: 109, // Yeka Sub-city (under Addis Ababa)
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-11-22T10:00:00.000Z',
+    approverUserId: 3, // approver1
+    approvalDate: '2024-11-27T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-11-17T08:00:00.000Z',
+    updatedAt: '2024-12-02T16:00:00.000Z'
   }
 ];
 
@@ -5397,6 +5850,621 @@ let responses = [
     regionalNote: null,
     createdAt: '2024-10-10T11:45:00.000Z',
     updatedAt: '2024-10-25T16:00:00.000Z'
+  },
+  
+  // Amhara Region Submissions
+  // Amhara Region itself
+  {
+    submissionId: 42,
+    submissionName: 'Amhara Region - 2024 Annual Assessment',
+    unitId: 21, // Amhara Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-20T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-18T08:00:00.000Z',
+    updatedAt: '2024-12-20T09:00:00.000Z'
+  },
+  {
+    submissionId: 43,
+    submissionName: 'Amhara Region - Q4 2024 Submission',
+    unitId: 21, // Amhara Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-15T10:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-16T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-10T08:00:00.000Z',
+    updatedAt: '2024-12-16T14:00:00.000Z'
+  },
+  {
+    submissionId: 44,
+    submissionName: 'Amhara Region - Digital Services 2024',
+    unitId: 21, // Amhara Region
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-28T09:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-01T15:00:00.000Z',
+    rejectionReason: 'Incomplete data submission. Please provide additional evidence for digital transformation initiatives.',
+    createdAt: '2024-11-25T08:00:00.000Z',
+    updatedAt: '2024-12-05T10:00:00.000Z'
+  },
+  
+  // North Gondar Zone submissions
+  {
+    submissionId: 45,
+    submissionName: 'North Gondar Zone - 2024 Assessment',
+    unitId: 300, // North Gondar Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-19T11:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-17T08:00:00.000Z',
+    updatedAt: '2024-12-19T11:00:00.000Z'
+  },
+  {
+    submissionId: 46,
+    submissionName: 'North Gondar Zone - Q3 2024 Report',
+    unitId: 300, // North Gondar Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-10T14:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-12T16:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-05T08:00:00.000Z',
+    updatedAt: '2024-12-12T16:00:00.000Z'
+  },
+  
+  // South Gondar Zone submissions
+  {
+    submissionId: 47,
+    submissionName: 'South Gondar Zone - 2024 Annual Report',
+    unitId: 301, // South Gondar Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-18T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-15T08:00:00.000Z',
+    updatedAt: '2024-12-18T10:00:00.000Z'
+  },
+  {
+    submissionId: 48,
+    submissionName: 'South Gondar Zone - E-Government Services',
+    unitId: 301, // South Gondar Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-30T09:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-03T14:00:00.000Z',
+    rejectionReason: 'Missing documentation for citizen engagement platforms. Please resubmit with complete evidence.',
+    createdAt: '2024-11-28T08:00:00.000Z',
+    updatedAt: '2024-12-08T11:00:00.000Z'
+  },
+  
+  // North Wollo Zone submissions
+  {
+    submissionId: 49,
+    submissionName: 'North Wollo Zone - 2024 Assessment',
+    unitId: 302, // North Wollo Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-21T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-21T08:00:00.000Z'
+  },
+  {
+    submissionId: 50,
+    submissionName: 'North Wollo Zone - Digital Infrastructure',
+    unitId: 302, // North Wollo Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-14T12:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-15T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-10T08:00:00.000Z',
+    updatedAt: '2024-12-15T15:00:00.000Z'
+  },
+  
+  // South Wollo Zone submissions
+  {
+    submissionId: 51,
+    submissionName: 'South Wollo Zone - 2024 Q4 Submission',
+    unitId: 303, // South Wollo Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-22T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-20T08:00:00.000Z',
+    updatedAt: '2024-12-22T09:00:00.000Z'
+  },
+  {
+    submissionId: 52,
+    submissionName: 'South Wollo Zone - Citizen Services 2024',
+    unitId: 303, // South Wollo Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-13T11:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-14T16:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-08T08:00:00.000Z',
+    updatedAt: '2024-12-14T16:00:00.000Z'
+  },
+  
+  // East Gojjam Zone submissions
+  {
+    submissionId: 53,
+    submissionName: 'East Gojjam Zone - 2024 Assessment',
+    unitId: 304, // East Gojjam Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-17T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-15T08:00:00.000Z',
+    updatedAt: '2024-12-17T10:00:00.000Z'
+  },
+  
+  // West Gojjam Zone submissions
+  {
+    submissionId: 54,
+    submissionName: 'West Gojjam Zone - 2024 Annual Report',
+    unitId: 305, // West Gojjam Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-11T13:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-13T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-08T08:00:00.000Z',
+    updatedAt: '2024-12-13T14:00:00.000Z'
+  },
+  {
+    submissionId: 55,
+    submissionName: 'West Gojjam Zone - E-Services Implementation',
+    unitId: 305, // West Gojjam Zone
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-25T09:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-11-28T15:00:00.000Z',
+    rejectionReason: 'Insufficient evidence for online service delivery. Please provide detailed documentation.',
+    createdAt: '2024-11-22T08:00:00.000Z',
+    updatedAt: '2024-12-02T10:00:00.000Z'
+  },
+  
+  // Woreda submissions - North Gondar Zone
+  {
+    submissionId: 56,
+    submissionName: 'Gondar Woreda - 2024 Assessment',
+    unitId: 3000, // Gondar Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-20T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-18T08:00:00.000Z',
+    updatedAt: '2024-12-20T08:00:00.000Z'
+  },
+  {
+    submissionId: 57,
+    submissionName: 'Debark Woreda - 2024 Q4 Report',
+    unitId: 3001, // Debark Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-16T10:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-17T14:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-12T08:00:00.000Z',
+    updatedAt: '2024-12-17T14:00:00.000Z'
+  },
+  {
+    submissionId: 58,
+    submissionName: 'Beyeda Woreda - 2024 Assessment',
+    unitId: 3002, // Beyeda Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-19T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-17T08:00:00.000Z',
+    updatedAt: '2024-12-19T09:00:00.000Z'
+  },
+  {
+    submissionId: 59,
+    submissionName: 'Janamora Woreda - Digital Services',
+    unitId: 3003, // Janamora Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-01T08:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-04T13:00:00.000Z',
+    rejectionReason: 'Missing information on citizen engagement platforms. Please provide complete documentation.',
+    createdAt: '2024-11-28T08:00:00.000Z',
+    updatedAt: '2024-12-06T10:00:00.000Z'
+  },
+  {
+    submissionId: 60,
+    submissionName: 'Dabat Woreda - 2024 Assessment',
+    unitId: 3004, // Dabat Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-21T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-21T10:00:00.000Z'
+  },
+  {
+    submissionId: 61,
+    submissionName: 'Telemt Woreda - 2024 Q4 Submission',
+    unitId: 3005, // Telemt Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-15T11:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-16T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-11T08:00:00.000Z',
+    updatedAt: '2024-12-16T15:00:00.000Z'
+  },
+  
+  // Woreda submissions - South Gondar Zone
+  {
+    submissionId: 62,
+    submissionName: 'Ebenat Woreda - 2024 Assessment',
+    unitId: 3010, // Ebenat Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-18T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-16T08:00:00.000Z',
+    updatedAt: '2024-12-18T09:00:00.000Z'
+  },
+  {
+    submissionId: 63,
+    submissionName: 'Fogera Woreda - 2024 Annual Report',
+    unitId: 3011, // Fogera Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-14T12:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-15T16:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-10T08:00:00.000Z',
+    updatedAt: '2024-12-15T16:00:00.000Z'
+  },
+  {
+    submissionId: 64,
+    submissionName: 'Farta Woreda - E-Government Services',
+    unitId: 3012, // Farta Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-11-29T10:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-02T14:00:00.000Z',
+    rejectionReason: 'Incomplete data on online service delivery. Please resubmit with full documentation.',
+    createdAt: '2024-11-26T08:00:00.000Z',
+    updatedAt: '2024-12-05T11:00:00.000Z'
+  },
+  {
+    submissionId: 65,
+    submissionName: 'Lay Gayint Woreda - 2024 Assessment',
+    unitId: 3013, // Lay Gayint Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-22T08:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-20T08:00:00.000Z',
+    updatedAt: '2024-12-22T08:00:00.000Z'
+  },
+  {
+    submissionId: 66,
+    submissionName: 'Tach Gayint Woreda - 2024 Q4 Submission',
+    unitId: 3014, // Tach Gayint Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-13T13:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-14T17:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-09T08:00:00.000Z',
+    updatedAt: '2024-12-14T17:00:00.000Z'
+  },
+  {
+    submissionId: 67,
+    submissionName: 'Semada Woreda - Digital Infrastructure',
+    unitId: 3015, // Semada Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-17T11:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-15T08:00:00.000Z',
+    updatedAt: '2024-12-17T11:00:00.000Z'
+  },
+  
+  // Woreda submissions - North Wollo Zone
+  {
+    submissionId: 68,
+    submissionName: 'Woldiya Woreda - 2024 Assessment',
+    unitId: 3020, // Woldiya Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-19T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-17T08:00:00.000Z',
+    updatedAt: '2024-12-19T10:00:00.000Z'
+  },
+  {
+    submissionId: 69,
+    submissionName: 'Kobo Woreda - 2024 Annual Report',
+    unitId: 3021, // Kobo Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-12T14:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-13T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-08T08:00:00.000Z',
+    updatedAt: '2024-12-13T15:00:00.000Z'
+  },
+  {
+    submissionId: 70,
+    submissionName: 'Meket Woreda - E-Services 2024',
+    unitId: 3022, // Meket Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-03T09:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-06T13:00:00.000Z',
+    rejectionReason: 'Missing evidence for citizen engagement initiatives. Please provide complete documentation.',
+    createdAt: '2024-11-30T08:00:00.000Z',
+    updatedAt: '2024-12-09T10:00:00.000Z'
+  },
+  {
+    submissionId: 71,
+    submissionName: 'Bugna Woreda - 2024 Assessment',
+    unitId: 3023, // Bugna Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-21T09:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-21T09:00:00.000Z'
+  },
+  {
+    submissionId: 72,
+    submissionName: 'Raya Kobo Woreda - 2024 Q4 Submission',
+    unitId: 3024, // Raya Kobo Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-11T15:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-12T16:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-07T08:00:00.000Z',
+    updatedAt: '2024-12-12T16:00:00.000Z'
+  },
+  
+  // Woreda submissions - South Wollo Zone
+  {
+    submissionId: 73,
+    submissionName: 'Dessie Woreda - 2024 Assessment',
+    unitId: 3030, // Dessie Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-20T11:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-18T08:00:00.000Z',
+    updatedAt: '2024-12-20T11:00:00.000Z'
+  },
+  {
+    submissionId: 74,
+    submissionName: 'Kombolcha Woreda - Digital Transformation',
+    unitId: 3031, // Kombolcha Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-16T12:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-17T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-12T08:00:00.000Z',
+    updatedAt: '2024-12-17T15:00:00.000Z'
+  },
+  {
+    submissionId: 75,
+    submissionName: 'Kutaber Woreda - 2024 Annual Report',
+    unitId: 3032, // Kutaber Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-02T10:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-05T14:00:00.000Z',
+    rejectionReason: 'Incomplete information on online service platforms. Please provide detailed evidence.',
+    createdAt: '2024-11-29T08:00:00.000Z',
+    updatedAt: '2024-12-07T11:00:00.000Z'
+  },
+  {
+    submissionId: 76,
+    submissionName: 'Ambasel Woreda - 2024 Assessment',
+    unitId: 3033, // Ambasel Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-22T10:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-20T08:00:00.000Z',
+    updatedAt: '2024-12-22T10:00:00.000Z'
+  },
+  {
+    submissionId: 77,
+    submissionName: 'Tenta Woreda - 2024 Q4 Submission',
+    unitId: 3034, // Tenta Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-14T13:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-15T17:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-10T08:00:00.000Z',
+    updatedAt: '2024-12-15T17:00:00.000Z'
+  },
+  
+  // Woreda submissions - East Gojjam Zone
+  {
+    submissionId: 78,
+    submissionName: 'Debre Markos Woreda - 2024 Assessment',
+    unitId: 3040, // Debre Markos Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-18T12:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-16T08:00:00.000Z',
+    updatedAt: '2024-12-18T12:00:00.000Z'
+  },
+  {
+    submissionId: 79,
+    submissionName: 'Dejen Woreda - E-Government Services',
+    unitId: 3041, // Dejen Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-15T14:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-16T18:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-11T08:00:00.000Z',
+    updatedAt: '2024-12-16T18:00:00.000Z'
+  },
+  {
+    submissionId: 80,
+    submissionName: 'Bure Woreda - 2024 Annual Report',
+    unitId: 3042, // Bure Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+    submittedDate: '2024-12-04T11:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-07T15:00:00.000Z',
+    rejectionReason: 'Missing documentation for digital service delivery. Please resubmit with complete evidence.',
+    createdAt: '2024-12-01T08:00:00.000Z',
+    updatedAt: '2024-12-09T12:00:00.000Z'
+  },
+  
+  // Woreda submissions - West Gojjam Zone
+  {
+    submissionId: 81,
+    submissionName: 'Finote Selam Woreda - 2024 Assessment',
+    unitId: 3050, // Finote Selam Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-19T13:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-17T08:00:00.000Z',
+    updatedAt: '2024-12-19T13:00:00.000Z'
+  },
+  {
+    submissionId: 82,
+    submissionName: 'Dangila Woreda - Digital Infrastructure',
+    unitId: 3051, // Dangila Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+    submittedDate: '2024-12-17T15:00:00.000Z',
+    approverUserId: 6, // amhara_approver
+    approvalDate: '2024-12-18T19:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-13T08:00:00.000Z',
+    updatedAt: '2024-12-18T19:00:00.000Z'
+  },
+  {
+    submissionId: 83,
+    submissionName: 'Motta Woreda - 2024 Q4 Submission',
+    unitId: 3052, // Motta Woreda
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 2, // contributor1
+    submissionStatus: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+    submittedDate: '2024-12-21T11:00:00.000Z',
+    approverUserId: null,
+    approvalDate: null,
+    rejectionReason: null,
+    createdAt: '2024-12-19T08:00:00.000Z',
+    updatedAt: '2024-12-21T11:00:00.000Z'
   }
   
   // NOTE: The above responses are sample data. In production, ALL applicable questions for each unit type

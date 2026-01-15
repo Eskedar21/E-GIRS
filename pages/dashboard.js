@@ -3,10 +3,12 @@ import Layout from '../components/Layout';
 import Sidebar from '../components/Sidebar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import { getAllUnits } from '../data/administrativeUnits';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isCollapsed } = useSidebar();
   const userRole = user ? user.role : '';
   const [units] = useState(getAllUnits());
   const [stats, setStats] = useState({
@@ -209,8 +211,8 @@ export default function Dashboard() {
       <Layout title="Dashboard">
         <div className="flex">
           <Sidebar />
-        <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-          <div className="w-full">
+        <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                 Dashboard

@@ -103,6 +103,17 @@ export default function AssessmentFramework() {
     }
   };
 
+  const handleStatusChange = (yearId, newStatus) => {
+    updateAssessmentYear(yearId, { status: newStatus });
+    refreshData();
+    setSuccessMessage('Assessment Year status updated successfully!');
+    setTimeout(() => setSuccessMessage(''), 5000);
+    // Dispatch event to notify other pages
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
+  };
+
   // Dimension Management
   const handleDimensionSubmit = (e) => {
     e.preventDefault();
@@ -274,7 +285,7 @@ export default function AssessmentFramework() {
         <div className="flex">
           <Sidebar />
         <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                 Assessment Framework Management
@@ -401,12 +412,14 @@ export default function AssessmentFramework() {
                       {years.map((year) => (
                         <Card
                           key={year.assessmentYearId}
-                          onClick={() => setSelectedYear(year)}
-                          className="cursor-pointer hover:border-mint-primary-blue hover:shadow-md transition-all"
+                          className="hover:border-mint-primary-blue hover:shadow-md transition-all"
                         >
                           <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
+                            <div className="flex justify-between items-start mb-3">
+                              <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => setSelectedYear(year)}
+                              >
                                 <h3 className="font-semibold text-mint-dark-text mb-1">{year.yearName}</h3>
                                 <p className="text-sm text-mint-dark-text/70">Status: {year.status}</p>
                               </div>
@@ -419,6 +432,31 @@ export default function AssessmentFramework() {
                               }`}>
                                 {year.status}
                               </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Select
+                                value={year.status}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleStatusChange(year.assessmentYearId, e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1 text-sm"
+                              >
+                                <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
+                                <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
+                                <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
+                              </Select>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedYear(year);
+                                }}
+                                variant="outline"
+                                className="text-xs px-3"
+                              >
+                                Manage
+                              </Button>
                             </div>
                           </CardContent>
                         </Card>

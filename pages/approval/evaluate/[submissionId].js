@@ -4,6 +4,7 @@ import Layout from '../../../components/Layout';
 import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSidebar } from '../../../contexts/SidebarContext';
 import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
 import { getResponsesBySubmission } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
@@ -16,6 +17,12 @@ export default function EvaluateSubmission() {
   const router = useRouter();
   const { submissionId } = router.query;
   const { user } = useAuth();
+  const { isCollapsed, setCollapsed } = useSidebar();
+  
+  // Force sidebar to be collapsed on this page
+  useEffect(() => {
+    setCollapsed(true);
+  }, [setCollapsed]);
   const [submissionDetails, setSubmissionDetails] = useState(null);
   const [rejectionReasons, setRejectionReasons] = useState({});
   const [regionalNotes, setRegionalNotes] = useState({});
@@ -276,7 +283,7 @@ export default function EvaluateSubmission() {
         <Layout title="Evaluate Submission">
           <div className="flex">
             <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
               <div className="w-full">
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray text-center">
                   <p className="text-mint-dark-text/70">Loading submission details...</p>
@@ -299,7 +306,7 @@ export default function EvaluateSubmission() {
           <Sidebar />
           {/* Assessment Dimensions Navigation Sidebar */}
           {submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && (
-            <aside className="w-80 bg-transparent fixed left-64 top-16 bottom-0 overflow-y-auto z-40 pl-8">
+            <aside className={`w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
               <div className="p-4 pt-8">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Assessment Dimensions</h2>
                 <div className="space-y-1">
@@ -328,10 +335,10 @@ export default function EvaluateSubmission() {
               </div>
             </aside>
           )}
-          <div className="flex flex-grow ml-64" style={submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 ? { marginLeft: 'calc(256px + 320px)' } : {}}>
+          <div className={`flex flex-grow transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`} style={submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 ? { marginLeft: isCollapsed ? 'calc(64px + 320px)' : 'calc(256px + 320px)' } : {}}>
             {/* Main Content */}
             <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
-              <div className="w-full max-w-5xl mx-auto">
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Success Message */}
                 {successMessage && (
                   <div className={`mb-6 p-4 rounded-lg ${

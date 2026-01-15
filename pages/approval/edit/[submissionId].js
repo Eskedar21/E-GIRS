@@ -220,7 +220,7 @@ export default function EditSubmission() {
           <div className="flex flex-grow ml-64">
             {/* Main Content */}
             <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
-              <div className="w-full max-w-5xl mx-auto">
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Success Message */}
                 {successMessage && (
                   <div className="mb-6 p-4 rounded-lg bg-green-100 border border-green-300">

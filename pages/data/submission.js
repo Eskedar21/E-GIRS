@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { 
   getAllAssessmentYears, 
   getAssessmentYearById,
@@ -27,24 +28,9 @@ import { getSubQuestionById } from '../../data/assessmentFramework';
 
 export default function DataSubmission() {
   const { user } = useAuth();
+  const { isCollapsed, setCollapsed } = useSidebar();
   
-  // Early return if no user - ProtectedRoute will handle redirect
-  if (!user) {
-    return (
-      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
-        <div></div>
-      </ProtectedRoute>
-    );
-  }
-  
-  const currentUser = {
-    userId: user.userId,
-    unitId: user.officialUnitId,
-    unitType: user.unitType,
-    role: user.role
-  };
-  const userRole = user.role;
-  
+  // All hooks must be called unconditionally at the top level
   const [assessmentYears, setAssessmentYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
   const [dimensions, setDimensions] = useState([]);
@@ -61,41 +47,16 @@ export default function DataSubmission() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
 
-  // Check if user has unit assigned
-  if (!user.officialUnitId) {
-    return (
-      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
-        <Layout title="Data Submission">
-          <div className="flex">
-            <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-              <div className="w-full">
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                  <p className="font-semibold">No Unit Assigned</p>
-                  <p className="text-sm mt-1">Your account is not assigned to an administrative unit. Please contact your administrator.</p>
-                </div>
-              </div>
-            </main>
-          </div>
-        </Layout>
-      </ProtectedRoute>
-    );
-  }
-
-  const currentUnit = getUnitById(currentUser.unitId);
-
-  // Memoize loadSubmission to avoid infinite loops
+  // Memoize loadSubmission to avoid infinite loops - must be defined before conditional returns
   const loadSubmission = useCallback(() => {
-    if (!selectedYear || !user) return;
+    if (!selectedYear || !user || !user.officialUnitId) return;
     
     // Ensure user can only access their own unit's submissions
-    if (currentUser.unitId !== user.officialUnitId) {
-      alert('You can only access submissions for your assigned unit.');
-      return;
-    }
+    const unitId = user.officialUnitId;
+    const userId = user.userId;
     
     // Check if submission exists for this unit and year
-    const existingSubmissions = getSubmissionsByUnit(currentUser.unitId);
+    const existingSubmissions = getSubmissionsByUnit(unitId);
     const existingSubmission = existingSubmissions.find(s => 
       s.assessmentYearId === selectedYear.assessmentYearId &&
       (s.submissionStatus === SUBMISSION_STATUS.DRAFT || 
@@ -133,14 +94,14 @@ export default function DataSubmission() {
       
       // Create new submission
       const newSubmission = createSubmission({
-        unitId: currentUser.unitId,
+        unitId: unitId,
         assessmentYearId: selectedYear.assessmentYearId,
-        contributorUserId: currentUser.userId,
+        contributorUserId: userId,
         submissionName: submissionName || null
       });
       setSubmission(newSubmission);
     }
-  }, [selectedYear, user, currentUser.unitId, currentUser.userId]);
+  }, [selectedYear, user, submissionName]);
 
   useEffect(() => {
     // Reload assessment years to get newly created ones
@@ -180,7 +141,7 @@ export default function DataSubmission() {
   }, [selectedYear]);
 
   useEffect(() => {
-    if (selectedYear && currentUser.unitType) {
+    if (selectedYear && user?.unitType) {
       try {
         const yearDimensions = getDimensionsByYear(selectedYear.assessmentYearId);
         if (!yearDimensions || yearDimensions.length === 0) {
@@ -207,7 +168,7 @@ export default function DataSubmission() {
             if (ut === 'Sub-city') return ['Woreda'];
             return [ut];
           };
-          const applicableUnitTypes = getApplicableUnitTypes(currentUser.unitType);
+          const applicableUnitTypes = getApplicableUnitTypes(user?.unitType);
           // Filter indicators by applicable unit type
           const applicableIndicators = dimIndicators.filter(ind => 
             applicableUnitTypes.includes(ind.applicableUnitType)
@@ -232,12 +193,81 @@ export default function DataSubmission() {
         setSuccessMessage('Error loading assessment framework. Please refresh the page.');
         setTimeout(() => setSuccessMessage(''), 5000);
       }
-    } else if (selectedYear && !currentUser.unitType) {
+    } else if (selectedYear && !user?.unitType) {
       setDimensions([]);
       setIndicators([]);
       setSubQuestions([]);
     }
-  }, [selectedYear, currentUser.unitId, currentUser.unitType, loadSubmission]);
+  }, [selectedYear, user, loadSubmission]);
+
+  // Group sub-questions by dimension and indicator - must be computed before conditional returns
+  const groupedQuestions = useMemo(() => {
+    return dimensions.map(dimension => {
+      const dimIndicators = indicators.filter(ind => ind.dimensionId === dimension.dimensionId);
+      return {
+        dimension,
+        indicators: dimIndicators.map(indicator => ({
+          indicator,
+          subQuestions: subQuestions.filter(sq => sq.parentIndicatorId === indicator.indicatorId)
+        }))
+      };
+    }).filter(group => group.indicators.length > 0);
+  }, [dimensions, indicators, subQuestions]);
+
+  // Update active section when dimension index changes
+  useEffect(() => {
+    if (groupedQuestions.length > 0 && currentDimensionIndex >= 0 && currentDimensionIndex < groupedQuestions.length) {
+      const dimension = groupedQuestions[currentDimensionIndex].dimension;
+      setActiveSection(dimension.dimensionId);
+    }
+  }, [currentDimensionIndex, groupedQuestions]);
+
+  // Reset to first dimension when year or questions change
+  useEffect(() => {
+    if (groupedQuestions.length > 0) {
+      setCurrentDimensionIndex(0);
+    }
+  }, [selectedYear?.assessmentYearId, groupedQuestions]);
+  
+  // Early return if no user - ProtectedRoute will handle redirect
+  if (!user) {
+    return (
+      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
+        <div></div>
+      </ProtectedRoute>
+    );
+  }
+  
+  const currentUser = {
+    userId: user.userId,
+    unitId: user.officialUnitId,
+    unitType: user.unitType,
+    role: user.role
+  };
+  const userRole = user.role;
+
+  // Check if user has unit assigned
+  if (!user.officialUnitId) {
+    return (
+      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
+        <Layout title="Data Submission">
+          <div className="flex">
+            <Sidebar />
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
+              <div className="w-full">
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                  <p className="font-semibold">No Unit Assigned</p>
+                  <p className="text-sm mt-1">Your account is not assigned to an administrative unit. Please contact your administrator.</p>
+                </div>
+              </div>
+            </main>
+          </div>
+        </Layout>
+      </ProtectedRoute>
+    );
+  }
+
+  const currentUnit = getUnitById(currentUser.unitId);
 
   const handleResponseChange = (subQuestionId, value) => {
     setResponses(prev => ({
@@ -598,18 +628,6 @@ export default function DataSubmission() {
     }
   };
 
-  // Group sub-questions by dimension and indicator
-  const groupedQuestions = dimensions.map(dimension => {
-    const dimIndicators = indicators.filter(ind => ind.dimensionId === dimension.dimensionId);
-    return {
-      dimension,
-      indicators: dimIndicators.map(indicator => ({
-        indicator,
-        subQuestions: subQuestions.filter(sq => sq.parentIndicatorId === indicator.indicatorId)
-      }))
-    };
-  }).filter(group => group.indicators.length > 0);
-
   // Calculate progress
   const totalAnsweredQuestions = Object.keys(responses).filter(k => responses[k] && responses[k] !== '').length;
   const totalQuestions = subQuestions.length;
@@ -648,29 +666,14 @@ export default function DataSubmission() {
     }
   };
 
-  // Update active section when dimension index changes
-  useEffect(() => {
-    if (groupedQuestions.length > 0 && currentDimensionIndex >= 0 && currentDimensionIndex < groupedQuestions.length) {
-      const dimension = groupedQuestions[currentDimensionIndex].dimension;
-      setActiveSection(dimension.dimensionId);
-    }
-  }, [currentDimensionIndex, groupedQuestions]);
-
-  // Reset to first dimension when year or questions change
-  useEffect(() => {
-    if (groupedQuestions.length > 0) {
-      setCurrentDimensionIndex(0);
-    }
-  }, [selectedYear?.assessmentYearId]);
-
   return (
     <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
       <Layout title="Data Submission">
         <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
           {/* Assessment Dimensions Navigation Sidebar */}
-          <aside className="w-80 bg-transparent fixed left-64 top-16 bottom-0 overflow-y-auto z-40 pl-8">
-            <div className="p-4 pt-8">
+          <aside className="w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-4 pr-0 left-64 transition-all duration-300">
+            <div className="pl-4 pr-0 pt-8 pb-4">
               {/* Progress Header */}
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-gray-900 mb-2">Assessment Dimensions</h2>
@@ -743,8 +746,8 @@ export default function DataSubmission() {
             </div>
           </aside>
 
-          <main className="flex-grow ml-[calc(256px+320px)] pl-4 pr-8 py-8 bg-gray-50 text-gray-900 min-h-screen">
-          <div className="w-full">
+          <main className="flex-grow pl-2 pr-8 py-8 bg-gray-50 text-gray-900 min-h-screen ml-[calc(256px+320px)] transition-all duration-300">
+          <div className="w-full max-w-6xl mx-auto">
             {/* Page Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">

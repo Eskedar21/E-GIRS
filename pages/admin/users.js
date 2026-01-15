@@ -66,7 +66,7 @@ export default function UserManagement() {
         <div className="flex">
           <Sidebar />
         <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6">
               <div className="flex items-center justify-between">
                 <div>

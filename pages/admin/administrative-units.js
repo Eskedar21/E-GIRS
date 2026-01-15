@@ -3,6 +3,7 @@ import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -24,6 +25,7 @@ import {
 
 export default function AdministrativeUnitsManagement() {
   const { user } = useAuth();
+  const { isCollapsed } = useSidebar();
   const [units, setUnits] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -409,8 +411,8 @@ export default function AdministrativeUnitsManagement() {
       <Layout title="Administrative Unit Management">
         <div className="flex">
           <Sidebar />
-        <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-          <div className="max-w-7xl mx-auto">
+        <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
+          <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">

@@ -469,6 +469,245 @@ const defaultAdministrativeUnits = [
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
+  {
+    unitId: 3002,
+    officialUnitName: 'Beyeda',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031103',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3003,
+    officialUnitName: 'Janamora',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031104',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3004,
+    officialUnitName: 'Dabat',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031105',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3005,
+    officialUnitName: 'Telemt',
+    unitType: 'Woreda',
+    parentUnitId: 300, // North Gondar Zone
+    pCode: 'ET031106',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Sample Woredas from Amhara - South Gondar Zone
+  {
+    unitId: 3010,
+    officialUnitName: 'Ebenat',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030601',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3011,
+    officialUnitName: 'Fogera',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030602',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3012,
+    officialUnitName: 'Farta',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030603',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3013,
+    officialUnitName: 'Lay Gayint',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030604',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3014,
+    officialUnitName: 'Tach Gayint',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030605',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3015,
+    officialUnitName: 'Semada',
+    unitType: 'Woreda',
+    parentUnitId: 301, // South Gondar Zone
+    pCode: 'ET030606',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Sample Woredas from Amhara - North Wollo Zone
+  {
+    unitId: 3020,
+    officialUnitName: 'Woldiya',
+    unitType: 'Woreda',
+    parentUnitId: 302, // North Wollo Zone
+    pCode: 'ET030901',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3021,
+    officialUnitName: 'Kobo',
+    unitType: 'Woreda',
+    parentUnitId: 302, // North Wollo Zone
+    pCode: 'ET030902',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3022,
+    officialUnitName: 'Meket',
+    unitType: 'Woreda',
+    parentUnitId: 302, // North Wollo Zone
+    pCode: 'ET030903',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3023,
+    officialUnitName: 'Bugna',
+    unitType: 'Woreda',
+    parentUnitId: 302, // North Wollo Zone
+    pCode: 'ET030904',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3024,
+    officialUnitName: 'Raya Kobo',
+    unitType: 'Woreda',
+    parentUnitId: 302, // North Wollo Zone
+    pCode: 'ET030905',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Sample Woredas from Amhara - South Wollo Zone
+  {
+    unitId: 3030,
+    officialUnitName: 'Dessie',
+    unitType: 'Woreda',
+    parentUnitId: 303, // South Wollo Zone
+    pCode: 'ET030501',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3031,
+    officialUnitName: 'Kombolcha',
+    unitType: 'Woreda',
+    parentUnitId: 303, // South Wollo Zone
+    pCode: 'ET030502',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3032,
+    officialUnitName: 'Kutaber',
+    unitType: 'Woreda',
+    parentUnitId: 303, // South Wollo Zone
+    pCode: 'ET030503',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3033,
+    officialUnitName: 'Ambasel',
+    unitType: 'Woreda',
+    parentUnitId: 303, // South Wollo Zone
+    pCode: 'ET030504',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3034,
+    officialUnitName: 'Tenta',
+    unitType: 'Woreda',
+    parentUnitId: 303, // South Wollo Zone
+    pCode: 'ET030505',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Sample Woredas from Amhara - East Gojjam Zone
+  {
+    unitId: 3040,
+    officialUnitName: 'Debre Markos',
+    unitType: 'Woreda',
+    parentUnitId: 304, // East Gojjam Zone
+    pCode: 'ET030301',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3041,
+    officialUnitName: 'Dejen',
+    unitType: 'Woreda',
+    parentUnitId: 304, // East Gojjam Zone
+    pCode: 'ET030302',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3042,
+    officialUnitName: 'Bure',
+    unitType: 'Woreda',
+    parentUnitId: 304, // East Gojjam Zone
+    pCode: 'ET030303',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Sample Woredas from Amhara - West Gojjam Zone
+  {
+    unitId: 3050,
+    officialUnitName: 'Finote Selam',
+    unitType: 'Woreda',
+    parentUnitId: 305, // West Gojjam Zone
+    pCode: 'ET030401',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3051,
+    officialUnitName: 'Dangila',
+    unitType: 'Woreda',
+    parentUnitId: 305, // West Gojjam Zone
+    pCode: 'ET030402',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    unitId: 3052,
+    officialUnitName: 'Motta',
+    unitType: 'Woreda',
+    parentUnitId: 305, // West Gojjam Zone
+    pCode: 'ET030403',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
   
   // Sample Woredas from Tigray - North Western Zone
   {

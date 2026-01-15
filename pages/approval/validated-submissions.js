@@ -99,7 +99,7 @@ export default function ValidatedSubmissions() {
         <div className="flex">
           <Sidebar />
           <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-            <div className="w-full">
+            <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <a

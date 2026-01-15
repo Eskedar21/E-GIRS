@@ -43,9 +43,9 @@ const defaultUsers = [
   {
     userId: 3,
     username: 'approver1',
-    email: 'approver@example.gov.et',
+    email: 'addis.approver@addisababa.gov.et',
     password: 'Approver123!',
-    officialUnitId: 3, // Addis Ababa City Administration
+    officialUnitId: 10, // Addis Ababa City Administration
     role: 'Regional Approver',
     isEmailVerified: true,
     isAccountLocked: false,
@@ -73,6 +73,23 @@ const defaultUsers = [
     passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 6,
+    username: 'amhara_approver',
+    email: 'amhara.approver@amhara.gov.et',
+    password: 'Amhara123!',
+    officialUnitId: 21, // Amhara Region
+    role: 'Regional Approver',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
   }
 ];
 
@@ -88,7 +105,7 @@ const loadUsers = () => {
     if (stored) {
       const parsed = JSON.parse(stored);
       // Ensure all users have required fields
-      return parsed.map(user => ({
+      let storedUsers = parsed.map(user => ({
         ...user,
         emailVerificationToken: user.emailVerificationToken || null,
         passwordResetToken: user.passwordResetToken || null,
@@ -97,6 +114,19 @@ const loadUsers = () => {
         isAccountLocked: user.isAccountLocked !== undefined ? user.isAccountLocked : false,
         isTwoFactorEnabled: user.isTwoFactorEnabled !== undefined ? user.isTwoFactorEnabled : false,
       }));
+      
+      // Merge with default users - add any new users from defaults that don't exist in stored
+      const storedUserIds = new Set(storedUsers.map(u => u.userId));
+      const newUsersFromDefaults = defaultUsers.filter(u => !storedUserIds.has(u.userId));
+      
+      if (newUsersFromDefaults.length > 0) {
+        // Add new users from defaults
+        storedUsers = [...storedUsers, ...newUsersFromDefaults];
+        // Update stored users in localStorage
+        saveUsers(storedUsers);
+      }
+      
+      return storedUsers;
     }
   } catch (error) {
     console.error('Error loading users from localStorage:', error);

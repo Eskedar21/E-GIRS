@@ -4,6 +4,7 @@ import Layout from '../../../components/Layout';
 import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSidebar } from '../../../contexts/SidebarContext';
 import { getSubmissionById, getResponsesBySubmission, validateResponse, submitCentralValidation, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
@@ -15,6 +16,12 @@ export default function EvaluateCentralSubmission() {
   const router = useRouter();
   const { submissionId } = router.query;
   const { user } = useAuth();
+  const { isCollapsed, setCollapsed } = useSidebar();
+  
+  // Force sidebar to be collapsed on this page
+  useEffect(() => {
+    setCollapsed(true);
+  }, [setCollapsed]);
   const [submissionDetails, setSubmissionDetails] = useState(null);
   const [validationNotes, setValidationNotes] = useState({});
   const [rejectionReasons, setRejectionReasons] = useState({});
@@ -22,6 +29,8 @@ export default function EvaluateCentralSubmission() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [openCommentSections, setOpenCommentSections] = useState({});
+  const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
+  const [activeSection, setActiveSection] = useState(null);
 
   useEffect(() => {
     if (submissionId) {
@@ -237,13 +246,53 @@ export default function EvaluateCentralSubmission() {
     return map;
   }, [submissionDetails]);
 
+  // Navigate to dimension by index
+  const goToDimension = (index) => {
+    if (submissionDetails?.groupedData && index >= 0 && index < submissionDetails.groupedData.length) {
+      setCurrentDimensionIndex(index);
+      const dimension = submissionDetails.groupedData[index].dimension;
+      setActiveSection(dimension.dimensionId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Navigate to next dimension
+  const goToNextDimension = () => {
+    if (submissionDetails?.groupedData && currentDimensionIndex < submissionDetails.groupedData.length - 1) {
+      goToDimension(currentDimensionIndex + 1);
+    }
+  };
+
+  // Navigate to previous dimension
+  const goToPreviousDimension = () => {
+    if (currentDimensionIndex > 0) {
+      goToDimension(currentDimensionIndex - 1);
+    }
+  };
+
+  // Update active section when dimension index changes
+  useEffect(() => {
+    if (submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && 
+        currentDimensionIndex >= 0 && currentDimensionIndex < submissionDetails.groupedData.length) {
+      const dimension = submissionDetails.groupedData[currentDimensionIndex].dimension;
+      setActiveSection(dimension.dimensionId);
+    }
+  }, [currentDimensionIndex, submissionDetails]);
+
+  // Reset to first dimension when submission changes
+  useEffect(() => {
+    if (submissionDetails?.groupedData && submissionDetails.groupedData.length > 0) {
+      setCurrentDimensionIndex(0);
+    }
+  }, [submissionId]);
+
   if (!submissionDetails) {
     return (
       <ProtectedRoute allowedRoles={['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']}>
         <Layout title="Evaluate Submission">
           <div className="flex">
             <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
               <div className="w-full">
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray text-center">
                   <p className="text-mint-dark-text/70">Loading submission details...</p>
@@ -261,12 +310,43 @@ export default function EvaluateCentralSubmission() {
   return (
     <ProtectedRoute allowedRoles={['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']}>
       <Layout title="Evaluate Submission">
-        <div className="flex">
+        <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
-          <div className="flex flex-grow ml-64">
+          {/* Assessment Dimensions Navigation Sidebar */}
+          {submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && (
+            <aside className={`w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
+              <div className="p-4 pt-8">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Assessment Dimensions</h2>
+                <div className="space-y-1">
+                  {submissionDetails.groupedData.map(({ dimension }, index) => (
+                    <div key={dimension.dimensionId}>
+                      <button
+                        onClick={() => goToDimension(index)}
+                        className={`w-full flex items-center text-left p-2 rounded-lg transition-all ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670]/10 text-[#0d6670] border-l-4 border-[#0d6670]'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670] text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <span className="text-sm font-medium flex-1">{dimension.dimensionName}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          )}
+          <div className={`flex flex-grow transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`} style={submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 ? { marginLeft: isCollapsed ? 'calc(64px + 320px)' : 'calc(256px + 320px)' } : {}}>
             {/* Main Content */}
             <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
-              <div className="w-full max-w-5xl mx-auto">
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Success Message */}
                 {successMessage && (
                   <div className={`mb-6 p-4 rounded-lg ${
@@ -539,6 +619,39 @@ export default function EvaluateCentralSubmission() {
               ) : (
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray text-center">
                   <p className="text-mint-dark-text/70">No questions available for this submission.</p>
+                </div>
+              )}
+              
+              {/* Navigation Buttons */}
+              {submissionDetails.groupedData && submissionDetails.groupedData.length > 0 && (
+                <div className="flex items-center justify-between bg-white border-2 border-mint-medium-gray rounded-xl p-6 shadow-sm mt-6">
+                  <button
+                    onClick={goToPreviousDimension}
+                    disabled={currentDimensionIndex === 0}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                      currentDimensionIndex === 0
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-mint-primary-blue hover:bg-mint-secondary-blue text-white'
+                    }`}
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="text-sm text-mint-dark-text">
+                    Dimension {currentDimensionIndex + 1} of {submissionDetails.groupedData.length}
+                  </div>
+                  
+                  <button
+                    onClick={goToNextDimension}
+                    disabled={currentDimensionIndex === submissionDetails.groupedData.length - 1}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                      currentDimensionIndex === submissionDetails.groupedData.length - 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-mint-primary-blue hover:bg-mint-secondary-blue text-white'
+                    }`}
+                  >
+                    Next →
+                  </button>
                 </div>
               )}
               </div>

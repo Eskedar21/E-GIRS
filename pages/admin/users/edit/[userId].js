@@ -204,7 +204,7 @@ export default function EditUser() {
           <div className="flex">
             <Sidebar />
             <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-              <div className="max-w-4xl mx-auto">
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <p>Loading...</p>
               </div>
             </main>

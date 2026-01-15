@@ -98,7 +98,7 @@ export default function ReportsIndex() {
         <div className="flex">
           <Sidebar />
           <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-            <div className="w-full">
+            <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
               {/* Header */}
               <div className="mb-8">
                 <h1 className="text-4xl font-bold text-mint-primary-blue mb-2">
