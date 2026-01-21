@@ -7,7 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { getSubmissionById, getResponsesBySubmission, saveResponse, resubmitToCentralCommittee, SUBMISSION_STATUS } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
-import { getSubQuestionsByIndicator, getIndicatorsByDimension } from '../../../data/assessmentFramework';
+import { getSubQuestionsByIndicator, getIndicatorsByDimension, RESPONSE_TYPES } from '../../../data/assessmentFramework';
 import { getDimensionsByYear, getAssessmentYearById } from '../../../data/assessmentFramework';
 
 export default function EditSubmission() {
@@ -121,6 +121,160 @@ export default function EditSubmission() {
     }
   };
 
+  const renderQuestionInput = (subQuestion, response) => {
+    const responseValue = editedResponses[subQuestion.subQuestionId] || '';
+    const evidenceLink = editedEvidenceLinks[subQuestion.subQuestionId] || '';
+
+    switch (subQuestion.responseType) {
+      case RESPONSE_TYPES.YES_NO:
+      case 'Yes/No': // Fallback for backward compatibility
+        return (
+          <div className="space-y-2">
+            <div className="flex space-x-6">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name={`sq_${subQuestion.subQuestionId}`}
+                  value="Yes"
+                  checked={responseValue === 'Yes'}
+                  onChange={(e) => handleResponseChange(subQuestion.subQuestionId, e.target.value)}
+                  className="mr-2 w-4 h-4 text-[#0d6670] focus:ring-[#0d6670] border-gray-300"
+                />
+                <span className="text-gray-700">Yes</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name={`sq_${subQuestion.subQuestionId}`}
+                  value="No"
+                  checked={responseValue === 'No'}
+                  onChange={(e) => handleResponseChange(subQuestion.subQuestionId, e.target.value)}
+                  className="mr-2 w-4 h-4 text-[#0d6670] focus:ring-[#0d6670] border-gray-300"
+                />
+                <span className="text-gray-700">No</span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Evidence Link
+                <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+              </label>
+              <input
+                type="url"
+                value={evidenceLink}
+                onChange={(e) => handleEvidenceChange(subQuestion.subQuestionId, e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
+                placeholder="Enter Evidence Link"
+              />
+            </div>
+          </div>
+        );
+
+      case RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX:
+      case 'MultipleSelectCheckbox': // Fallback for backward compatibility
+        const options = subQuestion.checkboxOptions ? subQuestion.checkboxOptions.split(',').map(o => o.trim()) : [];
+        const selectedOptions = responseValue ? responseValue.split(',').map(v => v.trim()).filter(v => v) : [];
+        return (
+          <div className="space-y-3">
+            <div className="space-y-2 p-4 bg-white rounded-lg border border-gray-200">
+              {options.map((option, idx) => (
+                <label key={idx} className="flex items-center cursor-pointer hover:bg-gray-50 p-3 rounded transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedOptions.includes(option)}
+                    onChange={(e) => {
+                      const updated = e.target.checked
+                        ? [...selectedOptions, option]
+                        : selectedOptions.filter(v => v !== option);
+                      handleResponseChange(subQuestion.subQuestionId, updated.join(', '));
+                    }}
+                    className="mr-3 w-4 h-4 text-[#0d6670] focus:ring-[#0d6670] border-gray-300 rounded"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Evidence Link
+                <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+              </label>
+              <input
+                type="url"
+                value={evidenceLink}
+                onChange={(e) => handleEvidenceChange(subQuestion.subQuestionId, e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
+                placeholder="Enter Evidence Link"
+              />
+            </div>
+          </div>
+        );
+
+      case RESPONSE_TYPES.TEXT_EXPLANATION:
+      case 'TextExplanation': // Fallback for backward compatibility
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Your Explanation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={responseValue}
+                onChange={(e) => handleResponseChange(subQuestion.subQuestionId, e.target.value)}
+                rows="6"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white resize-y"
+                placeholder="Enter your explanation..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Evidence Link
+                <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+              </label>
+              <input
+                type="url"
+                value={evidenceLink}
+                onChange={(e) => handleEvidenceChange(subQuestion.subQuestionId, e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
+                placeholder="Enter Evidence Link"
+              />
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Answer <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={responseValue}
+                onChange={(e) => handleResponseChange(subQuestion.subQuestionId, e.target.value)}
+                rows="6"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white resize-y"
+                placeholder="Enter your answer..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Evidence Link
+                <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+              </label>
+              <input
+                type="url"
+                value={evidenceLink}
+                onChange={(e) => handleEvidenceChange(subQuestion.subQuestionId, e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
+                placeholder="Enter Evidence Link"
+              />
+            </div>
+          </div>
+        );
+    }
+  };
+
   const handleEvidenceChange = (subQuestionId, link) => {
     setEditedEvidenceLinks(prev => ({
       ...prev,
@@ -160,7 +314,7 @@ export default function EditSubmission() {
         if (result) {
           setSuccessMessage('✅ Submission edited and resubmitted to Central Committee successfully!');
           setTimeout(() => {
-            router.push('/approval/rejected-submissions');
+            router.push('/approval/queue');
           }, 2000);
         } else {
           alert('Error resubmitting submission. Please try again.');
@@ -247,10 +401,10 @@ export default function EditSubmission() {
                       </p>
                     </div>
                     <button
-                      onClick={() => router.push('/approval/rejected-submissions')}
+                      onClick={() => router.push('/approval/queue')}
                       className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
                     >
-                      ← Back to Rejected Submissions
+                      ← Back to Queue
                     </button>
                   </div>
                 </div>
@@ -301,10 +455,10 @@ export default function EditSubmission() {
                                       key={subQuestion.subQuestionId} 
                                       className="p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6"
                                     >
-                                      {/* Question Header */}
+                                      {/* Question Header with Answer Display */}
                                       <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">
                                         <div className="flex items-start space-x-3">
-                                          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-mint-primary-blue text-white flex items-center justify-center font-bold text-lg">
+                                          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0d6670] text-white flex items-center justify-center font-bold text-lg">
                                             {globalQuestionNumber}
                                           </div>
                                           <div className="flex-1">
@@ -321,47 +475,38 @@ export default function EditSubmission() {
                                                 Weight: {subQuestion.subWeightPercentage}%
                                               </span>
                                             </div>
+                                            {/* Always show current answer below question - all submitted submissions must have answers */}
+                                            <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                                              <p className="text-xs font-semibold text-gray-600 mb-1">Current Answer:</p>
+                                              <p className="text-sm text-gray-900 whitespace-pre-wrap">{currentValue || ''}</p>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
 
-                                      {/* Editable Answer Section */}
-                                      <div className="space-y-3">
-                                        <div className="bg-white p-4 rounded-lg border border-gray-300">
-                                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Answer
-                                          </label>
-                                          <textarea
-                                            value={currentValue}
-                                            onChange={(e) => handleResponseChange(subQuestion.subQuestionId, e.target.value)}
-                                            rows="4"
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue resize-none"
-                                            placeholder="Enter your answer here..."
-                                          />
-                                        </div>
-                                        
-                                        <div className="bg-white p-4 rounded-lg border border-gray-300">
-                                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Evidence Link (Optional)
-                                          </label>
-                                          <input
-                                            type="url"
-                                            value={currentEvidence}
-                                            onChange={(e) => handleEvidenceChange(subQuestion.subQuestionId, e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue"
-                                            placeholder="https://example.com/evidence"
-                                          />
-                                        </div>
-                                        
-                                        {/* Show Central Committee rejection reason if exists */}
-                                        {response && response.centralRejectionReason && (
-                                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-                                            <p className="text-sm font-semibold text-red-800 mb-1">
-                                              Central Committee Rejection Reason:
-                                            </p>
-                                            <p className="text-sm text-red-700">{response.centralRejectionReason}</p>
+                                      {/* Show Central Committee comments if exists - Above the input */}
+                                      {response && response.centralRejectionReason && (
+                                        <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                          <div className="flex items-start space-x-2">
+                                            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                            </svg>
+                                            <div className="flex-1">
+                                              <p className="text-sm font-semibold text-blue-800 mb-1">
+                                                Comments:
+                                              </p>
+                                              <p className="text-sm text-blue-700 whitespace-pre-wrap">{response.centralRejectionReason}</p>
+                                            </div>
                                           </div>
-                                        )}
+                                        </div>
+                                      )}
+
+                                      {/* Editable Answer Section */}
+                                      <div className="bg-white p-4 rounded-lg border border-gray-300">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                          Edit Answer:
+                                        </label>
+                                        {renderQuestionInput(subQuestion, response)}
                                       </div>
                                     </div>
                                   );
@@ -393,7 +538,7 @@ export default function EditSubmission() {
                     <button
                       onClick={handleResubmit}
                       disabled={isSubmitting}
-                      className="px-6 py-3 bg-mint-secondary-blue hover:bg-mint-primary-blue text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-8 py-3 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
                     >
                       {isSubmitting ? 'Resubmitting...' : 'Resubmit to Central Committee'}
                     </button>

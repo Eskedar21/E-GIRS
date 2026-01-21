@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
@@ -110,7 +110,8 @@ export default function ApprovalQueue() {
         { value: 'all', label: 'All Statuses' },
         { value: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL, label: 'Pending Initial Approval' },
         { value: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE, label: 'Rejected by Central Committee' },
-        { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Approved (Pending Central)' },
+        { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Pending Central Validation' },
+        { value: SUBMISSION_STATUS.VALIDATED, label: 'Validated' },
       ];
     }
     return [{ value: 'all', label: 'All Statuses' }];
@@ -132,10 +133,11 @@ export default function ApprovalQueue() {
         submissions = [...pending, ...rejected, ...validated];
       } else if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
         // Regional Approvers see submissions in their scope
-      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
-      const rejected = getSubmissionsByStatus(SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE);
+        const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
+        const rejected = getSubmissionsByStatus(SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE);
         const approvedPendingCentral = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
-        const allBeforeFilter = [...pending, ...rejected, ...approvedPendingCentral];
+        const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
+        const allBeforeFilter = [...pending, ...rejected, ...approvedPendingCentral, ...validated];
         
         // Filter by scope
         submissions = filterSubmissionsByAccess(allBeforeFilter, user, allUnits);
@@ -199,9 +201,9 @@ export default function ApprovalQueue() {
     }
   }, [user, userRole]);
 
-  // Filter and search submissions
-  useEffect(() => {
-    let filtered = [...allSubmissions];
+  // Filter and search submissions - separate effect for filter changes (resets page) vs data updates (keeps page)
+  const applyFilters = useCallback((submissions, resetPage = false) => {
+    let filtered = [...submissions];
     const allUnits = getAllUnits();
 
     // Status filter
@@ -210,22 +212,40 @@ export default function ApprovalQueue() {
     }
 
     // Scope filter (by unit) - For regional approvers, filter by Region, Zone, or Woreda
+    // For Addis Ababa approver, filter by Addis Ababa, Sub-city, or Woreda
     if (scopeFilter !== 'all') {
       filtered = filtered.filter(s => {
         const unit = getUnitById(s.unitId);
         if (!unit) return false;
         
         if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
-          // Regional approvers filter by Region, Zone, or Woreda
-          if (scopeFilter === 'region') {
-            // Show submissions from the region itself
-            return unit.unitType === 'Region' && unit.unitId === user?.officialUnitId;
-          } else if (scopeFilter === 'zone') {
-            // Show submissions from all zones under the region
-            return unit.unitType === 'Zone' && descendantUnitsByType.zones.some(z => z.unitId === unit.unitId);
-          } else if (scopeFilter === 'woreda') {
-            // Show submissions from all woredas under the region
-            return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+          // Check if this is Addis Ababa approver (unitId: 10)
+          const isAddisAbabaApprover = user?.officialUnitId === 10;
+          
+          if (isAddisAbabaApprover) {
+            // Addis Ababa approvers filter by Addis Ababa, Sub-city, or Woreda
+            if (scopeFilter === 'city') {
+              // Show submissions from Addis Ababa City Administration itself
+              return unit.unitType === 'City Administration' && unit.unitId === user?.officialUnitId;
+            } else if (scopeFilter === 'subcity') {
+              // Show submissions from all sub-cities under Addis Ababa
+              return unit.unitType === 'Sub-city' && descendantUnitsByType.subCities.some(sc => sc.unitId === unit.unitId);
+            } else if (scopeFilter === 'woreda') {
+              // Show submissions from all woredas under Addis Ababa (through sub-cities)
+              return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+            }
+          } else {
+            // Regional approvers filter by Region, Zone, or Woreda
+            if (scopeFilter === 'region') {
+              // Show submissions from the region itself
+              return unit.unitType === 'Region' && unit.unitId === user?.officialUnitId;
+            } else if (scopeFilter === 'zone') {
+              // Show submissions from all zones under the region
+              return unit.unitType === 'Zone' && descendantUnitsByType.zones.some(z => z.unitId === unit.unitId);
+            } else if (scopeFilter === 'woreda') {
+              // Show submissions from all woredas under the region
+              return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+            }
           }
         } else {
           // Central Committee filters
@@ -254,8 +274,22 @@ export default function ApprovalQueue() {
     }
 
     setFilteredSubmissions(filtered);
-    setCurrentPage(1);
-  }, [allSubmissions, statusFilter, scopeFilter, searchQuery, user, userRole, descendantUnitsByType]);
+    if (resetPage) {
+      setCurrentPage(1);
+    }
+  }, [statusFilter, scopeFilter, searchQuery, user, userRole, descendantUnitsByType]);
+
+  // When filters/search change, reset page to 1
+  useEffect(() => {
+    applyFilters(allSubmissions, true);
+  }, [statusFilter, scopeFilter, searchQuery, user, userRole, descendantUnitsByType]);
+
+  // When allSubmissions updates (but filters haven't changed), keep current page
+  useEffect(() => {
+    if (allSubmissions.length > 0) {
+      applyFilters(allSubmissions, false);
+    }
+  }, [allSubmissions]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -348,16 +382,18 @@ export default function ApprovalQueue() {
   };
 
   const getStatusBadgeClass = (status) => {
-    if (status === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL || 
-        status === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
-      return 'bg-yellow-100 text-yellow-800';
+    if (status === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL) {
+      return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+    } else if (status === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+      return 'bg-blue-100 text-blue-800 border border-blue-300';
     } else if (status === SUBMISSION_STATUS.VALIDATED) {
-      return 'bg-green-100 text-green-800';
-    } else if (status === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ||
-               status === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER) {
-      return 'bg-red-100 text-red-800';
+      return 'bg-green-100 text-green-800 border border-green-300';
+    } else if (status === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) {
+      return 'bg-gradient-to-r from-red-100 to-red-50 text-red-900 border-2 border-red-400 shadow-md font-semibold';
+    } else if (status === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER) {
+      return 'bg-red-100 text-red-800 border border-red-300';
     }
-    return 'bg-gray-100 text-gray-800';
+    return 'bg-gray-100 text-gray-800 border border-gray-300';
   };
 
   const handleReview = (submissionId) => {
@@ -498,11 +534,20 @@ export default function ApprovalQueue() {
                       >
                         <option value="all">All Scopes</option>
                         {['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole) ? (
-                          <>
-                            <option value="region">Region</option>
-                            <option value="zone">Zone</option>
-                            <option value="woreda">Woreda</option>
-                          </>
+                          // Check if this is Addis Ababa approver (unitId: 10)
+                          user?.officialUnitId === 10 ? (
+                            <>
+                              <option value="city">Addis Ababa</option>
+                              <option value="subcity">Sub-city</option>
+                              <option value="woreda">Woreda</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="region">Region</option>
+                              <option value="zone">Zone</option>
+                              <option value="woreda">Woreda</option>
+                            </>
+                          )
                         ) : (
                           <>
                             <option value="region">Region</option>
@@ -596,8 +641,12 @@ export default function ApprovalQueue() {
                         </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(submission.submissionStatus)}`}>
-                                    {submission.submissionStatus}
+                                  <span className={`inline-flex px-3 py-1.5 text-xs font-medium rounded-lg shadow-sm ${getStatusBadgeClass(submission.submissionStatus)}`}>
+                                    {submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ? (
+                                      <span className="tracking-wide">{submission.submissionStatus}</span>
+                                    ) : (
+                                      submission.submissionStatus
+                                    )}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -629,26 +678,35 @@ export default function ApprovalQueue() {
                     {totalPages > 1 && (
                       <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                         <div className="text-sm text-gray-700">
-                          Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedSubmissions.length)} of {sortedSubmissions.length} results
-                </div>
+                          {sortedSubmissions.length > 0 ? (
+                            <>
+                              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedSubmissions.length)} of {sortedSubmissions.length} result{sortedSubmissions.length !== 1 ? 's' : ''}
+                            </>
+                          ) : (
+                            'No results to display'
+                          )}
+                        </div>
                         <div className="flex space-x-2">
-              <button
+                          <button
                             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                             disabled={currentPage === 1}
                             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                          >
                             Previous
-              </button>
-              <button
+                          </button>
+                          <span className="px-4 py-2 text-sm text-gray-700">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                          <button
                             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                             disabled={currentPage === totalPages}
                             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Next
-              </button>
-          </div>
-        </div>
-      )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </>
               )}
             </div>

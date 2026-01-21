@@ -5,7 +5,7 @@ import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
-import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
+import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, resubmitToCentralCommittee, rejectToContributor, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
 import { getResponsesBySubmission } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
@@ -28,6 +28,8 @@ export default function EvaluateSubmission() {
   const [regionalNotes, setRegionalNotes] = useState({});
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showRejectToContributorModal, setShowRejectToContributorModal] = useState(false);
+  const [rejectToContributorComment, setRejectToContributorComment] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [openCommentSections, setOpenCommentSections] = useState({});
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
@@ -99,6 +101,15 @@ export default function EvaluateSubmission() {
         if (r.regionalRejectionReason) reasons[r.responseId] = r.regionalRejectionReason;
       });
       setRejectionReasons(reasons);
+      
+      // Initialize Central Committee rejection reasons if submission is rejected
+      if (submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) {
+        const rejectedResponses = responses.filter(r => r.validationStatus === VALIDATION_STATUS.REJECTED && r.centralRejectionReason);
+        // Store rejection reasons for display
+        rejectedResponses.forEach(r => {
+          reasons[`central_${r.responseId}`] = r.centralRejectionReason;
+        });
+      }
     }
   };
 
@@ -204,6 +215,41 @@ export default function EvaluateSubmission() {
     }
   };
 
+  const handleEditAndResubmit = () => {
+    if (!submissionDetails) return;
+    router.push(`/approval/edit/${submissionId}`);
+  };
+
+  const handleRejectToContributor = () => {
+    if (!user || !submissionDetails) return;
+    
+    if (!rejectToContributorComment.trim()) {
+      alert('Please provide additional comments before rejecting to contributor.');
+      return;
+    }
+    
+    if (!canPerformAction(user, 'approve_submission')) {
+      alert('You do not have permission to reject submissions.');
+      return;
+    }
+    
+    try {
+      const result = rejectToContributor(submissionDetails.submission.submissionId, rejectToContributorComment);
+      
+      if (result) {
+        setShowRejectToContributorModal(false);
+        setRejectToContributorComment('');
+        setSuccessMessage('⚠️ Submission sent back to Data Contributor with your comments. You will be redirected to the approval queue.');
+        setTimeout(() => {
+          router.push('/approval/queue');
+        }, 3000);
+        setTimeout(() => setSuccessMessage(''), 8000);
+      }
+    } catch (error) {
+      alert(error.message || 'Error rejecting submission. Please try again.');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return '';
     try {
@@ -298,6 +344,8 @@ export default function EvaluateSubmission() {
 
   const isSubmitted = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL ||
                       submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
+  
+  const isRejectedByCentralCommittee = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
 
   return (
     <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
@@ -372,6 +420,37 @@ export default function EvaluateSubmission() {
                       ← Back to Queue
                     </button>
                   </div>
+                  
+                  {/* Central Committee Rejection Notice */}
+                  {isRejectedByCentralCommittee && (
+                    <div className="mb-6 p-5 bg-gradient-to-br from-red-50 via-red-50 to-red-100 border-2 border-red-400 rounded-xl shadow-lg">
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-bold text-red-900 mb-2 tracking-tight">
+                            Rejected by Central Committee
+                          </h3>
+                          <p className="text-sm text-red-800 mb-4 leading-relaxed">
+                            This submission has been rejected by the Central Committee. Review the rejection reasons below and choose an action.
+                          </p>
+                          {submissionDetails.submission.rejectionReason && (
+                            <div className="mt-4 p-4 bg-white border-2 border-red-200 rounded-lg shadow-sm">
+                              <p className="text-sm font-bold text-red-900 mb-2 uppercase tracking-wide">Comments:</p>
+                              <div className="text-sm text-red-800 whitespace-pre-wrap leading-relaxed">
+                                {submissionDetails.submission.rejectionReason}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               {/* Questions and Answers */}
@@ -415,16 +494,21 @@ export default function EvaluateSubmission() {
                             <div className="space-y-4">
                               {indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
                                 const globalQuestionNumber = questionNumberMap[subQuestion.subQuestionId] || 0;
-                                const hasAnswer = response && response.responseValue && response.responseValue.trim() !== '';
+                                // For submitted submissions, all questions must have answers
+                                // Find response from the responses array if not in groupedData
+                                const actualResponse = response || submissionDetails?.responses?.find(r => r.subQuestionId === subQuestion.subQuestionId);
+                                const answerText = actualResponse?.responseValue || '';
+                                const hasAnswer = answerText && answerText.trim() !== '';
+                                
                                 return (
                                   <div 
                                     key={subQuestion.subQuestionId} 
                                     className="p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6"
                                   >
-                                    {/* Question Header */}
+                                    {/* Question Header with Answer */}
                                     <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">
                                       <div className="flex items-start space-x-3">
-                                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-mint-primary-blue text-white flex items-center justify-center font-bold text-lg">
+                                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0d6670] text-white flex items-center justify-center font-bold text-lg">
                                           {globalQuestionNumber}
                                         </div>
                                         <div className="flex-1">
@@ -440,66 +524,60 @@ export default function EvaluateSubmission() {
                                             <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
                                               Weight: {subQuestion.subWeightPercentage}%
                                             </span>
-                                            {hasAnswer && (
-                                              <span className="px-2 py-1 bg-[#0d6670]/10 text-[#0d6670] rounded font-semibold">
-                                                ✓ Answered
-                                              </span>
-                                            )}
+                                          </div>
+                                          {/* Always show Answer inline with question - all submitted submissions must have answers */}
+                                          <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                                            <p className="text-xs font-semibold text-gray-600 mb-1">Answer:</p>
+                                            <p className="text-sm text-gray-900 whitespace-pre-wrap break-words leading-relaxed">
+                                              {answerText || ''}
+                                            </p>
                                           </div>
                                         </div>
                                       </div>
                                     </div>
 
-                                    {/* Answer Section */}
-                                    {response && hasAnswer ? (
+                                        {/* Additional Details Section */}
+                                    {actualResponse ? (
                                       <div className="space-y-3">
-                                        {/* Answer Display */}
-                                        <div className="bg-white p-4 rounded-lg border border-gray-300">
-                                          <div className="flex items-start justify-between mb-2">
-                                            <label className="block text-sm font-semibold text-gray-700">
-                                              Answer
-                                            </label>
-                                            {/* Comment Button */}
-                                            <button
-                                              onClick={() => setOpenCommentSections(prev => ({ 
-                                                ...prev, 
-                                                [response.responseId]: !prev[response.responseId] 
-                                              }))}
-                                              className="flex items-center space-x-1 text-gray-600 hover:text-mint-primary-blue transition-colors"
-                                              title="Add comment"
-                                            >
-                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        
+                                        {/* Central Committee Comments for this specific response */}
+                                        {isRejectedByCentralCommittee && actualResponse.centralRejectionReason && (
+                                          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                                            <div className="flex items-start space-x-2">
+                                              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                               </svg>
-                                              <span className="text-xs">+</span>
-                                            </button>
+                                              <div className="flex-1">
+                                                <p className="text-sm font-semibold text-blue-800 mb-1">
+                                                  Comments:
+                                                </p>
+                                                <p className="text-sm text-blue-700 whitespace-pre-wrap">
+                                                  {actualResponse.centralRejectionReason}
+                                                </p>
+                                              </div>
+                                            </div>
                                           </div>
-                                          <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                                            <p className="text-gray-900 whitespace-pre-wrap break-words leading-relaxed text-sm">
-                                              {response.responseValue}
-                                            </p>
-                                          </div>
-                                        </div>
+                                        )}
                                         
-                                        {response.evidenceLink && (
+                                        {actualResponse.evidenceLink && (
                                           <div className="bg-white p-4 rounded-lg border border-gray-300">
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                               Evidence Link
                                             </label>
                                             <a
-                                              href={response.evidenceLink}
+                                              href={actualResponse.evidenceLink}
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               className="text-sm text-mint-primary-blue hover:underline break-all inline-flex items-center space-x-2"
                                             >
-                                              <span>{response.evidenceLink}</span>
+                                              <span>{actualResponse.evidenceLink}</span>
                                               <span className="text-xs">↗</span>
                                             </a>
                                           </div>
                                         )}
                                         
                                         {/* Comments Section */}
-                                        {isSubmitted && hasAnswer && (
+                                        {isSubmitted && actualResponse && (
                                           <div className="mt-3 bg-gray-50 rounded-lg border border-gray-300 p-4">
                                             <div className="mb-3">
                                               <div className="flex items-center justify-between mb-3">
@@ -507,7 +585,7 @@ export default function EvaluateSubmission() {
                                                 <button
                                                   onClick={() => setOpenCommentSections(prev => ({ 
                                                     ...prev, 
-                                                    [response.responseId]: !prev[response.responseId] 
+                                                    [actualResponse.responseId]: !prev[actualResponse.responseId] 
                                                   }))}
                                                   className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                 >
@@ -516,7 +594,7 @@ export default function EvaluateSubmission() {
                                               </div>
                                               
                                               {/* Existing Comments - Always visible */}
-                                              {response.regionalNote && (
+                                              {actualResponse.regionalNote && (
                                                 <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
                                                   <div className="flex items-start space-x-2 mb-2">
                                                     <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -540,11 +618,11 @@ export default function EvaluateSubmission() {
                                                           })()}
                                                         </span>
                                                         <span className="text-xs text-gray-500 ml-2">
-                                                          {formatDate(response.updatedAt)}
+                                                          {formatDate(actualResponse.updatedAt)}
                                                         </span>
                                                       </div>
                                                       <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
-                                                        {response.regionalNote}
+                                                        {actualResponse.regionalNote}
                                                       </p>
                                                     </div>
                                                   </div>
@@ -552,28 +630,28 @@ export default function EvaluateSubmission() {
                                               )}
                                               
                                               {/* Comment Input - Toggleable */}
-                                              {openCommentSections[response.responseId] && (
+                                              {openCommentSections[actualResponse.responseId] && (
                                                 <div className="space-y-2">
                                                   <textarea
-                                                    value={regionalNotes[response.responseId] || ''}
-                                                    onChange={(e) => setRegionalNotes(prev => ({ ...prev, [response.responseId]: e.target.value }))}
+                                                    value={regionalNotes[actualResponse.responseId] || ''}
+                                                    onChange={(e) => setRegionalNotes(prev => ({ ...prev, [actualResponse.responseId]: e.target.value }))}
                                                     rows="3"
                                                     className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue resize-none"
                                                     placeholder="Add your comment here..."
                                                   />
                                                   <div className="flex justify-end space-x-2">
                                                     <button
-                                                      onClick={() => setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }))}
+                                                      onClick={() => setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }))}
                                                       className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                     >
                                                       Cancel
                                                     </button>
                                                     <button
                                                       onClick={() => {
-                                                        handleSaveComment(response.responseId);
-                                                        setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
+                                                        handleSaveComment(actualResponse.responseId);
+                                                        setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
                                                       }}
-                                                      disabled={!regionalNotes[response.responseId]?.trim()}
+                                                      disabled={!regionalNotes[actualResponse.responseId]?.trim()}
                                                       className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                       Add Comment
@@ -585,16 +663,7 @@ export default function EvaluateSubmission() {
                                           </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
-                                        <p className="text-yellow-800 text-sm font-semibold mb-2">
-                                          ⚠️ No answer provided for this question yet.
-                                        </p>
-                                        <p className="text-xs text-yellow-700">
-                                          This question should be answered by the Data Contributor. If the submission was already submitted, please contact the contributor to complete this question.
-                                        </p>
-                                      </div>
-                                    )}
+                                    ) : null}
                                   </div>
                                 );
                               })}
@@ -653,30 +722,28 @@ export default function EvaluateSubmission() {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-lg font-bold text-gray-900">Application Status</h4>
-                      <span className={`px-4 py-1.5 rounded-full text-sm font-semibold inline-flex items-center gap-2 ${
+                      <span className={`px-3 py-1.5 rounded-md text-xs font-medium ${
                         submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL 
-                          ? 'bg-yellow-100 text-yellow-800' 
+                          ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' 
                           : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-gray-50 text-gray-700 border border-gray-200'
                       }`}>
                         {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL && (
-                          <>
-                            <span>⏳</span>
-                            <span>Pending</span>
-                          </>
+                          <span>Pending</span>
                         )}
                         {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER && (
-                          <>
-                            <span>✗</span>
-                            <span>Rejected</span>
-                          </>
+                          <span>Rejected</span>
+                        )}
+                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE && (
+                          <span>Rejected</span>
                         )}
                         {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION && (
-                          <>
-                            <span>✓</span>
-                            <span>Approved</span>
-                          </>
+                          <span>Pending</span>
                         )}
                       </span>
                     </div>
@@ -692,24 +759,45 @@ export default function EvaluateSubmission() {
                         })()}</p>
                       )}
                     </div>
-                    <p className="mt-4 text-sm text-gray-700 font-medium">Review and take necessary action.</p>
+                    {isRejectedByCentralCommittee ? (
+                      <p className="mt-4 text-sm text-red-700 font-medium">This submission was rejected by the Central Committee. Choose an action below.</p>
+                    ) : (
+                      <p className="mt-4 text-sm text-gray-700 font-medium">Review and take necessary action.</p>
+                    )}
                   </div>
                   
                   {/* Action Buttons */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => setShowApproveModal(true)}
-                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => setShowRejectModal(true)}
-                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 font-semibold rounded-lg transition-colors"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {isRejectedByCentralCommittee ? (
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleEditAndResubmit}
+                        className="w-full px-6 py-3 bg-white border-2 border-blue-500 hover:bg-blue-50 text-blue-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Edit and Resubmit
+                      </button>
+                      <button
+                        onClick={() => setShowRejectToContributorModal(true)}
+                        className="w-full px-6 py-3 bg-white border-2 border-red-500 hover:bg-red-50 text-red-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Reject to Contributor
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => setShowApproveModal(true)}
+                        className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setShowRejectModal(true)}
+                        className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </aside>
             )}
@@ -810,6 +898,69 @@ export default function EvaluateSubmission() {
                   className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject to Contributor Modal */}
+        {showRejectToContributorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div 
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              onClick={() => setShowRejectToContributorModal(false)}
+            ></div>
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 transform transition-all">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Reject to Contributor</h3>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-base leading-relaxed text-gray-700 mb-4">
+                  This will send the submission back to the Data Contributor with the Central Committee's rejection reasons and your additional comments.
+                </p>
+                {submissionDetails?.submission.rejectionReason && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm font-semibold text-blue-800 mb-2">Comments:</p>
+                    <p className="text-sm text-blue-700 whitespace-pre-wrap">{submissionDetails.submission.rejectionReason}</p>
+                  </div>
+                )}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Additional Comments <span className="text-red-500">*</span>
+                  <span className="text-xs text-gray-500 font-normal ml-2">(Your comments will be appended to the Central Committee's feedback)</span>
+                </label>
+                <textarea
+                  value={rejectToContributorComment}
+                  onChange={(e) => setRejectToContributorComment(e.target.value)}
+                  rows="5"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Add your comments here. These will be sent along with the Central Committee's rejection reasons..."
+                  required
+                />
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowRejectToContributorModal(false);
+                    setRejectToContributorComment('');
+                  }}
+                  className="px-5 py-2.5 bg-[#E0F2F7] hover:bg-[#B8E6F0] text-[#0d6670] font-semibold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejectToContributor}
+                  disabled={!rejectToContributorComment.trim()}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send to Contributor
                 </button>
               </div>
             </div>
