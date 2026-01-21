@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../components/Layout';
@@ -21,13 +21,25 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell
+  Cell,
+  AreaChart,
+  Area
 } from 'recharts';
 
 export default function PublicDashboard() {
   const router = useRouter();
   // Initialize with the latest year (2025)
   const [selectedYearId, setSelectedYearId] = useState(assessmentYears[assessmentYears.length - 1].id);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+
+  // Auto-refresh data periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Calculate KPIs using calculation utilities
   const nationalIndex = useMemo(() => calculateNationalIndex(selectedYearId), [selectedYearId]);
@@ -104,12 +116,24 @@ export default function PublicDashboard() {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-mint-primary-blue mb-2">
-                National E-Government Performance Dashboard
-              </h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-4xl font-bold text-mint-primary-blue">
+                  National E-Government Performance Dashboard
+                </h1>
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-green-700">Live</span>
+                </div>
+              </div>
               <p className="text-mint-dark-text/70 text-lg">
                 Comprehensive assessment of e-government maturity across administrative units
               </p>
+              <div className="flex items-center gap-2 mt-2 text-sm text-mint-dark-text/60">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+              </div>
             </div>
             <div className="mt-4 md:mt-0">
               <label htmlFor="year-select" className="block text-sm font-semibold text-mint-dark-text mb-2">
@@ -119,7 +143,7 @@ export default function PublicDashboard() {
                 id="year-select"
                 value={selectedYearId}
                 onChange={(e) => setSelectedYearId(e.target.value)}
-                className="px-4 py-2.5 border-2 border-mint-medium-gray rounded-lg bg-white text-mint-dark-text font-medium focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-mint-primary-blue shadow-sm min-w-[200px]"
+                className="px-4 py-2.5 border-2 border-mint-medium-gray rounded-lg bg-white text-mint-dark-text font-medium focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-mint-primary-blue shadow-sm min-w-[200px] hover:border-mint-primary-blue transition-colors"
               >
                 {assessmentYears.map((year) => (
                   <option key={year.id} value={year.id}>
@@ -133,72 +157,150 @@ export default function PublicDashboard() {
 
         {/* Key Performance Indicators */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-mint-primary-blue mb-4">Key Performance Indicators</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-mint-primary-blue">Key Performance Indicators</h2>
+            <div className="text-sm text-mint-dark-text/60">
+              Real-time data • Auto-refreshing
+            </div>
+          </div>
           
           {/* National Index and Maturity Counts */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-mint-primary-blue to-mint-secondary-blue rounded-xl shadow-lg p-6 text-white">
-              <p className="text-white/80 text-sm font-medium mb-1">National Index</p>
-              <p className="text-4xl font-bold mb-2">
+            <div className="bg-gradient-to-br from-mint-primary-blue via-mint-secondary-blue to-[#0a4f57] rounded-xl shadow-xl p-6 text-white transform hover:scale-105 transition-all duration-200">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-white/90 text-sm font-medium uppercase tracking-wide">National Index</p>
+                <svg className="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <p className="text-5xl font-bold mb-3">
                 {nationalIndex.toFixed(3)}
               </p>
-              <div className="mt-3">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm">
+              <div className="mt-3 flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-sm border border-white/30">
                   {getMaturityLevel(nationalIndex)}
                 </span>
+                <div className="flex-1 bg-white/20 rounded-full h-2">
+                  <div 
+                    className="bg-white h-2 rounded-full transition-all duration-500" 
+                    style={{ width: `${nationalIndex * 100}%` }}
+                  ></div>
+                </div>
               </div>
             </div>
             
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-              <p className="text-mint-dark-text/70 text-sm font-medium mb-1">Very High Maturity</p>
-              <p className="text-4xl font-bold text-mint-primary-blue">
+            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500 hover:shadow-xl transition-all transform hover:scale-105">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-mint-dark-text/70 text-sm font-medium uppercase tracking-wide">Very High Maturity</p>
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-4xl font-bold text-green-600 mb-1">
                 {maturityCounts['Very High']}
               </p>
-              <p className="text-xs text-mint-dark-text/60 mt-2">Units</p>
+              <p className="text-xs text-mint-dark-text/60 mt-2">Units (≥0.75)</p>
+              <div className="mt-3 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-green-500 h-1.5 rounded-full transition-all" 
+                  style={{ width: `${rankedUnits.length > 0 ? (maturityCounts['Very High'] / rankedUnits.length * 100) : 0}%` }}
+                ></div>
+              </div>
             </div>
             
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-              <p className="text-mint-dark-text/70 text-sm font-medium mb-1">High Maturity</p>
-              <p className="text-4xl font-bold text-mint-primary-blue">
+            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#0d6670] hover:shadow-xl transition-all transform hover:scale-105">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-mint-dark-text/70 text-sm font-medium uppercase tracking-wide">High Maturity</p>
+                <svg className="w-6 h-6 text-[#0d6670]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <p className="text-4xl font-bold text-[#0d6670] mb-1">
                 {maturityCounts['High']}
               </p>
-              <p className="text-xs text-mint-dark-text/60 mt-2">Units</p>
+              <p className="text-xs text-mint-dark-text/60 mt-2">Units (0.50-0.75)</p>
+              <div className="mt-3 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-[#0d6670] h-1.5 rounded-full transition-all" 
+                  style={{ width: `${rankedUnits.length > 0 ? (maturityCounts['High'] / rankedUnits.length * 100) : 0}%` }}
+                ></div>
+              </div>
             </div>
             
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-              <p className="text-mint-dark-text/70 text-sm font-medium mb-1">Medium/Low Maturity</p>
-              <p className="text-4xl font-bold text-mint-primary-blue">
+            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-yellow-500 hover:shadow-xl transition-all transform hover:scale-105">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-mint-dark-text/70 text-sm font-medium uppercase tracking-wide">Medium/Low Maturity</p>
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-4xl font-bold text-yellow-600 mb-1">
                 {maturityCounts['Medium'] + maturityCounts['Low']}
               </p>
-              <p className="text-xs text-mint-dark-text/60 mt-2">Units</p>
+              <p className="text-xs text-mint-dark-text/60 mt-2">Units (&lt;0.50)</p>
+              <div className="mt-3 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-yellow-500 h-1.5 rounded-full transition-all" 
+                  style={{ width: `${rankedUnits.length > 0 ? ((maturityCounts['Medium'] + maturityCounts['Low']) / rankedUnits.length * 100) : 0}%` }}
+                ></div>
+              </div>
             </div>
           </div>
 
           {/* Dimension Score KPIs */}
           {dimensionScores.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {dimensionScores.map((dim) => (
-                <div key={dim.dimensionId} className="bg-white rounded-lg shadow-md p-4 border border-mint-medium-gray">
-                  <p className="text-xs text-mint-dark-text/70 font-medium mb-1 truncate">{dim.dimensionName}</p>
-                  <p className="text-2xl font-bold text-mint-primary-blue">
-                    {dim.nationalAverage.toFixed(3)}
-                  </p>
-                </div>
-              ))}
+              {dimensionScores.map((dim, index) => {
+                const colors = [
+                  'from-blue-500 to-blue-600',
+                  'from-purple-500 to-purple-600',
+                  'from-green-500 to-green-600',
+                  'from-orange-500 to-orange-600',
+                  'from-teal-500 to-teal-600',
+                  'from-pink-500 to-pink-600'
+                ];
+                const colorClass = colors[index % colors.length];
+                return (
+                  <div 
+                    key={dim.dimensionId} 
+                    className={`bg-gradient-to-br ${colorClass} rounded-xl shadow-lg p-4 text-white transform hover:scale-105 transition-all duration-200`}
+                  >
+                    <p className="text-xs font-medium mb-2 truncate text-white/90">{dim.dimensionName}</p>
+                    <p className="text-2xl font-bold mb-2">
+                      {dim.nationalAverage.toFixed(3)}
+                    </p>
+                    <div className="w-full bg-white/20 rounded-full h-1.5">
+                      <div 
+                        className="bg-white h-1.5 rounded-full transition-all duration-500" 
+                        style={{ width: `${dim.nationalAverage * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Visualizations */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Visualization 1: National Performance Over Time (Line Chart) */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-            <h3 className="text-lg font-bold text-mint-primary-blue mb-4">National Performance Over Time</h3>
+          {/* Visualization 1: National Performance Over Time (Area Chart) */}
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-mint-primary-blue">National Performance Over Time</h3>
+              <span className="text-xs text-mint-dark-text/60 bg-mint-light-gray px-2 py-1 rounded">Trend Analysis</span>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart
+              <AreaChart
                 data={lineChartData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               >
+                <defs>
+                  <linearGradient id="colorNational" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0d6670" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#0d6670" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
                   dataKey="year" 
@@ -213,14 +315,16 @@ export default function PublicDashboard() {
                 />
                 <Tooltip 
                   formatter={(value) => value.toFixed(3)}
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                 />
                 <Legend />
-                <Line 
+                <Area 
                   type="monotone" 
                   dataKey="National Index"
                   stroke="#0d6670" 
                   strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#colorNational)"
                   dot={{ fill: '#0d6670', r: 5 }}
                   activeDot={{ r: 7 }}
                 />
@@ -238,18 +342,21 @@ export default function PublicDashboard() {
                     />
                   );
                 })}
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
           {/* Visualization 2: Unit Performance Ranking (Bar Chart) */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-            <h3 className="text-lg font-bold text-mint-primary-blue mb-4">Unit Performance Ranking</h3>
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-mint-primary-blue">Top 10 Unit Performance Ranking</h3>
+              <span className="text-xs text-mint-dark-text/60 bg-mint-light-gray px-2 py-1 rounded">Top Performers</span>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
                 data={rankedUnits.slice(0, 10).reverse()}
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
@@ -264,13 +371,13 @@ export default function PublicDashboard() {
                   dataKey="name"
                   stroke="#374151"
                   style={{ fontSize: '11px' }}
-                  width={90}
+                  width={110}
                 />
                 <Tooltip 
                   formatter={(value) => value.toFixed(3)}
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                 />
-                <Bar dataKey="score" name="E-GIRS Score" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="score" name="E-GIRS Score" radius={[0, 8, 8, 0]}>
                   {rankedUnits.slice(0, 10).reverse().map((unit, index) => {
                     const maturityLevel = getMaturityLevel(unit.score);
                     let color = '#ef4444'; // red

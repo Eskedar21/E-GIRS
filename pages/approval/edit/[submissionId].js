@@ -4,6 +4,7 @@ import Layout from '../../../components/Layout';
 import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSidebar } from '../../../contexts/SidebarContext';
 import { getSubmissionById, getResponsesBySubmission, saveResponse, resubmitToCentralCommittee, SUBMISSION_STATUS } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
@@ -14,11 +15,14 @@ export default function EditSubmission() {
   const router = useRouter();
   const { submissionId } = router.query;
   const { user } = useAuth();
+  const { isCollapsed, setCollapsed } = useSidebar();
   const [submissionDetails, setSubmissionDetails] = useState(null);
   const [editedResponses, setEditedResponses] = useState({});
   const [editedEvidenceLinks, setEditedEvidenceLinks] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
+  const [activeSection, setActiveSection] = useState(null);
 
   useEffect(() => {
     if (submissionId) {
@@ -89,10 +93,14 @@ export default function EditSubmission() {
       // Initialize edited responses and evidence links
       const responseMap = {};
       const evidenceMap = {};
-      responses.forEach(r => {
-        responseMap[r.subQuestionId] = r.responseValue || '';
-        evidenceMap[r.subQuestionId] = r.evidenceLink || '';
-      });
+      if (responses && Array.isArray(responses)) {
+        responses.forEach(r => {
+          if (r && r.subQuestionId) {
+            responseMap[r.subQuestionId] = r.responseValue || '';
+            evidenceMap[r.subQuestionId] = r.evidenceLink || '';
+          }
+        });
+      }
       setEditedResponses(responseMap);
       setEditedEvidenceLinks(evidenceMap);
       
@@ -111,13 +119,17 @@ export default function EditSubmission() {
     }));
     
     // Auto-save to database
-    if (submissionDetails) {
-      saveResponse({
-        submissionId: submissionDetails.submission.submissionId,
-        subQuestionId: subQuestionId,
-        responseValue: value,
-        evidenceLink: editedEvidenceLinks[subQuestionId] || null
-      });
+    if (submissionDetails && submissionDetails.submission && submissionDetails.submission.submissionId) {
+      try {
+        saveResponse({
+          submissionId: submissionDetails.submission.submissionId,
+          subQuestionId: subQuestionId,
+          responseValue: value,
+          evidenceLink: editedEvidenceLinks[subQuestionId] || null
+        });
+      } catch (error) {
+        console.error('Error saving response:', error);
+      }
     }
   };
 
@@ -282,30 +294,41 @@ export default function EditSubmission() {
     }));
     
     // Auto-save to database
-    if (submissionDetails) {
-      saveResponse({
-        submissionId: submissionDetails.submission.submissionId,
-        subQuestionId: subQuestionId,
-        responseValue: editedResponses[subQuestionId] || '',
-        evidenceLink: link || null
-      });
+    if (submissionDetails && submissionDetails.submission && submissionDetails.submission.submissionId) {
+      try {
+        saveResponse({
+          submissionId: submissionDetails.submission.submissionId,
+          subQuestionId: subQuestionId,
+          responseValue: editedResponses[subQuestionId] || '',
+          evidenceLink: link || null
+        });
+      } catch (error) {
+        console.error('Error saving evidence link:', error);
+      }
     }
   };
 
   const handleResubmit = () => {
-    if (!submissionDetails) return;
+    if (!submissionDetails || !submissionDetails.submission || !submissionDetails.submission.submissionId) {
+      alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
     
     if (confirm('Are you sure you want to resubmit this submission to the Central Committee? All changes will be saved.')) {
       setIsSubmitting(true);
       try {
         // Save all responses first
         Object.keys(editedResponses).forEach(subQuestionId => {
-          saveResponse({
-            submissionId: submissionDetails.submission.submissionId,
-            subQuestionId: parseInt(subQuestionId),
-            responseValue: editedResponses[subQuestionId],
-            evidenceLink: editedEvidenceLinks[subQuestionId] || null
-          });
+          try {
+            saveResponse({
+              submissionId: submissionDetails.submission.submissionId,
+              subQuestionId: parseInt(subQuestionId),
+              responseValue: editedResponses[subQuestionId],
+              evidenceLink: editedEvidenceLinks[subQuestionId] || null
+            });
+          } catch (error) {
+            console.error(`Error saving response for question ${subQuestionId}:`, error);
+          }
         });
         
         // Resubmit to Central Committee
@@ -347,6 +370,39 @@ export default function EditSubmission() {
     return map;
   }, [submissionDetails]);
 
+  // Set active section when dimension index changes
+  useEffect(() => {
+    if (submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && currentDimensionIndex >= 0 && currentDimensionIndex < submissionDetails.groupedData.length) {
+      const dimension = submissionDetails.groupedData[currentDimensionIndex].dimension;
+      setActiveSection(dimension.dimensionId);
+    }
+  }, [currentDimensionIndex, submissionDetails]);
+
+  // Navigate to dimension by index
+  const goToDimension = (index) => {
+    if (submissionDetails?.groupedData && index >= 0 && index < submissionDetails.groupedData.length) {
+      setCurrentDimensionIndex(index);
+      const dimension = submissionDetails.groupedData[index].dimension;
+      setActiveSection(dimension.dimensionId);
+      // Scroll to top of main content
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Navigate to next dimension
+  const goToNextDimension = () => {
+    if (submissionDetails?.groupedData && currentDimensionIndex < submissionDetails.groupedData.length - 1) {
+      goToDimension(currentDimensionIndex + 1);
+    }
+  };
+
+  // Navigate to previous dimension
+  const goToPreviousDimension = () => {
+    if (currentDimensionIndex > 0) {
+      goToDimension(currentDimensionIndex - 1);
+    }
+  };
+
   if (!submissionDetails) {
     return (
       <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
@@ -369,11 +425,42 @@ export default function EditSubmission() {
   return (
     <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
       <Layout title="Edit Submission">
-        <div className="flex">
+        <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
+          {/* Assessment Dimensions Navigation Sidebar */}
+          {submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && (
+            <aside className={`w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
+              <div className="p-4 pt-8">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Assessment Dimensions</h2>
+                <div className="space-y-1">
+                  {submissionDetails.groupedData.map(({ dimension }, index) => (
+                    <div key={dimension.dimensionId}>
+                      <button
+                        onClick={() => goToDimension(index)}
+                        className={`w-full flex items-center text-left p-2 rounded-lg transition-all ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670]/10 text-[#0d6670] border-l-4 border-[#0d6670]'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670] text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <span className="text-sm font-medium flex-1">{dimension.dimensionName}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          )}
           <div className="flex flex-grow ml-64">
             {/* Main Content */}
-            <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+            <main className={`flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto transition-all duration-300 ${submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 ? (isCollapsed ? 'ml-16' : 'ml-80') : (isCollapsed ? 'ml-16' : 'ml-64')}`}>
               <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Success Message */}
                 {successMessage && (
@@ -413,6 +500,9 @@ export default function EditSubmission() {
                 {submissionDetails.groupedData && submissionDetails.groupedData.length > 0 ? (
                   <div className="space-y-6">
                     {submissionDetails.groupedData.map(({ dimension, indicators: dimIndicators }, dimIdx) => {
+                      // Only show the current dimension
+                      if (dimIdx !== currentDimensionIndex) return null;
+                      
                       return (
                         <div key={dimension.dimensionId} className="bg-white rounded-xl p-6 border-2 border-mint-medium-gray shadow-sm">
                           <div className="mb-6 pb-4 border-b-2 border-mint-primary-blue">
@@ -524,26 +614,64 @@ export default function EditSubmission() {
                   </div>
                 )}
 
-                {/* Resubmit Button */}
-                <div className="mt-8 p-6 bg-gray-50 rounded-xl border border-gray-300">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-mint-dark-text mb-1">
-                        Ready to Resubmit?
-                      </h3>
-                      <p className="text-sm text-mint-dark-text/70">
-                        After editing, click the button below to resubmit this submission to the Central Committee.
-                      </p>
+                {/* Navigation Buttons and Resubmit */}
+                {submissionDetails.groupedData && submissionDetails.groupedData.length > 0 && (
+                  <div className="mt-6">
+                    {/* Navigation Buttons */}
+                    <div className="flex items-center justify-between bg-white border-2 border-mint-medium-gray rounded-xl p-6 shadow-sm mb-6">
+                      <button
+                        onClick={goToPreviousDimension}
+                        disabled={currentDimensionIndex === 0}
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                          currentDimensionIndex === 0
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-[#0d6670] hover:bg-[#0a4f57] text-white'
+                        }`}
+                      >
+                        ← Previous
+                      </button>
+                      
+                      <div className="text-sm text-mint-dark-text">
+                        Dimension {currentDimensionIndex + 1} of {submissionDetails.groupedData.length}
+                      </div>
+                      
+                      <button
+                        onClick={goToNextDimension}
+                        disabled={currentDimensionIndex === submissionDetails.groupedData.length - 1}
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                          currentDimensionIndex === submissionDetails.groupedData.length - 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-[#0d6670] hover:bg-[#0a4f57] text-white'
+                        }`}
+                      >
+                        Next →
+                      </button>
                     </div>
-                    <button
-                      onClick={handleResubmit}
-                      disabled={isSubmitting}
-                      className="px-8 py-3 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-                    >
-                      {isSubmitting ? 'Resubmitting...' : 'Resubmit to Central Committee'}
-                    </button>
+
+                    {/* Resubmit Button - Show on last dimension */}
+                    {currentDimensionIndex === submissionDetails.groupedData.length - 1 && (
+                      <div className="p-6 bg-gray-50 rounded-xl border border-gray-300">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-mint-dark-text mb-1">
+                              Ready to Resubmit?
+                            </h3>
+                            <p className="text-sm text-mint-dark-text/70">
+                              After editing, click the button below to resubmit this submission to the Central Committee.
+                            </p>
+                          </div>
+                          <button
+                            onClick={handleResubmit}
+                            disabled={isSubmitting}
+                            className="px-8 py-3 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                          >
+                            {isSubmitting ? 'Resubmitting...' : 'Resubmit to Central Committee'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             </main>
           </div>

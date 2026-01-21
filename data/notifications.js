@@ -334,7 +334,7 @@ export const initializeRealNotifications = () => {
           };
           inAppNotifications.push(notification);
         });
-      } else if (user.role === 'Data Contributor' || user.role === 'Institute Data Contributor') {
+      } else if (user.role === 'Data Contributor' || user.role === 'Institute Data Contributor' || user.role === 'Federal Data Contributor') {
         // Notifications for approved submissions
         const approvedSubmissions = allSubmissions.filter(s => 
           s.contributorUserId === user.userId && 

@@ -6,11 +6,17 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Test user credentials for demo
 const TEST_USERS = [
-  { username: 'admin', password: 'Admin123!', role: 'MInT Admin' },
-  { username: 'contributor1', password: 'Contributor123!', role: 'Data Contributor' },
-  { username: 'approver1', password: 'Approver123!', role: 'Regional Approver (Addis Ababa)' },
-  { username: 'amhara_approver', password: 'Amhara123!', role: 'Regional Approver (Amhara)' },
-  { username: 'committee1', password: 'Committee123!', role: 'Central Committee Member' }
+  { username: 'admin', password: 'Admin123!', role: 'MInT Admin', category: 'Admin' },
+  { username: 'contributor1', password: 'Contributor123!', role: 'Data Contributor', category: 'Regional' },
+  { username: 'institute_contributor', password: 'Institute123!', role: 'Institute Data Contributor', category: 'Federal' },
+  { username: 'federal_contributor', password: 'Federal123!', role: 'Federal Data Contributor', category: 'Federal' },
+  { username: 'approver1', password: 'Approver123!', role: 'Regional Approver (Addis Ababa)', category: 'Regional' },
+  { username: 'amhara_approver', password: 'Amhara123!', role: 'Regional Approver (Amhara)', category: 'Regional' },
+  { username: 'federal_approver', password: 'FederalApp123!', role: 'Federal Approver', category: 'Federal' },
+  { username: 'initial_approver', password: 'Initial123!', role: 'Initial Approver', category: 'Regional' },
+  { username: 'committee1', password: 'Committee123!', role: 'Central Committee Member', category: 'Central' },
+  { username: 'chairman', password: 'Chairman123!', role: 'Chairman (CC)', category: 'Central' },
+  { username: 'secretary', password: 'Secretary123!', role: 'Secretary (CC)', category: 'Central' }
 ];
 
 export default function Login() {
@@ -143,30 +149,43 @@ export default function Login() {
               </svg>
             </button>
             {showTestCredentials && (
-              <div className="mt-4 space-y-3">
-                {TEST_USERS.map((testUser, index) => (
-                  <div
-                    key={index}
-                    className="bg-white border border-[#0d6670]/20 rounded-lg p-3 flex items-center justify-between"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-mint-dark-text">{testUser.role}</p>
-                      <p className="text-xs text-mint-dark-text/70 mt-1">
-                        Username: <span className="font-mono font-semibold">{testUser.username}</span>
-                      </p>
-                      <p className="text-xs text-mint-dark-text/70">
-                        Password: <span className="font-mono font-semibold">{testUser.password}</span>
-                      </p>
+              <div className="mt-4 space-y-4">
+                {/* Group by category */}
+                {['Admin', 'Regional', 'Federal', 'Central'].map((category) => {
+                  const categoryUsers = TEST_USERS.filter(u => u.category === category);
+                  if (categoryUsers.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="space-y-2">
+                      <h4 className="text-xs font-bold text-[#0d6670] uppercase tracking-wider">
+                        {category} Roles
+                      </h4>
+                      {categoryUsers.map((testUser, index) => (
+                        <div
+                          key={index}
+                          className="bg-white border border-[#0d6670]/20 rounded-lg p-3 flex items-center justify-between hover:border-[#0d6670]/40 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-mint-dark-text">{testUser.role}</p>
+                            <p className="text-xs text-mint-dark-text/70 mt-1">
+                              Username: <span className="font-mono font-semibold">{testUser.username}</span>
+                            </p>
+                            <p className="text-xs text-mint-dark-text/70">
+                              Password: <span className="font-mono font-semibold">{testUser.password}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => fillTestCredentials(testUser.username, testUser.password)}
+                            className="ml-4 px-3 py-1.5 bg-mint-primary-blue hover:bg-mint-secondary-blue text-white text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            Use
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => fillTestCredentials(testUser.username, testUser.password)}
-                      className="ml-4 px-3 py-1.5 bg-mint-primary-blue hover:bg-mint-secondary-blue text-white text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      Use
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

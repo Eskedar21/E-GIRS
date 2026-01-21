@@ -30107,8 +30107,28 @@ export const getResponseBySubQuestion = (submissionId, subQuestionId) => {
 
 // Create or update a response (Real-time database operation)
 export const saveResponse = (responseData) => {
+  if (!responseData) {
+    console.error('saveResponse called with undefined or null responseData');
+    return null;
+  }
+  
+  if (!responseData.submissionId) {
+    console.error('saveResponse called without submissionId');
+    return null;
+  }
+  
+  if (!responseData.subQuestionId) {
+    console.error('saveResponse called without subQuestionId');
+    return null;
+  }
+  
+  if (!responses || !Array.isArray(responses)) {
+    console.error('responses array is not initialized');
+    return null;
+  }
+  
   const existing = responses.find(r => 
-    r.submissionId === responseData.submissionId && 
+    r && r.submissionId === responseData.submissionId && 
     r.subQuestionId === responseData.subQuestionId
   );
   
@@ -30216,7 +30236,17 @@ export const submitForApproval = (submissionId) => {
 
 // Regional Approver per-question approval actions (does NOT auto-submit)
 export const approveResponseByRegionalApprover = (responseId, approverUserId, note = null) => {
-  const response = responses.find(r => r.responseId === responseId);
+  if (!responseId) {
+    console.error('approveResponseByRegionalApprover called with undefined or null responseId');
+    return null;
+  }
+  
+  if (!responses || !Array.isArray(responses)) {
+    console.error('responses array is not initialized');
+    return null;
+  }
+  
+  const response = responses.find(r => r && r.responseId === responseId);
   if (response) {
     response.regionalApprovalStatus = VALIDATION_STATUS.APPROVED;
     response.regionalRejectionReason = null;
@@ -30230,7 +30260,17 @@ export const approveResponseByRegionalApprover = (responseId, approverUserId, no
 
 // Regional Approver per-question rejection (does NOT auto-submit)
 export const rejectResponseByRegionalApprover = (responseId, approverUserId, rejectionReason) => {
-  const response = responses.find(r => r.responseId === responseId);
+  if (!responseId) {
+    console.error('rejectResponseByRegionalApprover called with undefined or null responseId');
+    return null;
+  }
+  
+  if (!responses || !Array.isArray(responses)) {
+    console.error('responses array is not initialized');
+    return null;
+  }
+  
+  const response = responses.find(r => r && r.responseId === responseId);
   if (response) {
     response.regionalApprovalStatus = VALIDATION_STATUS.REJECTED;
     response.regionalRejectionReason = rejectionReason;
@@ -30353,7 +30393,17 @@ export const rejectByInitialApprover = (submissionId, approverUserId, rejectionR
 
 // Central Validation actions (does NOT auto-submit)
 export const validateResponse = (responseId, validationStatus, rejectionReason = null, generalNote = null) => {
-  const response = responses.find(r => r.responseId === responseId);
+  if (!responseId) {
+    console.error('validateResponse called with undefined or null responseId');
+    return null;
+  }
+  
+  if (!responses || !Array.isArray(responses)) {
+    console.error('responses array is not initialized');
+    return null;
+  }
+  
+  const response = responses.find(r => r && r.responseId === responseId);
   if (response) {
     response.validationStatus = validationStatus;
     response.centralRejectionReason = rejectionReason;
@@ -30446,16 +30496,25 @@ export const submitCentralValidation = (submissionId, validatorUserId) => {
 
 // Resubmit after rejection
 export const resubmitToCentralCommittee = (submissionId) => {
+  if (!submissionId) {
+    console.error('resubmitToCentralCommittee called with undefined or null submissionId');
+    return null;
+  }
+  
   const submission = getSubmissionById(submissionId);
   if (submission) {
     submission.submissionStatus = SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION;
     submission.updatedAt = new Date().toISOString();
     // Reset validation status for all responses
     const submissionResponses = getResponsesBySubmission(submissionId);
-    submissionResponses.forEach(r => {
-      r.validationStatus = VALIDATION_STATUS.PENDING;
-      r.centralRejectionReason = null;
-    });
+    if (submissionResponses && Array.isArray(submissionResponses)) {
+      submissionResponses.forEach(r => {
+        if (r) {
+          r.validationStatus = VALIDATION_STATUS.PENDING;
+          r.centralRejectionReason = null;
+        }
+      });
+    }
     return submission;
   }
   return null;

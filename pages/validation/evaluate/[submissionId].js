@@ -109,7 +109,10 @@ export default function EvaluateCentralSubmission() {
   };
 
   const handleApproveSubmission = () => {
-    if (!user || !submissionDetails) return;
+    if (!user || !submissionDetails || !submissionDetails.submission) {
+      alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
     
     if (!canPerformAction(user, 'validate_submission')) {
       alert('You do not have permission to approve submissions.');
@@ -118,10 +121,12 @@ export default function EvaluateCentralSubmission() {
     
     try {
       // Approve all answered questions
-      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      const responses = submissionDetails?.responses || [];
+      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        if (!response.validationStatus || response.validationStatus === VALIDATION_STATUS.PENDING) {
-          const note = validationNotes[response.responseId] || '';
+        if (response && response.responseId && (!response.validationStatus || response.validationStatus === VALIDATION_STATUS.PENDING)) {
+          const notes = validationNotes || {};
+          const note = notes[response.responseId] || '';
           validateResponse(response.responseId, VALIDATION_STATUS.APPROVED, null, note);
         }
       });
@@ -136,17 +141,18 @@ export default function EvaluateCentralSubmission() {
         if (result.submissionStatus === SUBMISSION_STATUS.VALIDATED) {
           setSuccessMessage('✅ Validation submitted successfully! The submission has been validated and will proceed to the calculation engine. You will be redirected to the validation queue.');
           setTimeout(() => {
-            router.push('/validation/central');
+            router.push('/approval/queue');
           }, 3000);
         } else {
           setSuccessMessage('⚠️ Validation submitted. The submission has been sent back to the Regional Approver with rejection reasons. You will be redirected to the validation queue.');
           setTimeout(() => {
-            router.push('/validation/central');
+            router.push('/approval/queue');
           }, 3000);
         }
         setTimeout(() => setSuccessMessage(''), 8000);
       }
     } catch (error) {
+      console.error('Approve submission error:', error);
       alert(error.message || 'Error submitting validation. Please try again.');
     }
   };
@@ -158,7 +164,10 @@ export default function EvaluateCentralSubmission() {
       return;
     }
     
-    if (!user || !submissionDetails) return;
+    if (!user || !submissionDetails || !submissionDetails.submission) {
+      alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
     
     if (!canPerformAction(user, 'validate_submission')) {
       alert('You do not have permission to reject submissions.');
@@ -167,10 +176,14 @@ export default function EvaluateCentralSubmission() {
     
     try {
       // Reject all answered questions with the same reason and their notes
-      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      const responses = submissionDetails?.responses || [];
+      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        const note = validationNotes[response.responseId] || response.generalNote || null;
-        validateResponse(response.responseId, VALIDATION_STATUS.REJECTED, reason, note);
+        if (response && response.responseId) {
+          const notes = validationNotes || {};
+          const note = notes[response.responseId] || (response.generalNote || null);
+          validateResponse(response.responseId, VALIDATION_STATUS.REJECTED, reason, note);
+        }
       });
       
       // Submit rejection
@@ -182,11 +195,12 @@ export default function EvaluateCentralSubmission() {
         setRejectionReasons(prev => ({ ...prev, ['submission']: '' }));
         setSuccessMessage('⚠️ Submission rejected. The submission has been sent back to the Regional Approver for revision. You will be redirected to the validation queue.');
         setTimeout(() => {
-          router.push('/validation/central');
+          router.push('/approval/queue');
         }, 3000);
         setTimeout(() => setSuccessMessage(''), 8000);
       }
     } catch (error) {
+      console.error('Reject submission error:', error);
       alert(error.message || 'Error submitting rejection. Please try again.');
     }
   };
@@ -374,7 +388,7 @@ export default function EvaluateCentralSubmission() {
                       )}
                     </div>
                     <button
-                      onClick={() => router.push('/validation/central')}
+                      onClick={() => router.push('/approval/queue')}
                       className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
                     >
                       ← Back to Queue
@@ -479,10 +493,14 @@ export default function EvaluateCentralSubmission() {
                                             </label>
                                             {/* Comment Button */}
                                             <button
-                                              onClick={() => setOpenCommentSections(prev => ({ 
-                                                ...prev, 
-                                                [response.responseId]: !prev[response.responseId] 
-                                              }))}
+                                              onClick={() => {
+                                                if (response && response.responseId) {
+                                                  setOpenCommentSections(prev => ({ 
+                                                    ...prev, 
+                                                    [response.responseId]: !prev[response.responseId] 
+                                                  }));
+                                                }
+                                              }}
                                               className="flex items-center space-x-1 text-gray-600 hover:text-mint-primary-blue transition-colors"
                                               title="Add comment"
                                             >
@@ -523,10 +541,14 @@ export default function EvaluateCentralSubmission() {
                                               <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-sm font-bold text-gray-900">Comments</h4>
                                                 <button
-                                                  onClick={() => setOpenCommentSections(prev => ({ 
-                                                    ...prev, 
-                                                    [response.responseId]: !prev[response.responseId] 
-                                                  }))}
+                                                  onClick={() => {
+                                                    if (response && response.responseId) {
+                                                      setOpenCommentSections(prev => ({ 
+                                                        ...prev, 
+                                                        [response.responseId]: !prev[response.responseId] 
+                                                      }));
+                                                    }
+                                                  }}
                                                   className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                 >
                                                   Add Comment
@@ -534,7 +556,7 @@ export default function EvaluateCentralSubmission() {
                                               </div>
                                               
                                               {/* Existing Comments - Always visible */}
-                                              {response.generalNote && (
+                                              {response && response.generalNote && (
                                                 <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
                                                   <div className="flex items-start space-x-2 mb-2">
                                                     <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,28 +585,38 @@ export default function EvaluateCentralSubmission() {
                                               )}
                                               
                                               {/* Comment Input - Toggleable */}
-                                              {openCommentSections[response.responseId] && (
+                                              {response && response.responseId && openCommentSections[response.responseId] && (
                                                 <div className="space-y-2">
                                                   <textarea
                                                     value={validationNotes[response.responseId] || ''}
-                                                    onChange={(e) => setValidationNotes(prev => ({ ...prev, [response.responseId]: e.target.value }))}
+                                                    onChange={(e) => {
+                                                      if (response && response.responseId) {
+                                                        setValidationNotes(prev => ({ ...prev, [response.responseId]: e.target.value }));
+                                                      }
+                                                    }}
                                                     rows="3"
                                                     className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue resize-none"
                                                     placeholder="Add your comment here..."
                                                   />
                                                   <div className="flex justify-end space-x-2">
                                                     <button
-                                                      onClick={() => setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }))}
+                                                      onClick={() => {
+                                                        if (response && response.responseId) {
+                                                          setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
+                                                        }
+                                                      }}
                                                       className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                     >
                                                       Cancel
                                                     </button>
                                                     <button
                                                       onClick={() => {
-                                                        handleSaveComment(response.responseId);
-                                                        setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
+                                                        if (response && response.responseId) {
+                                                          handleSaveComment(response.responseId);
+                                                          setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
+                                                        }
                                                       }}
-                                                      disabled={!validationNotes[response.responseId]?.trim()}
+                                                      disabled={!response || !response.responseId || !validationNotes[response.responseId]?.trim()}
                                                       className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                       Add Comment

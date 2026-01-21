@@ -8,30 +8,238 @@ export default function ReportsIndex() {
   const { user } = useAuth();
   const userRole = user ? user.role : '';
 
-  // Define available reports based on user role
-  const publicReports = [
-    {
-      id: 'public-dashboard',
-      title: 'National E-Government Performance Dashboard',
-      description: 'Comprehensive national overview with KPIs, trend analysis, comparative map, and rankings',
-      path: '/public-dashboard',
-      icon: '📊',
-      color: 'from-mint-primary-blue to-mint-secondary-blue',
-      features: [
-        'National Index and Dimension KPIs',
-        'Performance trends over time',
-        'Unit rankings and comparisons',
-        'Interactive maturity map',
-        'CSV export functionality'
-      ]
-    },
-    {
+  // Define role-specific reports
+  const roleBasedReports = {
+    'Regional Approver': [
+      {
+        id: 'regional-report',
+        title: 'Regional Performance Report',
+        description: 'Index results for region, zone, and woreda with overview numbers and visual representations',
+        path: '/reports/regional-approver',
+        icon: '📊',
+        color: 'from-mint-primary-blue to-mint-secondary-blue',
+        features: [
+          'Region, Zone, and Woreda index results',
+          'Overview numbers and KPIs',
+          'Indicator-based visualizations',
+          'Dimension-based representations',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Data Contributor': [
+      {
+        id: 'contributor-report',
+        title: 'My Unit Performance Report',
+        description: 'Index results for your assigned unit with year filter',
+        path: '/reports/data-contributor',
+        icon: '📋',
+        color: 'from-green-500 to-emerald-600',
+        features: [
+          'Unit-specific index results',
+          'Year of assessment filter',
+          'Performance trends',
+          'Dimension breakdown',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Institute Data Contributor': [
+      {
+        id: 'contributor-report',
+        title: 'My Unit Performance Report',
+        description: 'Index results for your assigned unit with year filter',
+        path: '/reports/data-contributor',
+        icon: '📋',
+        color: 'from-green-500 to-emerald-600',
+        features: [
+          'Unit-specific index results',
+          'Year of assessment filter',
+          'Performance trends',
+          'Dimension breakdown',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Federal Data Contributor': [
+      {
+        id: 'federal-contributor-report',
+        title: 'My Submissions Report',
+        description: 'View your submission history and status (no index calculation)',
+        path: '/reports/federal-contributor',
+        icon: '📄',
+        color: 'from-purple-500 to-indigo-600',
+        features: [
+          'Submission history',
+          'Status tracking',
+          'Year filter',
+          'Submission details',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Central Committee Member': [
+      {
+        id: 'central-approver-report',
+        title: 'Comprehensive Administrative Report',
+        description: 'All administrative units results with federal institutions final submissions',
+        path: '/reports/central-approver',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'All admin units results',
+          'Tabbed interface',
+          'Federal institutions final submissions',
+          'Comprehensive analytics',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Chairman (CC)': [
+      {
+        id: 'central-approver-report',
+        title: 'Comprehensive Administrative Report',
+        description: 'All administrative units results with federal institutions final submissions',
+        path: '/reports/central-approver',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'All admin units results',
+          'Tabbed interface',
+          'Federal institutions final submissions',
+          'Comprehensive analytics',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'Secretary (CC)': [
+      {
+        id: 'central-approver-report',
+        title: 'Comprehensive Administrative Report',
+        description: 'All administrative units results with federal institutions final submissions',
+        path: '/reports/central-approver',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'All admin units results',
+          'Tabbed interface',
+          'Federal institutions final submissions',
+          'Comprehensive analytics',
+          'Export capabilities'
+        ]
+      }
+    ],
+    'MInT Admin': [
+      {
+        id: 'central-approver-report',
+        title: 'Comprehensive Administrative Report',
+        description: 'All administrative units results with federal institutions final submissions',
+        path: '/reports/central-approver',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'All admin units results',
+          'Tabbed interface',
+          'Federal institutions final submissions',
+          'Comprehensive analytics',
+          'Export capabilities'
+        ]
+      },
+      {
+        id: 'federal-overview',
+        title: 'Federal Institute Submissions Overview',
+        description: 'Consolidated view of submission status across all Federal Institutes',
+        path: '/reports/federal-institutes-overview',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'Filter by year and status',
+          'Sortable data table',
+          'Submission tracking',
+          'CSV export',
+          'Role-based access'
+        ]
+      },
+      {
+        id: 'federal-detail',
+        title: 'Federal Institute Detailed Submission View',
+        description: 'View complete question-and-answer data for a specific Federal Institute',
+        path: '/reports/federal-institute-detail',
+        icon: '📄',
+        color: 'from-purple-500 to-indigo-600',
+        features: [
+          'Complete Q&A display',
+          'Evidence links',
+          'Central Committee notes',
+          'Print to PDF',
+          'Organized by dimensions'
+        ]
+      }
+    ],
+    'Super Admin': [
+      {
+        id: 'central-approver-report',
+        title: 'Comprehensive Administrative Report',
+        description: 'All administrative units results with federal institutions final submissions',
+        path: '/reports/central-approver',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'All admin units results',
+          'Tabbed interface',
+          'Federal institutions final submissions',
+          'Comprehensive analytics',
+          'Export capabilities'
+        ]
+      },
+      {
+        id: 'federal-overview',
+        title: 'Federal Institute Submissions Overview',
+        description: 'Consolidated view of submission status across all Federal Institutes',
+        path: '/reports/federal-institutes-overview',
+        icon: '🏛️',
+        color: 'from-orange-500 to-red-600',
+        features: [
+          'Filter by year and status',
+          'Sortable data table',
+          'Submission tracking',
+          'CSV export',
+          'Role-based access'
+        ]
+      },
+      {
+        id: 'federal-detail',
+        title: 'Federal Institute Detailed Submission View',
+        description: 'View complete question-and-answer data for a specific Federal Institute',
+        path: '/reports/federal-institute-detail',
+        icon: '📄',
+        color: 'from-purple-500 to-indigo-600',
+        features: [
+          'Complete Q&A display',
+          'Evidence links',
+          'Central Committee notes',
+          'Print to PDF',
+          'Organized by dimensions'
+        ]
+      }
+    ]
+  };
+
+  // Get available reports for current user role
+  const getAvailableReports = () => {
+    if (!userRole) return [];
+    
+    // Get role-specific reports
+    const reports = roleBasedReports[userRole] || [];
+    
+    // Add unit scorecard for all roles (if they have access to view units)
+    reports.push({
       id: 'unit-scorecard',
       title: 'Unit Scorecard',
       description: 'Detailed drill-down report for individual administrative units',
       path: '/reports/unit-scorecard',
       icon: '📋',
-      color: 'from-green-500 to-emerald-600',
+      color: 'from-blue-500 to-blue-600',
       features: [
         'Dimensional performance analysis',
         'Unit vs National Average comparison',
@@ -39,55 +247,9 @@ export default function ReportsIndex() {
         'Radar chart visualization',
         'Export capabilities'
       ]
-    }
-  ];
-
-  const internalReports = [
-    {
-      id: 'federal-overview',
-      title: 'Federal Institute Submissions Overview',
-      description: 'Consolidated view of submission status across all Federal Institutes',
-      path: '/reports/federal-institutes-overview',
-      icon: '🏛️',
-      color: 'from-orange-500 to-red-600',
-      roles: ['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor'],
-      features: [
-        'Filter by year and status',
-        'Sortable data table',
-        'Submission tracking',
-        'CSV export',
-        'Role-based access'
-      ]
-    },
-    {
-      id: 'federal-detail',
-      title: 'Federal Institute Detailed Submission View',
-      description: 'View complete question-and-answer data for a specific Federal Institute',
-      path: '/reports/federal-institute-detail',
-      icon: '📄',
-      color: 'from-purple-500 to-indigo-600',
-      roles: ['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor'],
-      features: [
-        'Complete Q&A display',
-        'Evidence links',
-        'Central Committee notes',
-        'Print to PDF',
-        'Organized by dimensions'
-      ]
-    }
-  ];
-
-  // Filter reports based on user role
-  const getAvailableReports = () => {
-    const available = [...publicReports];
-    
-    internalReports.forEach(report => {
-      if (report.roles.includes('all') || (userRole && report.roles.includes(userRole))) {
-        available.push(report);
-      }
     });
     
-    return available;
+    return reports;
   };
 
   const availableReports = getAvailableReports();
@@ -161,10 +323,10 @@ export default function ReportsIndex() {
                 <h3 className="text-lg font-bold text-mint-primary-blue mb-3">About Reports</h3>
                 <div className="space-y-2 text-sm text-mint-dark-text/70">
                   <p>
-                    <strong>Public Reports:</strong> Available to all users, these reports provide comprehensive insights into national e-government performance, including trends, rankings, and detailed unit analysis.
+                    <strong>Role-Specific Reports:</strong> Each user role has access to reports tailored to their responsibilities and scope of work. Reports are designed to provide relevant insights based on your access level.
                   </p>
                   <p>
-                    <strong>Internal Reports:</strong> Role-based reports for viewing and analyzing Federal Institute submissions. Access is restricted based on user permissions.
+                    <strong>Access Control:</strong> Report access is automatically filtered based on your role and assigned administrative unit. You will only see data within your authorized scope.
                   </p>
                   <p>
                     All reports support data export in CSV format and include interactive visualizations for better data analysis.

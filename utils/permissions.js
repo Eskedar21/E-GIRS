@@ -36,7 +36,7 @@ export const canAccessUnit = (user, targetUnitId, allUnits) => {
   }
 
   // Data Contributors can only access their own unit
-  if (['Data Contributor', 'Institute Data Contributor'].includes(user.role)) {
+  if (['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(user.role)) {
     return user.officialUnitId === targetUnitId;
   }
 
@@ -91,7 +91,7 @@ export const filterSubmissionsByAccess = (submissions, user, allUnits) => {
   }
 
   // Data Contributors can only see their own unit's submissions
-  if (['Data Contributor', 'Institute Data Contributor'].includes(user.role)) {
+  if (['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(user.role)) {
     return submissions.filter(s => s.unitId === user.officialUnitId);
   }
 
@@ -126,7 +126,7 @@ export const canPerformAction = (user, action, resource = null) => {
       return ['Super Admin', 'MInT Admin'].includes(role);
     
     case 'submit_data':
-      return ['Data Contributor', 'Institute Data Contributor'].includes(role);
+      return ['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(role);
     
     case 'approve_submission':
       return ['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(role);
@@ -135,17 +135,17 @@ export const canPerformAction = (user, action, resource = null) => {
       return ['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(role);
     
     case 'edit_submission':
-      if (['Data Contributor', 'Institute Data Contributor'].includes(role)) {
+      if (['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(role)) {
         // Can only edit their own unit's submissions in Draft or Rejected status
-        if (resource && resource.unitId === user.officialUnitId) {
-          return ['Draft', 'Rejected by Initial Approver'].includes(resource.submissionStatus);
+        if (resource && resource.unitId === user.officialUnitId && resource.contributorUserId === user.userId) {
+          return ['Draft', 'Rejected by Initial Approver', 'Rejected by Central Committee'].includes(resource.submissionStatus);
         }
       }
       return false;
     
     case 'delete_submission':
       // Only Data Contributors can delete their own draft submissions
-      if (['Data Contributor', 'Institute Data Contributor'].includes(role)) {
+      if (['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(role)) {
         if (resource && resource.unitId === user.officialUnitId) {
           return resource.submissionStatus === 'Draft';
         }
@@ -185,7 +185,7 @@ export const getAccessibleUnitIds = (user, allUnits) => {
   }
 
   // Data Contributors can only access their own unit
-  if (['Data Contributor', 'Institute Data Contributor'].includes(user.role)) {
+  if (['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor'].includes(user.role)) {
     return [user.officialUnitId];
   }
 

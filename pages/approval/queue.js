@@ -101,9 +101,8 @@ export default function ApprovalQueue() {
     if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
       return [
         { value: 'all', label: 'All Statuses' },
-        { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Pending Central Validation' },
-        { value: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE, label: 'Rejected by Central Committee' },
-        { value: SUBMISSION_STATUS.VALIDATED, label: 'Validated' },
+        { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Pending Approval' },
+        { value: SUBMISSION_STATUS.VALIDATED, label: 'Verified' },
       ];
     } else if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
       return [
@@ -126,11 +125,10 @@ export default function ApprovalQueue() {
       const allUnits = getAllUnits();
       
       if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
-        // Central Committee sees all submissions with these statuses
+        // Central Committee sees all submissions with Pending Approval and Verified statuses
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
-        const rejected = getSubmissionsByStatus(SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE);
         const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-        submissions = [...pending, ...rejected, ...validated];
+        submissions = [...pending, ...validated];
       } else if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
         // Regional Approvers see submissions in their scope
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
@@ -219,42 +217,56 @@ export default function ApprovalQueue() {
         if (!unit) return false;
         
         if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
-          // Check if this is Addis Ababa approver (unitId: 10)
-          const isAddisAbabaApprover = user?.officialUnitId === 10;
-          
-          if (isAddisAbabaApprover) {
-            // Addis Ababa approvers filter by Addis Ababa, Sub-city, or Woreda
-            if (scopeFilter === 'city') {
-              // Show submissions from Addis Ababa City Administration itself
-              return unit.unitType === 'City Administration' && unit.unitId === user?.officialUnitId;
-            } else if (scopeFilter === 'subcity') {
-              // Show submissions from all sub-cities under Addis Ababa
-              return unit.unitType === 'Sub-city' && descendantUnitsByType.subCities.some(sc => sc.unitId === unit.unitId);
-            } else if (scopeFilter === 'woreda') {
-              // Show submissions from all woredas under Addis Ababa (through sub-cities)
-              return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+          // Federal Approvers filter by Federal Institute
+          if (userRole === 'Federal Approver') {
+            if (scopeFilter === 'federal') {
+              // Show submissions from Federal Institutes in their scope
+              return unit.unitType === 'Federal Institute';
             }
           } else {
-            // Regional approvers filter by Region, Zone, or Woreda
-            if (scopeFilter === 'region') {
-              // Show submissions from the region itself
-              return unit.unitType === 'Region' && unit.unitId === user?.officialUnitId;
-            } else if (scopeFilter === 'zone') {
-              // Show submissions from all zones under the region
-              return unit.unitType === 'Zone' && descendantUnitsByType.zones.some(z => z.unitId === unit.unitId);
-            } else if (scopeFilter === 'woreda') {
-              // Show submissions from all woredas under the region
-              return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+            // Check if this is Addis Ababa approver (unitId: 10)
+            const isAddisAbabaApprover = user?.officialUnitId === 10;
+            
+            if (isAddisAbabaApprover) {
+              // Addis Ababa approvers filter by Addis Ababa, Sub-city, or Woreda
+              if (scopeFilter === 'city') {
+                // Show submissions from Addis Ababa City Administration itself
+                return unit.unitType === 'City Administration' && unit.unitId === user?.officialUnitId;
+              } else if (scopeFilter === 'subcity') {
+                // Show submissions from all sub-cities under Addis Ababa
+                return unit.unitType === 'Sub-city' && descendantUnitsByType.subCities.some(sc => sc.unitId === unit.unitId);
+              } else if (scopeFilter === 'woreda') {
+                // Show submissions from all woredas under Addis Ababa (through sub-cities)
+                return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+              }
+            } else {
+              // Regional approvers filter by Region, Zone, or Woreda
+              if (scopeFilter === 'region') {
+                // Show submissions from the region itself
+                return unit.unitType === 'Region' && unit.unitId === user?.officialUnitId;
+              } else if (scopeFilter === 'zone') {
+                // Show submissions from all zones under the region
+                return unit.unitType === 'Zone' && descendantUnitsByType.zones.some(z => z.unitId === unit.unitId);
+              } else if (scopeFilter === 'woreda') {
+                // Show submissions from all woredas under the region
+                return unit.unitType === 'Woreda' && descendantUnitsByType.woredas.some(w => w.unitId === unit.unitId);
+              }
             }
           }
         } else {
-          // Central Committee filters
-          if (scopeFilter === 'region') {
-            return unit.unitType === 'Region';
-          } else if (scopeFilter === 'federal') {
+          // Central Committee filters - can filter by all unit types
+          if (scopeFilter === 'federal') {
             return unit.unitType === 'Federal Institute';
+          } else if (scopeFilter === 'region') {
+            return unit.unitType === 'Region';
           } else if (scopeFilter === 'city') {
             return unit.unitType === 'City Administration';
+          } else if (scopeFilter === 'zone') {
+            return unit.unitType === 'Zone';
+          } else if (scopeFilter === 'subcity') {
+            return unit.unitType === 'Sub-city';
+          } else if (scopeFilter === 'woreda') {
+            return unit.unitType === 'Woreda';
           }
         }
         return true;
@@ -416,13 +428,28 @@ export default function ApprovalQueue() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole) 
                     ? 'Central Validation Queue' 
+                    : userRole === 'Federal Approver'
+                    ? 'Federal Approval Queue'
                     : 'Approval Queue'}
                   </h1>
                 <p className="text-gray-600">
                   {['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)
                     ? 'Monitor and manage all submissions pending central validation. Track total number of submissions that are pending, verified, and rejected.'
+                    : userRole === 'Federal Approver'
+                    ? 'Monitor and manage all Federal Institute submissions in your scope. Review and approve data submissions from Federal Institutes under your jurisdiction.'
                     : 'Monitor and manage all submissions in your scope. Track total number of submissions that are pending, verified, and rejected.'}
                     </p>
+                  {userRole === 'Federal Approver' && user?.officialUnitId && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Your Scope:</strong> You have access to review and approve submissions from Federal Institutes assigned to your administrative unit.
+                        {(() => {
+                          const userUnit = getUnitById(user.officialUnitId);
+                          return userUnit ? ` (${userUnit.officialUnitName})` : '';
+                        })()}
+                      </p>
+                    </div>
+                  )}
                   </div>
 
               {/* Summary Cards */}
@@ -534,8 +561,11 @@ export default function ApprovalQueue() {
                       >
                         <option value="all">All Scopes</option>
                         {['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole) ? (
-                          // Check if this is Addis Ababa approver (unitId: 10)
-                          user?.officialUnitId === 10 ? (
+                          userRole === 'Federal Approver' ? (
+                            <>
+                              <option value="federal">Federal Institute</option>
+                            </>
+                          ) : user?.officialUnitId === 10 ? (
                             <>
                               <option value="city">Addis Ababa</option>
                               <option value="subcity">Sub-city</option>
@@ -550,9 +580,12 @@ export default function ApprovalQueue() {
                           )
                         ) : (
                           <>
-                            <option value="region">Region</option>
                             <option value="federal">Federal Institute</option>
+                            <option value="region">Region</option>
                             <option value="city">City Administration</option>
+                            <option value="zone">Zone</option>
+                            <option value="subcity">Sub-city</option>
+                            <option value="woreda">Woreda</option>
                                   </>
                                 )}
                       </select>

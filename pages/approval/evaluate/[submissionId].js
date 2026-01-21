@@ -114,7 +114,10 @@ export default function EvaluateSubmission() {
   };
 
   const handleApproveSubmission = () => {
-    if (!user || !submissionDetails) return;
+    if (!user || !submissionDetails || !submissionDetails.submission) {
+      alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
     
     if (!canPerformAction(user, 'approve_submission')) {
       alert('You do not have permission to approve submissions.');
@@ -123,9 +126,10 @@ export default function EvaluateSubmission() {
     
     try {
       // Approve all answered questions
-      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      const responses = submissionDetails?.responses || [];
+      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        if (!response.regionalApprovalStatus || response.regionalApprovalStatus === VALIDATION_STATUS.PENDING) {
+        if (response && response.responseId && (!response.regionalApprovalStatus || response.regionalApprovalStatus === VALIDATION_STATUS.PENDING)) {
           approveResponseByRegionalApprover(response.responseId, user.userId, null);
         }
       });
@@ -151,6 +155,7 @@ export default function EvaluateSubmission() {
         setTimeout(() => setSuccessMessage(''), 8000);
       }
     } catch (error) {
+      console.error('Approve submission error:', error);
       setShowApproveModal(false);
       alert(error.message || 'Error submitting approval. Please try again.');
     }
@@ -163,7 +168,10 @@ export default function EvaluateSubmission() {
       return;
     }
     
-    if (!user || !submissionDetails) return;
+    if (!user || !submissionDetails || !submissionDetails.submission) {
+      alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
     
     if (!canPerformAction(user, 'approve_submission')) {
       alert('You do not have permission to reject submissions.');
@@ -172,9 +180,12 @@ export default function EvaluateSubmission() {
     
     try {
       // Reject all answered questions
-      const answeredResponses = submissionDetails.responses.filter(r => r.responseValue && r.responseValue.trim() !== '');
+      const responses = submissionDetails?.responses || [];
+      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        rejectResponseByRegionalApprover(response.responseId, user.userId, reason);
+        if (response && response.responseId) {
+          rejectResponseByRegionalApprover(response.responseId, user.userId, reason);
+        }
       });
       
       // Submit rejection
@@ -191,6 +202,7 @@ export default function EvaluateSubmission() {
         setTimeout(() => setSuccessMessage(''), 8000);
       }
     } catch (error) {
+      console.error('Reject submission error:', error);
       alert(error.message || 'Error submitting rejection. Please try again.');
     }
   };
@@ -496,7 +508,7 @@ export default function EvaluateSubmission() {
                                 const globalQuestionNumber = questionNumberMap[subQuestion.subQuestionId] || 0;
                                 // For submitted submissions, all questions must have answers
                                 // Find response from the responses array if not in groupedData
-                                const actualResponse = response || submissionDetails?.responses?.find(r => r.subQuestionId === subQuestion.subQuestionId);
+                                const actualResponse = response || submissionDetails?.responses?.find(r => r && r.subQuestionId === subQuestion.subQuestionId) || null;
                                 const answerText = actualResponse?.responseValue || '';
                                 const hasAnswer = answerText && answerText.trim() !== '';
                                 
@@ -583,10 +595,14 @@ export default function EvaluateSubmission() {
                                               <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-sm font-bold text-gray-900">Comments</h4>
                                                 <button
-                                                  onClick={() => setOpenCommentSections(prev => ({ 
-                                                    ...prev, 
-                                                    [actualResponse.responseId]: !prev[actualResponse.responseId] 
-                                                  }))}
+                                                  onClick={() => {
+                                                    if (actualResponse && actualResponse.responseId) {
+                                                      setOpenCommentSections(prev => ({ 
+                                                        ...prev, 
+                                                        [actualResponse.responseId]: !prev[actualResponse.responseId] 
+                                                      }));
+                                                    }
+                                                  }}
                                                   className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                 >
                                                   Add Comment
@@ -630,28 +646,38 @@ export default function EvaluateSubmission() {
                                               )}
                                               
                                               {/* Comment Input - Toggleable */}
-                                              {openCommentSections[actualResponse.responseId] && (
+                                              {actualResponse && actualResponse.responseId && openCommentSections[actualResponse.responseId] && (
                                                 <div className="space-y-2">
                                                   <textarea
                                                     value={regionalNotes[actualResponse.responseId] || ''}
-                                                    onChange={(e) => setRegionalNotes(prev => ({ ...prev, [actualResponse.responseId]: e.target.value }))}
+                                                    onChange={(e) => {
+                                                      if (actualResponse && actualResponse.responseId) {
+                                                        setRegionalNotes(prev => ({ ...prev, [actualResponse.responseId]: e.target.value }));
+                                                      }
+                                                    }}
                                                     rows="3"
                                                     className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue resize-none"
                                                     placeholder="Add your comment here..."
                                                   />
                                                   <div className="flex justify-end space-x-2">
                                                     <button
-                                                      onClick={() => setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }))}
+                                                      onClick={() => {
+                                                        if (actualResponse && actualResponse.responseId) {
+                                                          setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
+                                                        }
+                                                      }}
                                                       className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
                                                     >
                                                       Cancel
                                                     </button>
                                                     <button
                                                       onClick={() => {
-                                                        handleSaveComment(actualResponse.responseId);
-                                                        setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
+                                                        if (actualResponse && actualResponse.responseId) {
+                                                          handleSaveComment(actualResponse.responseId);
+                                                          setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
+                                                        }
                                                       }}
-                                                      disabled={!regionalNotes[actualResponse.responseId]?.trim()}
+                                                      disabled={!actualResponse || !actualResponse.responseId || !regionalNotes[actualResponse.responseId]?.trim()}
                                                       className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                       Add Comment

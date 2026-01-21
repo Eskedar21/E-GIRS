@@ -151,3 +151,93 @@ export const getRankedUnits = (yearId) => {
     }));
 };
 
+/**
+ * Get unit score for a specific year
+ * Works with both mockData structure (id/name) and administrativeUnits structure (unitId/officialUnitName)
+ */
+export const getUnitScore = (unitId, yearId, allUnits) => {
+  const unit = allUnits.find(u => 
+    (u.unitId && u.unitId === unitId) || 
+    (u.id && u.id === unitId) ||
+    (u.id && String(u.id) === String(unitId))
+  );
+  if (!unit) return 0;
+  
+  // Try to get from scoresByYear (mockData structure)
+  if (unit.scoresByYear && unit.scoresByYear[yearId] !== undefined) {
+    return unit.scoresByYear[yearId];
+  }
+  
+  // For administrative units, we might need to calculate from submissions
+  // For now, return 0 if no score is available
+  return 0;
+};
+
+/**
+ * Get unit dimension scores for a specific year
+ * Works with both mockData structure and administrativeUnits structure
+ */
+export const getUnitDimensionScores = (unitId, yearId, allUnits) => {
+  const unit = allUnits.find(u => 
+    (u.unitId && u.unitId === unitId) || 
+    (u.id && u.id === unitId) ||
+    (u.id && String(u.id) === String(unitId))
+  );
+  if (!unit) return [];
+  
+  // Try to get from dimensionsScoresByYear (mockData structure)
+  if (unit.dimensionsScoresByYear && unit.dimensionsScoresByYear[yearId]) {
+    return unit.dimensionsScoresByYear[yearId];
+  }
+  
+  // For administrative units without mock data, return empty array
+  // In production, this would calculate from submissions
+  return [];
+};
+
+/**
+ * Get child units for a given parent unit
+ * Works with administrativeUnits structure (parentUnitId)
+ */
+export const getChildUnits = (parentUnitId, allUnits) => {
+  return allUnits.filter(u => 
+    u.parentUnitId === parentUnitId || 
+    (u.parentUnitId && String(u.parentUnitId) === String(parentUnitId))
+  );
+};
+
+/**
+ * Get all descendant units (children, grandchildren, etc.)
+ * Works with administrativeUnits structure
+ */
+export const getAllDescendantUnits = (parentUnitId, allUnits) => {
+  const children = getChildUnits(parentUnitId, allUnits);
+  const allDescendants = [...children];
+  
+  children.forEach(child => {
+    const childId = child.unitId || child.id;
+    if (childId) {
+      allDescendants.push(...getAllDescendantUnits(childId, allUnits));
+    }
+  });
+  
+  return allDescendants;
+};
+
+/**
+ * Get units by type within a hierarchy
+ * Works with administrativeUnits structure
+ */
+export const getUnitsByTypeInHierarchy = (parentUnitId, unitType, allUnits) => {
+  const descendants = getAllDescendantUnits(parentUnitId, allUnits);
+  return descendants.filter(u => u.unitType === unitType);
+};
+
+/**
+ * Get all units (for compatibility with mockData structure)
+ */
+export const getAllUnitsForCalculations = () => {
+  // This will be replaced with actual data from administrativeUnits
+  return [];
+};
+

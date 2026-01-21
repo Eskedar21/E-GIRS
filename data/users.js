@@ -90,6 +90,108 @@ const defaultUsers = [
     passwordResetExpires: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 7,
+    username: 'institute_contributor',
+    email: 'institute.contributor@health.gov.et',
+    password: 'Institute123!',
+    officialUnitId: 2, // Ministry of Health
+    role: 'Institute Data Contributor',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 8,
+    username: 'federal_contributor',
+    email: 'federal.contributor@health.gov.et',
+    password: 'Federal123!',
+    officialUnitId: 2, // Ministry of Health
+    role: 'Federal Data Contributor',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 9,
+    username: 'federal_approver',
+    email: 'federal.approver@health.gov.et',
+    password: 'FederalApp123!',
+    officialUnitId: 2, // Ministry of Health
+    role: 'Federal Approver',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 10,
+    username: 'chairman',
+    email: 'chairman@mint.gov.et',
+    password: 'Chairman123!',
+    officialUnitId: null,
+    role: 'Chairman (CC)',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 11,
+    username: 'secretary',
+    email: 'secretary@mint.gov.et',
+    password: 'Secretary123!',
+    officialUnitId: null,
+    role: 'Secretary (CC)',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 12,
+    username: 'initial_approver',
+    email: 'initial.approver@mint.gov.et',
+    password: 'Initial123!',
+    officialUnitId: 10, // Addis Ababa City Administration
+    role: 'Initial Approver',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
   }
 ];
 
@@ -191,6 +293,7 @@ export const getRolesForUnitType = (unitType) => {
     case 'Federal Institute':
       return [
         USER_ROLES.INSTITUTE_DATA_CONTRIBUTOR,
+        USER_ROLES.FEDERAL_DATA_CONTRIBUTOR,
         USER_ROLES.FEDERAL_APPROVER
       ];
     case 'Region':
