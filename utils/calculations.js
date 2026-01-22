@@ -45,18 +45,31 @@ export const getNationalDimensionScores = (yearId) => {
   const dimensions = getDimensionsByYear(assessmentYearId);
   if (!dimensions || dimensions.length === 0) return [];
   
-  // Use dimension IDs from mockData (IF, CP, SD, PCE, TE, DI)
+  // Map dimension names to short codes used in mockData (IF, CP, SD, PCE, TE, DI)
+  const dimensionNameMap = {
+    'Institutional Framework': 'IF',
+    'Content Provision': 'CP',
+    'Service Delivery': 'SD',
+    'Participation & Citizen Engagement': 'PCE',
+    'Technology Enablement': 'TE',
+    'Digital Inclusion': 'DI'
+  };
+  
+  // Also map dimension IDs for backward compatibility (1-6 for year 1, 7-12 for year 2)
   const dimensionIdMap = {
-    1: 'IF', // Institutional Framework
-    2: 'CP', // Content Provision
-    3: 'SD', // Service Delivery
-    4: 'PCE', // Participation & Citizen Engagement
-    5: 'TE', // Technology Enablement
-    6: 'DI' // Digital Inclusion
+    1: 'IF', 7: 'IF',   // Institutional Framework
+    2: 'CP', 8: 'CP',   // Content Provision
+    3: 'SD', 9: 'SD',   // Service Delivery
+    4: 'PCE', 10: 'PCE', // Participation & Citizen Engagement
+    5: 'TE', 11: 'TE',   // Technology Enablement
+    6: 'DI', 12: 'DI'    // Digital Inclusion
   };
   
   return dimensions.map(dimension => {
-    const mappedId = dimensionIdMap[dimension.dimensionId] || dimension.dimensionId;
+    // Try to get mapped ID from name first, then from ID, otherwise use dimension name
+    const mappedId = dimensionNameMap[dimension.dimensionName] || 
+                     dimensionIdMap[dimension.dimensionId] || 
+                     dimension.dimensionName;
     return {
       dimensionId: mappedId,
       dimensionName: dimension.dimensionName,

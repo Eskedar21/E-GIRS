@@ -9,11 +9,9 @@ const TEST_USERS = [
   { username: 'admin', password: 'Admin123!', role: 'MInT Admin', category: 'Admin' },
   { username: 'contributor1', password: 'Contributor123!', role: 'Data Contributor', category: 'Regional' },
   { username: 'institute_contributor', password: 'Institute123!', role: 'Institute Data Contributor', category: 'Federal' },
-  { username: 'federal_contributor', password: 'Federal123!', role: 'Federal Data Contributor', category: 'Federal' },
   { username: 'approver1', password: 'Approver123!', role: 'Regional Approver (Addis Ababa)', category: 'Regional' },
   { username: 'amhara_approver', password: 'Amhara123!', role: 'Regional Approver (Amhara)', category: 'Regional' },
   { username: 'federal_approver', password: 'FederalApp123!', role: 'Federal Approver', category: 'Federal' },
-  { username: 'initial_approver', password: 'Initial123!', role: 'Initial Approver', category: 'Regional' },
   { username: 'committee1', password: 'Committee123!', role: 'Central Committee Member', category: 'Central' },
   { username: 'chairman', password: 'Chairman123!', role: 'Chairman (CC)', category: 'Central' },
   { username: 'secretary', password: 'Secretary123!', role: 'Secretary (CC)', category: 'Central' }

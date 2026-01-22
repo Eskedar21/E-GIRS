@@ -94,7 +94,7 @@ export default function ValidatedSubmissions() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
       <Layout title="Validated Submissions">
         <div className="flex">
           <Sidebar />

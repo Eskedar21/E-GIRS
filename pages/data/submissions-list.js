@@ -84,7 +84,7 @@ export default function SubmissionsList() {
     }
     
     if (filterStatus === 'rejected_by_regional') {
-      return allSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER);
+      return allSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER);
     }
     
     if (filterStatus === 'rejected_by_central') {
@@ -121,7 +121,7 @@ export default function SubmissionsList() {
       [SUBMISSION_STATUS.DRAFT]: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Draft' },
       [SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL]: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Pending Approval' },
       [SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION]: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Pending Central Validation' },
-      [SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER]: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Rejected by Regional Approver' },
+      [SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER]: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Rejected by Regional Approver' },
       [SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE]: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejected by Central Committee' },
       [SUBMISSION_STATUS.VALIDATED]: { bg: 'bg-green-100', text: 'text-green-800', label: 'Validated' },
       [SUBMISSION_STATUS.SCORING_COMPLETE]: { bg: 'bg-green-100', text: 'text-green-800', label: 'Scoring Complete' },
@@ -160,7 +160,7 @@ export default function SubmissionsList() {
   ];
 
   return (
-    <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor']}>
+    <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
       <Layout title="My Submissions">
         <div className="flex">
           <Sidebar />

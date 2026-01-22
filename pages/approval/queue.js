@@ -70,7 +70,7 @@ export default function ApprovalQueue() {
 
   // Get descendant units grouped by type for regional approvers
   const descendantUnitsByType = useMemo(() => {
-    if (!user || !user.officialUnitId || !['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
+    if (!user || !user.officialUnitId || !['Regional Approver', 'Federal Approver'].includes(userRole)) {
       return { zones: [], woredas: [], subCities: [] };
     }
     
@@ -104,7 +104,7 @@ export default function ApprovalQueue() {
         { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Pending Approval' },
         { value: SUBMISSION_STATUS.VALIDATED, label: 'Verified' },
       ];
-    } else if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
+    } else if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
       return [
         { value: 'all', label: 'All Statuses' },
         { value: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL, label: 'Pending Initial Approval' },
@@ -129,7 +129,7 @@ export default function ApprovalQueue() {
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
         const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
         submissions = [...pending, ...validated];
-      } else if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
+      } else if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
         // Regional Approvers see submissions in their scope
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
         const rejected = getSubmissionsByStatus(SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE);
@@ -216,7 +216,7 @@ export default function ApprovalQueue() {
         const unit = getUnitById(s.unitId);
         if (!unit) return false;
         
-        if (['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole)) {
+        if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
           // Federal Approvers filter by Federal Institute
           if (userRole === 'Federal Approver') {
             if (scopeFilter === 'federal') {
@@ -320,7 +320,7 @@ export default function ApprovalQueue() {
       } else if (sub.submissionStatus === SUBMISSION_STATUS.VALIDATED) {
         stats.verified++;
       } else if (sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ||
-                 sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER) {
+                 sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER) {
         stats.rejected++;
       } else if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
         stats.approved++;
@@ -402,22 +402,28 @@ export default function ApprovalQueue() {
       return 'bg-green-100 text-green-800 border border-green-300';
     } else if (status === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) {
       return 'bg-gradient-to-r from-red-100 to-red-50 text-red-900 border-2 border-red-400 shadow-md font-semibold';
-    } else if (status === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER) {
+    } else if (status === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER) {
       return 'bg-red-100 text-red-800 border border-red-300';
     }
     return 'bg-gray-100 text-gray-800 border border-gray-300';
   };
 
   const handleReview = (submissionId) => {
-    if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
+    // Chairman and Secretary have read-only access
+    if (['Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
+      // Read-only: just view, no actions allowed
       router.push(`/validation/evaluate/${submissionId}`);
-        } else {
+    } else if (userRole === 'Central Committee Member') {
+      router.push(`/validation/evaluate/${submissionId}`);
+    } else {
       router.push(`/approval/evaluate/${submissionId}`);
     }
   };
 
+  const isReadOnly = ['Chairman (CC)', 'Secretary (CC)'].includes(userRole);
+
   return (
-    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']}>
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']}>
       <Layout title="Approval Queue">
         <div className="flex">
           <Sidebar />
@@ -560,7 +566,7 @@ export default function ApprovalQueue() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                       >
                         <option value="all">All Scopes</option>
-                        {['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(userRole) ? (
+                        {['Regional Approver', 'Federal Approver'].includes(userRole) ? (
                           userRole === 'Federal Approver' ? (
                             <>
                               <option value="federal">Federal Institute</option>
@@ -695,9 +701,12 @@ export default function ApprovalQueue() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <button
                                     onClick={() => handleReview(submission.submissionId)}
-                                    className="text-blue-600 hover:text-blue-900 font-semibold"
+                                    className={isReadOnly 
+                                      ? "text-mint-primary-blue hover:text-mint-secondary-blue font-semibold opacity-75 cursor-pointer" 
+                                      : "text-blue-600 hover:text-blue-900 font-semibold"}
+                                    title={isReadOnly ? "View only (Read-only access)" : "Review and take action"}
                 >
-                                    Review
+                                    {isReadOnly ? 'View' : 'Review'}
                 </button>
                                 </td>
                               </tr>

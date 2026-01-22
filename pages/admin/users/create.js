@@ -37,9 +37,24 @@ export default function CreateUser() {
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     setUnits(getAllUnits());
+    // Reset form to fresh state on mount
+    setFormData({
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      officialUnitId: '',
+      role: '',
+      phoneNumber: ''
+    });
+    setErrors({});
+    setSuccessMessage('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   }, []);
 
   const handleInputChange = (e) => {
@@ -165,10 +180,26 @@ export default function CreateUser() {
     
     setSuccessMessage(`User "${newUser.username}" has been created successfully! An email verification link has been sent.${linkMessage}`);
     
-    // Redirect to users list after 2 seconds
+    // Reset form to fresh state
+    setFormData({
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      officialUnitId: '',
+      role: '',
+      phoneNumber: ''
+    });
+    setErrors({});
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setFormKey(prev => prev + 1); // Force form remount to clear browser autofill
+    
+    // Clear success message and redirect to users list after 3 seconds
     setTimeout(() => {
+      setSuccessMessage('');
       router.push('/admin/users');
-    }, 2000);
+    }, 3000);
   };
 
   const handleCancel = () => {
@@ -225,7 +256,7 @@ export default function CreateUser() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <form key={formKey} onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="username" className="mb-2">
@@ -239,6 +270,7 @@ export default function CreateUser() {
                           onChange={handleInputChange}
                           className={errors.username ? 'border-red-500' : ''}
                           placeholder="Enter username"
+                          autoComplete="off"
                         />
                         {errors.username && (
                           <p className="mt-1 text-sm text-red-500">{errors.username}</p>
@@ -257,6 +289,7 @@ export default function CreateUser() {
                           onChange={handleInputChange}
                           className={errors.email ? 'border-red-500' : ''}
                           placeholder="user@example.com"
+                          autoComplete="off"
                         />
                         {errors.email && (
                           <p className="mt-1 text-sm text-red-500">{errors.email}</p>
@@ -269,6 +302,8 @@ export default function CreateUser() {
                         <Label htmlFor="password" className="mb-2">
                           Password <span className="text-red-500">*</span>
                         </Label>
+                        {/* Hidden input to prevent browser autofill */}
+                        <input type="text" style={{ position: 'absolute', left: '-9999px' }} tabIndex="-1" autoComplete="off" />
                         <div className="relative">
                           <Input
                             type={showPassword ? "text" : "password"}
@@ -278,6 +313,7 @@ export default function CreateUser() {
                             onChange={handleInputChange}
                             className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
                             placeholder="Enter password"
+                            autoComplete="new-password"
                           />
                           <button
                             type="button"
@@ -317,6 +353,7 @@ export default function CreateUser() {
                             onChange={handleInputChange}
                             className={errors.confirmPassword ? 'border-red-500 pr-10' : 'pr-10'}
                             placeholder="Confirm password"
+                            autoComplete="new-password"
                           />
                           <button
                             type="button"
@@ -421,6 +458,7 @@ export default function CreateUser() {
                         value={formData.phoneNumber}
                         onChange={handleInputChange}
                         placeholder="+251 9XX XXX XXX"
+                        autoComplete="off"
                       />
                     </div>
 

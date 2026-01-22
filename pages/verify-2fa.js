@@ -6,10 +6,12 @@ import { verifyOTP, sendOTP, getUserById } from '../data/users';
 import { getUnitById } from '../data/administrativeUnits';
 import { InputOTP } from '../components/ui/input-otp';
 import { Label } from '../components/ui/label';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Verify2FA() {
   const router = useRouter();
   const { userId } = router.query;
+  const { refreshUser } = useAuth();
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -183,6 +185,9 @@ export default function Verify2FA() {
         
         localStorage.setItem('egirs_user', JSON.stringify(userSession));
         localStorage.removeItem('egirs_pending_2fa');
+        
+        // Refresh AuthContext to update user state
+        refreshUser();
         
         // Redirect to dashboard
         router.push('/dashboard');

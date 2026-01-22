@@ -6,7 +6,7 @@ export const SUBMISSION_STATUS = {
   DRAFT: 'Draft',
   PENDING_INITIAL_APPROVAL: 'Pending Initial Approval',
   PENDING_CENTRAL_VALIDATION: 'Pending Central Validation',
-  REJECTED_BY_INITIAL_APPROVER: 'Rejected by Initial Approver',
+  REJECTED_BY_REGIONAL_APPROVER: 'Rejected by Regional Approver',
   REJECTED_BY_CENTRAL_COMMITTEE: 'Rejected by Central Committee',
   VALIDATED: 'Validated',
   SCORING_COMPLETE: 'Scoring Complete'
@@ -23,31 +23,73 @@ let submissions = [
   // Example submissions for Central Validation (already approved by Regional Approvers)
   {
     submissionId: 1,
-    submissionName: 'Ministry of Health - 2024 Q4 Assessment',
-    unitId: 1, // Ministry of Health
+    submissionName: 'Ministry of Innovation and Technology - 2024 Annual Assessment',
+    unitId: 1, // Ministry of Innovation and Technology
     assessmentYearId: 1, // 2024 Assessment
-    contributorUserId: 2, // contributor1
-    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
-    submittedDate: '2024-12-15T10:30:00.000Z',
-    approverUserId: 3, // approver1
-    approvalDate: '2024-12-16T14:20:00.000Z',
+    contributorUserId: 7, // institute_contributor
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-12-10T10:30:00.000Z',
+    approverUserId: 9, // federal_approver
+    approvalDate: '2024-12-12T14:20:00.000Z',
     rejectionReason: null,
-    createdAt: '2024-12-10T08:00:00.000Z',
-    updatedAt: '2024-12-16T14:20:00.000Z'
+    createdAt: '2024-12-05T08:00:00.000Z',
+    updatedAt: '2024-12-15T16:20:00.000Z'
   },
   {
     submissionId: 2,
-    submissionName: 'Ministry of Education - 2024 Annual Report',
-    unitId: 2, // Ministry of Education
+    submissionName: 'Ministry of Health - 2024 Annual Assessment',
+    unitId: 2, // Ministry of Health
     assessmentYearId: 1, // 2024 Assessment
-    contributorUserId: 2, // contributor1
-    submissionStatus: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
-    submittedDate: '2024-12-14T09:15:00.000Z',
-    approverUserId: 3, // approver1
-    approvalDate: '2024-12-15T16:45:00.000Z',
+    contributorUserId: 7, // institute_contributor
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-12-08T09:15:00.000Z',
+    approverUserId: 9, // federal_approver
+    approvalDate: '2024-12-10T16:45:00.000Z',
     rejectionReason: null,
-    createdAt: '2024-12-08T08:00:00.000Z',
-    updatedAt: '2024-12-15T16:45:00.000Z'
+    createdAt: '2024-12-01T08:00:00.000Z',
+    updatedAt: '2024-12-12T16:45:00.000Z'
+  },
+  {
+    submissionId: 41,
+    submissionName: 'Ministry of Education - 2024 Annual Assessment',
+    unitId: 3, // Ministry of Education
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 7, // institute_contributor
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-12-12T11:00:00.000Z',
+    approverUserId: 9, // federal_approver
+    approvalDate: '2024-12-14T10:30:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-05T08:00:00.000Z',
+    updatedAt: '2024-12-15T10:30:00.000Z'
+  },
+  {
+    submissionId: 42,
+    submissionName: 'Ministry of Finance - 2024 Annual Assessment',
+    unitId: 4, // Ministry of Finance
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 7, // institute_contributor
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-12-11T14:00:00.000Z',
+    approverUserId: 9, // federal_approver
+    approvalDate: '2024-12-13T15:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-03T08:00:00.000Z',
+    updatedAt: '2024-12-14T15:00:00.000Z'
+  },
+  {
+    submissionId: 43,
+    submissionName: 'Ministry of Agriculture - 2024 Annual Assessment',
+    unitId: 5, // Ministry of Agriculture
+    assessmentYearId: 1, // 2024 Assessment
+    contributorUserId: 7, // institute_contributor
+    submissionStatus: SUBMISSION_STATUS.VALIDATED,
+    submittedDate: '2024-12-09T13:30:00.000Z',
+    approverUserId: 9, // federal_approver
+    approvalDate: '2024-12-11T16:00:00.000Z',
+    rejectionReason: null,
+    createdAt: '2024-12-02T08:00:00.000Z',
+    updatedAt: '2024-12-12T16:00:00.000Z'
   },
   {
     submissionId: 3,
@@ -30200,7 +30242,7 @@ export const submitForApproval = (submissionId) => {
       
       // Find approvers who can access this unit
       const approvers = allUsers.filter(user => {
-        if (!['Regional Approver', 'Federal Approver', 'Initial Approver'].includes(user.role)) {
+        if (!['Regional Approver', 'Federal Approver'].includes(user.role)) {
           return false;
         }
         if (!user.officialUnitId) return false;
@@ -30300,7 +30342,7 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
   
   if (hasRejections) {
     // If any response is rejected, send submission back to contributor
-    submission.submissionStatus = SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER;
+    submission.submissionStatus = SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER;
     submission.approverUserId = approverUserId;
     submission.approvalDate = new Date().toISOString();
     
@@ -30381,7 +30423,7 @@ export const approveByInitialApprover = (submissionId, approverUserId) => {
 export const rejectByInitialApprover = (submissionId, approverUserId, rejectionReason) => {
   const submission = getSubmissionById(submissionId);
   if (submission) {
-    submission.submissionStatus = SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER;
+    submission.submissionStatus = SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER;
     submission.approverUserId = approverUserId;
     submission.approvalDate = new Date().toISOString();
     submission.rejectionReason = rejectionReason;
@@ -30545,7 +30587,7 @@ export const rejectToContributor = (submissionId, additionalComment) => {
       });
     }
     
-    // Add additional comments from Initial Approver
+    // Add additional comments from Regional Approver
     if (additionalComment) {
       rejectionText += (rejectionText ? '\n\n' : '') + 'Additional Comments from Approver: ' + additionalComment;
     }

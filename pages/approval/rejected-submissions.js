@@ -106,7 +106,7 @@ export default function RejectedSubmissions() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
       <Layout title="Rejected Submissions">
         <div className="flex">
           <Sidebar />

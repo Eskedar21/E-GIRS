@@ -337,7 +337,7 @@ export default function EvaluateSubmission() {
 
   if (!submissionDetails) {
     return (
-      <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+      <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
         <Layout title="Evaluate Submission">
           <div className="flex">
             <Sidebar />
@@ -360,7 +360,7 @@ export default function EvaluateSubmission() {
   const isRejectedByCentralCommittee = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
 
   return (
-    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
       <Layout title="Evaluate Submission">
         <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
@@ -751,7 +751,7 @@ export default function EvaluateSubmission() {
                       <span className={`px-3 py-1.5 rounded-md text-xs font-medium ${
                         submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL 
                           ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' 
-                          : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
+                          : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER
                           ? 'bg-red-50 text-red-700 border border-red-200'
                           : submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE
                           ? 'bg-red-50 text-red-700 border border-red-200'
@@ -762,7 +762,7 @@ export default function EvaluateSubmission() {
                         {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL && (
                           <span>Pending</span>
                         )}
-                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER && (
+                        {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER && (
                           <span>Rejected</span>
                         )}
                         {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE && (

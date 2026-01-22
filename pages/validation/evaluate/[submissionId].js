@@ -17,6 +17,8 @@ export default function EvaluateCentralSubmission() {
   const { submissionId } = router.query;
   const { user } = useAuth();
   const { isCollapsed, setCollapsed } = useSidebar();
+  const userRole = user ? user.role : '';
+  const isReadOnly = ['Chairman (CC)', 'Secretary (CC)'].includes(userRole);
   
   // Force sidebar to be collapsed on this page
   useEffect(() => {
@@ -491,24 +493,26 @@ export default function EvaluateCentralSubmission() {
                                             <label className="block text-sm font-semibold text-gray-700">
                                               Answer
                                             </label>
-                                            {/* Comment Button */}
-                                            <button
-                                              onClick={() => {
-                                                if (response && response.responseId) {
-                                                  setOpenCommentSections(prev => ({ 
-                                                    ...prev, 
-                                                    [response.responseId]: !prev[response.responseId] 
-                                                  }));
-                                                }
-                                              }}
-                                              className="flex items-center space-x-1 text-gray-600 hover:text-mint-primary-blue transition-colors"
-                                              title="Add comment"
-                                            >
-                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                              </svg>
-                                              <span className="text-xs">+</span>
-                                            </button>
+                                            {/* Comment Button - Hidden for read-only users */}
+                                            {!isReadOnly && (
+                                              <button
+                                                onClick={() => {
+                                                  if (response && response.responseId) {
+                                                    setOpenCommentSections(prev => ({ 
+                                                      ...prev, 
+                                                      [response.responseId]: !prev[response.responseId] 
+                                                    }));
+                                                  }
+                                                }}
+                                                className="flex items-center space-x-1 text-gray-600 hover:text-mint-primary-blue transition-colors"
+                                                title="Add comment"
+                                              >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                </svg>
+                                                <span className="text-xs">+</span>
+                                              </button>
+                                            )}
                                           </div>
                                           <div className="bg-gray-50 p-3 rounded border border-gray-200">
                                             <p className="text-gray-900 whitespace-pre-wrap break-words leading-relaxed text-sm">
@@ -735,24 +739,28 @@ export default function EvaluateCentralSubmission() {
                         })()}</p>
                       )}
                     </div>
-                    <p className="mt-4 text-sm text-gray-700 font-medium">Review and take necessary action.</p>
+                    <p className="mt-4 text-sm text-gray-700 font-medium">
+                      {isReadOnly ? 'Read-only view. No actions available.' : 'Review and take necessary action.'}
+                    </p>
                   </div>
                   
-                  {/* Action Buttons */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => setShowApproveModal(true)}
-                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => setShowRejectModal(true)}
-                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 font-semibold rounded-lg transition-colors"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {/* Action Buttons - Hidden for Chairman and Secretary */}
+                  {!isReadOnly && (
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => setShowApproveModal(true)}
+                        className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setShowRejectModal(true)}
+                        className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 font-semibold rounded-lg transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </aside>
             )}

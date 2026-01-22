@@ -260,16 +260,16 @@ export default function UnitScorecard() {
 
   return (
     <Layout title={`Unit Scorecard - ${selectedUnit.name}`}>
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <Link
-              href="/public-dashboard"
+              href="/reports"
               className="flex items-center text-mint-primary-blue hover:text-mint-secondary-blue transition-colors"
             >
               <span className="text-xl mr-2">←</span>
-              <span className="text-sm font-medium">Back to Public Dashboard</span>
+              <span className="text-sm font-medium">Back to Reports</span>
             </Link>
           </div>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -281,7 +281,7 @@ export default function UnitScorecard() {
                 Detailed performance analysis and dimensional breakdown
               </p>
             </div>
-            <div className="mt-4 md:mt-0 space-y-2">
+            <div className="mt-4 md:mt-0">
               <div>
                 <label className="block text-sm font-semibold text-mint-dark-text mb-2">
                   Assessment Year
@@ -309,7 +309,7 @@ export default function UnitScorecard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-mint-primary-blue to-mint-secondary-blue rounded-xl shadow-lg p-6 text-white">
             <p className="text-white/80 text-sm font-medium mb-1">Overall Rank</p>
-            <p className="text-4xl font-bold mb-2">
+            <p className="text-4xl font-bold">
               {unitRank ? `${unitRank} / ${rankedUnits.length}` : 'N/A'}
             </p>
           </div>
@@ -327,182 +327,72 @@ export default function UnitScorecard() {
           </div>
         </div>
 
-        {/* Visualizations */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Visualization 1: Dimensional Performance Analysis (Radar Chart) */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-            <h3 className="text-lg font-bold text-mint-primary-blue mb-4">Dimensional Performance Analysis</h3>
-            {dimensionalPerformance.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <RadarChart data={dimensionalPerformance.map(dim => ({
-                  dimension: dim.dimensionName.length > 20 ? dim.dimensionName.substring(0, 20) + '...' : dim.dimensionName,
-                  fullDimension: dim.dimensionName,
-                  unitScore: Math.max(0, Math.min(1, dim.unitScore)), // Clamp between 0 and 1
-                  nationalAverage: Math.max(0, Math.min(1, dim.nationalAverage)) // Clamp between 0 and 1
-                }))}>
-                <PolarGrid stroke="#E5E7EB" />
-                <PolarAngleAxis 
-                  dataKey="dimension" 
-                  tick={{ fontSize: 11, fill: '#374151' }}
-                />
-                <PolarRadiusAxis 
-                  angle={90} 
-                  domain={[0, 1]}
-                  tick={{ fontSize: 10, fill: '#6B7280' }}
-                  tickFormatter={(value) => value.toFixed(2)}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [value.toFixed(3), name === 'unitScore' ? 'Unit Score' : 'National Average']}
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
-                  labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDimension || label}
-                />
-                <Legend />
-                <Radar
-                  name="Unit Score"
-                  dataKey="unitScore"
-                  stroke="#0d6670"
-                  fill="#0d6670"
-                  fillOpacity={0.6}
-                  strokeWidth={2}
-                />
-                <Radar
-                  name="National Average"
-                  dataKey="nationalAverage"
-                  stroke="#9CA3AF"
-                  fill="#9CA3AF"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-            ) : (
-              <div className="h-80 flex items-center justify-center bg-mint-light-gray rounded-lg border-2 border-dashed border-mint-medium-gray">
-                <div className="text-center">
-                  <p className="text-mint-dark-text/70 mb-2">No dimensional data available</p>
-                  <p className="text-sm text-mint-dark-text/50">Please ensure the unit has dimension scores for the selected year</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Visualization 2: Intra-Unit Performance Map */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-            <h3 className="text-lg font-bold text-mint-primary-blue mb-4">Intra-Unit Performance Map</h3>
-            <div className="h-80 flex items-center justify-center bg-gradient-to-br from-mint-light-gray to-white rounded-lg border-2 border-dashed border-mint-medium-gray">
-              <div className="text-center w-full px-4">
-                {childUnits.length > 0 ? (
-                  <>
-                    <p className="text-mint-dark-text/70 mb-4 text-sm font-medium">Sub-Unit Performance Overview</p>
-                    <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-                      {childUnits.map((child) => {
-                        const childMaturity = getMaturityLevel(child.score);
-                        return (
-                          <div 
-                            key={child.id} 
-                            className={`p-4 rounded-lg border-2 transition-all hover:shadow-md hover:scale-105 ${getMaturityColor(childMaturity)}`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-mint-dark-text/50">#{child.rank}</span>
-                              <span className="text-xs font-bold text-mint-primary-blue">{child.score.toFixed(3)}</span>
-                            </div>
-                            <p className="text-sm font-semibold mb-1">{child.name}</p>
-                            <p className="text-xs mt-1 font-medium">{childMaturity}</p>
-                            <div className="mt-2 w-full bg-white/50 rounded-full h-1.5">
-                              <div
-                                className={`h-1.5 rounded-full ${
-                                  child.score >= 0.75 ? 'bg-green-600' :
-                                  child.score >= 0.50 ? 'bg-[#0d6670]' :
-                                  child.score >= 0.25 ? 'bg-yellow-500' : 'bg-red-500'
-                                }`}
-                                style={{ width: `${child.score * 100}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : (
+        {/* Main Content Grid - Left: Dimensional Analysis, Right: Intra-Unit Performance */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Left Column: Dimensional Performance Analysis and Table */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Dimensional Performance Analysis (Radar Chart) */}
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
+              <h3 className="text-lg font-bold text-mint-primary-blue mb-4">Dimensional Performance Analysis</h3>
+              {dimensionalPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <RadarChart data={dimensionalPerformance.map(dim => ({
+                    dimension: dim.dimensionName.length > 20 ? dim.dimensionName.substring(0, 20) + '...' : dim.dimensionName,
+                    fullDimension: dim.dimensionName,
+                    unitScore: Math.max(0, Math.min(1, dim.unitScore)), // Clamp between 0 and 1
+                    nationalAverage: Math.max(0, Math.min(1, dim.nationalAverage)) // Clamp between 0 and 1
+                  }))}>
+                  <PolarGrid stroke="#E5E7EB" />
+                  <PolarAngleAxis 
+                    dataKey="dimension" 
+                    tick={{ fontSize: 11, fill: '#374151' }}
+                  />
+                  <PolarRadiusAxis 
+                    angle={90} 
+                    domain={[0, 1]}
+                    tick={{ fontSize: 10, fill: '#6B7280' }}
+                    tickFormatter={(value) => value.toFixed(2)}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [value.toFixed(3), name === 'unitScore' ? 'Unit Score' : 'National Average']}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                    labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDimension || label}
+                  />
+                  <Legend />
+                  <Radar
+                    name="Unit Score"
+                    dataKey="unitScore"
+                    stroke="#0d6670"
+                    fill="#0d6670"
+                    fillOpacity={0.6}
+                    strokeWidth={2}
+                  />
+                  <Radar
+                    name="National Average"
+                    dataKey="nationalAverage"
+                    stroke="#9CA3AF"
+                    fill="#9CA3AF"
+                    fillOpacity={0.3}
+                    strokeWidth={2}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+              ) : (
+                <div className="h-80 flex items-center justify-center bg-mint-light-gray rounded-lg border-2 border-dashed border-mint-medium-gray">
                   <div className="text-center">
-                    <p className="text-mint-dark-text/60 mb-2">No sub-units available for this unit</p>
-                    <p className="text-xs text-mint-dark-text/50">This unit does not have child administrative units in the hierarchy</p>
+                    <p className="text-mint-dark-text/70 mb-2">No dimensional data available</p>
+                    <p className="text-sm text-mint-dark-text/50">Please ensure the unit has dimension scores for the selected year</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
 
-        {/* Data Tables */}
-        <div className="space-y-6 mb-8">
-          {/* Table 1: Dimensional Performance */}
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-mint-medium-gray">
-            <div className="px-6 py-4 border-b border-mint-medium-gray bg-mint-light-gray flex justify-between items-center">
-              <h3 className="text-lg font-bold text-mint-primary-blue">Dimensional Performance</h3>
-              <button
-                onClick={exportDimensionalPerformance}
-                className="px-4 py-2 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors"
-              >
-                Export Data (CSV)
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-mint-medium-gray">
-                <thead className="bg-mint-primary-blue">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                      Dimension
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                      Unit Score
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                      National Average
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                      Gap / Surplus
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-mint-medium-gray">
-                  {dimensionalPerformance.length > 0 ? (
-                    dimensionalPerformance.map((dim, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-semibold text-mint-dark-text">{dim.dimensionName}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-lg font-bold text-mint-primary-blue">{dim.unitScore.toFixed(3)}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-mint-dark-text">{dim.nationalAverage.toFixed(3)}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm font-semibold ${dim.isSurplus ? 'text-green-600' : 'text-red-600'}`}>
-                            {dim.isSurplus ? '+' : ''}{dim.gap}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="px-6 py-8 text-center text-mint-dark-text/70">
-                        No dimensional data available for this unit
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Table 2: Sub-Unit Ranking */}
-          {childUnits.length > 0 && (
+            {/* Dimensional Performance Table */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-mint-medium-gray">
               <div className="px-6 py-4 border-b border-mint-medium-gray bg-mint-light-gray flex justify-between items-center">
-                <h3 className="text-lg font-bold text-mint-primary-blue">Sub-Unit Ranking</h3>
+                <h3 className="text-lg font-bold text-mint-primary-blue">Dimensional Performance</h3>
                 <button
-                  onClick={exportSubUnitRanking}
+                  onClick={exportDimensionalPerformance}
                   className="px-4 py-2 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors"
                 >
                   Export Data (CSV)
@@ -513,46 +403,103 @@ export default function UnitScorecard() {
                   <thead className="bg-mint-primary-blue">
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                        Rank
+                        Dimension
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                        Sub-Unit Name
+                        Unit Score
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                        Score
+                        National Average
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                        Maturity Level
+                        Gap / Surplus
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-mint-medium-gray">
-                    {childUnits.map((child) => {
-                      const childMaturity = getMaturityLevel(child.score);
-                      return (
-                        <tr key={child.id} className="hover:bg-mint-light-gray transition-colors">
+                    {dimensionalPerformance.length > 0 ? (
+                      dimensionalPerformance.map((dim, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-semibold text-mint-dark-text">{child.rank}</span>
+                            <span className="text-sm font-semibold text-mint-dark-text">{dim.dimensionName}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-mint-dark-text">{child.name}</span>
+                            <span className="text-lg font-bold text-mint-primary-blue">{dim.unitScore.toFixed(3)}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-bold text-mint-primary-blue">{child.score.toFixed(3)}</span>
+                            <span className="text-sm text-mint-dark-text">{dim.nationalAverage.toFixed(3)}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getMaturityColor(childMaturity)}`}>
-                              {childMaturity}
+                            <span className={`text-sm font-semibold ${dim.isSurplus ? 'text-green-600' : 'text-red-600'}`}>
+                              {dim.isSurplus ? '+' : ''}{dim.gap}
                             </span>
                           </td>
                         </tr>
-                      );
-                    })}
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-8 text-center text-mint-dark-text/70">
+                          No dimensional data available for this unit
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Right Column: Intra-Unit Performance */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-mint-primary-blue">Intra-Unit Performance</h3>
+                {childUnits.length > 0 && (
+                  <button
+                    onClick={exportSubUnitRanking}
+                    className="px-3 py-1.5 bg-[#0d6670] hover:bg-[#0a4f57] text-white text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    Export Data (CSV)
+                  </button>
+                )}
+              </div>
+              {childUnits.length > 0 ? (
+                <div className="max-h-[800px] overflow-y-auto pr-2 space-y-3">
+                  {childUnits.map((child) => {
+                    const childMaturity = getMaturityLevel(child.score);
+                    return (
+                      <div 
+                        key={child.id} 
+                        className={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${getMaturityColor(childMaturity)}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-mint-dark-text/50">#{child.rank}</span>
+                          <span className="text-sm font-bold text-mint-primary-blue">{child.score.toFixed(3)}</span>
+                        </div>
+                        <p className="text-sm font-semibold mb-1 text-mint-dark-text">{child.name}</p>
+                        <p className="text-xs mt-1 font-medium mb-2">{childMaturity}</p>
+                        <div className="w-full bg-white/50 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              child.score >= 0.75 ? 'bg-green-600' :
+                              child.score >= 0.50 ? 'bg-[#0d6670]' :
+                              child.score >= 0.25 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${child.score * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-mint-dark-text/60 mb-2">No sub-units available for this unit</p>
+                  <p className="text-xs text-mint-dark-text/50">This unit does not have child administrative units in the hierarchy</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

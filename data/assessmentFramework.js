@@ -77,6 +77,55 @@ const defaultDimensions = [
     dimensionWeight: 16.65,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  // Dimensions for 2025 Assessment (same structure as 2024)
+  {
+    dimensionId: 7,
+    assessmentYearId: 2,
+    dimensionName: 'Institutional Framework',
+    dimensionWeight: 16.67,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    dimensionId: 8,
+    assessmentYearId: 2,
+    dimensionName: 'Content Provision',
+    dimensionWeight: 16.67,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    dimensionId: 9,
+    assessmentYearId: 2,
+    dimensionName: 'Service Delivery',
+    dimensionWeight: 16.67,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    dimensionId: 10,
+    assessmentYearId: 2,
+    dimensionName: 'Participation & Citizen Engagement',
+    dimensionWeight: 16.67,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    dimensionId: 11,
+    assessmentYearId: 2,
+    dimensionName: 'Technology Enablement',
+    dimensionWeight: 16.67,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    dimensionId: 12,
+    assessmentYearId: 2,
+    dimensionName: 'Digital Inclusion',
+    dimensionWeight: 16.65,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
   }
 ];
 

@@ -4,27 +4,22 @@ import Layout from '../components/Layout';
 import Sidebar from '../components/Sidebar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserById, enable2FA, disable2FA, sendOTP, verifyOTP, updateUser } from '../data/users';
+import { getUserById, enable2FA, disable2FA, updateUser } from '../data/users';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
-import { InputOTP } from '../components/ui/input-otp';
 
 export default function Profile() {
   const router = useRouter();
   const { user } = useAuth();
   const [userData, setUserData] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [showOTPInput, setShowOTPInput] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  const [isDisabling, setIsDisabling] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -36,12 +31,6 @@ export default function Profile() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
 
   const handleEnable2FA = async () => {
     if (!phoneNumber.trim()) {
@@ -61,14 +50,11 @@ export default function Profile() {
     try {
       const result = enable2FA(user.userId, phoneNumber);
       if (result.success) {
-        // Send OTP for verification
-        const otpResult = sendOTP(phoneNumber, user.userId);
-        if (otpResult.success) {
-          setShowOTPInput(true);
-          setCountdown(60);
-          // In demo, show OTP
-          alert(`Demo: OTP sent to ${phoneNumber}. Check console for OTP: ${otpResult.otp}`);
-        }
+        setSuccess('Two-Factor Authentication has been enabled successfully!');
+        // Refresh user data
+        const updatedUser = getUserById(user.userId);
+        setUserData(updatedUser);
+        setTimeout(() => setSuccess(''), 5000);
       } else {
         setError(result.error);
       }
@@ -79,65 +65,13 @@ export default function Profile() {
     }
   };
 
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!otp.trim() || otp.length !== 6) {
-      setError('Please enter a valid 6-digit verification code');
-      return;
-    }
-
-    setIsVerifying(true);
-    
-    try {
-      const result = verifyOTP(user.userId, otp);
-      if (result.valid) {
-        // 2FA is already enabled, just verified
-        setSuccess('Two-Factor Authentication has been enabled successfully!');
-        setShowOTPInput(false);
-        setOtp('');
-        // Refresh user data
-        const updatedUser = getUserById(user.userId);
-        setUserData(updatedUser);
-        setTimeout(() => setSuccess(''), 5000);
-      } else {
-        setError(result.error || 'Invalid verification code');
-      }
-    } catch (err) {
-      setError('Failed to verify code. Please try again.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    if (!userData || !userData.phoneNumber) {
-      setError('Phone number not found');
-      return;
-    }
-
-    setIsSending(true);
-    setError('');
-    
-    try {
-      const result = sendOTP(userData.phoneNumber, user.userId);
-      if (result.success) {
-        setCountdown(60);
-        alert(`Demo: OTP sent to ${userData.phoneNumber}. Check console for OTP: ${result.otp}`);
-      }
-    } catch (err) {
-      setError('Failed to send OTP. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
-  };
 
   const handleDisable2FA = async () => {
     if (!confirm('Are you sure you want to disable Two-Factor Authentication? This will reduce your account security.')) {
       return;
     }
 
+    setIsDisabling(true);
     setError('');
     
     try {
@@ -146,13 +80,15 @@ export default function Profile() {
         setSuccess('Two-Factor Authentication has been disabled.');
         const updatedUser = getUserById(user.userId);
         setUserData(updatedUser);
-        setPhoneNumber('');
+        setPhoneNumber(updatedUser.phoneNumber || '');
         setTimeout(() => setSuccess(''), 5000);
       } else {
         setError(result.error);
       }
     } catch (err) {
       setError('Failed to disable 2FA. Please try again.');
+    } finally {
+      setIsDisabling(false);
     }
   };
 
@@ -287,10 +223,11 @@ export default function Profile() {
                       </div>
                       <Button
                         onClick={handleDisable2FA}
+                        disabled={isDisabling}
                         variant="outline"
                         className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                       >
-                        Disable 2FA
+                        {isDisabling ? 'Disabling...' : 'Disable 2FA'}
                       </Button>
                     </div>
                   ) : (
@@ -314,66 +251,13 @@ export default function Profile() {
                           Enter your mobile phone number to receive verification codes
                         </p>
                       </div>
-
-                      {!showOTPInput ? (
-                        <Button
-                          onClick={handleEnable2FA}
-                          disabled={isEnabling || !phoneNumber.trim()}
-                          className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
-                        >
-                          {isEnabling ? 'Enabling...' : 'Enable 2FA'}
-                        </Button>
-                      ) : (
-                        <form onSubmit={handleVerifyOTP} className="space-y-4">
-                          <div>
-                            <Label className="mb-4 block text-center">
-                              Verification Code <span className="text-red-500">*</span>
-                            </Label>
-                            <div className="flex justify-center">
-                              <InputOTP
-                                value={otp}
-                                onChange={(e) => {
-                                  setOtp(e.target.value);
-                                  setError('');
-                                }}
-                                maxLength={6}
-                                className={error ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                              />
-                            </div>
-                            <p className="mt-4 text-xs text-mint-dark-text/60 text-center">
-                              Enter the 6-digit code sent to {phoneNumber}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              type="submit"
-                              disabled={isVerifying || otp.length !== 6}
-                              className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
-                            >
-                              {isVerifying ? 'Verifying...' : 'Verify & Enable'}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={handleResendOTP}
-                              disabled={isSending || countdown > 0}
-                            >
-                              {isSending ? 'Sending...' : countdown > 0 ? `Resend (${countdown}s)` : 'Resend Code'}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setShowOTPInput(false);
-                                setOtp('');
-                                setError('');
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
-                      )}
+                      <Button
+                        onClick={handleEnable2FA}
+                        disabled={isEnabling || !phoneNumber.trim()}
+                        className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
+                      >
+                        {isEnabling ? 'Enabling...' : 'Enable 2FA'}
+                      </Button>
                     </div>
                   )}
                 </CardContent>

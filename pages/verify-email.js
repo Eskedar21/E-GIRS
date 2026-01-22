@@ -82,7 +82,7 @@ export default function VerifyEmail() {
                     Email Verified Successfully!
                   </h2>
                   <p className="text-mint-dark-text/70">
-                    Your email address has been verified. You can now log in to your account.
+                    {result?.message || 'Your email address has been verified. You can now log in to your account.'}
                   </p>
                 </div>
                 <Link

@@ -273,7 +273,7 @@ export const initializeRealNotifications = () => {
     
     // Create notifications for each user based on their role and submissions
     allUsers.forEach(user => {
-      if (user.role === 'Regional Approver' || user.role === 'Federal Approver' || user.role === 'Initial Approver') {
+      if (user.role === 'Regional Approver' || user.role === 'Federal Approver') {
         // Notifications for pending submissions in their queue
         const pendingSubmissions = allSubmissions.filter(s => 
           s.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL
@@ -334,7 +334,7 @@ export const initializeRealNotifications = () => {
           };
           inAppNotifications.push(notification);
         });
-      } else if (user.role === 'Data Contributor' || user.role === 'Institute Data Contributor' || user.role === 'Federal Data Contributor') {
+      } else if (user.role === 'Data Contributor' || user.role === 'Institute Data Contributor') {
         // Notifications for approved submissions
         const approvedSubmissions = allSubmissions.filter(s => 
           s.contributorUserId === user.userId && 

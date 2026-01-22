@@ -405,7 +405,7 @@ export default function EditSubmission() {
 
   if (!submissionDetails) {
     return (
-      <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+      <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
         <Layout title="Edit Submission">
           <div className="flex">
             <Sidebar />
@@ -423,13 +423,13 @@ export default function EditSubmission() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Initial Approver']}>
+    <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
       <Layout title="Edit Submission">
         <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
           {/* Assessment Dimensions Navigation Sidebar */}
           {submissionDetails?.groupedData && submissionDetails.groupedData.length > 0 && (
-            <aside className={`w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
+            <aside className={`w-80 bg-white border-r border-gray-200 fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
               <div className="p-4 pt-8">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Assessment Dimensions</h2>
                 <div className="space-y-1">
@@ -454,6 +454,20 @@ export default function EditSubmission() {
                       </button>
                     </div>
                   ))}
+                </div>
+                
+                {/* Quick Action Buttons */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="space-y-2">
+                    {/* Resubmit Button */}
+                    <button
+                      onClick={handleResubmit}
+                      disabled={isSubmitting}
+                      className="w-full px-4 py-3 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {isSubmitting ? 'Resubmitting...' : 'Resubmit to Central Committee'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </aside>

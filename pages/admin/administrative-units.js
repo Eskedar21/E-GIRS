@@ -407,7 +407,7 @@ export default function AdministrativeUnitsManagement() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Regional Admin', 'Institute Admin', 'Chairman (CC)', 'Central Committee Member', 'Secretary (CC)', 'Initial Approver']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Regional Admin', 'Institute Admin', 'Chairman (CC)', 'Central Committee Member', 'Secretary (CC)']}>
       <Layout title="Administrative Unit Management">
         <div className="flex">
           <Sidebar />

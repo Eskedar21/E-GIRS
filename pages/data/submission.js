@@ -27,6 +27,64 @@ import {
 } from '../../data/submissions';
 import { getSubQuestionById } from '../../data/assessmentFramework';
 
+// Demo status rotation for showing different submission statuses
+const DEMO_STATUSES = [
+  SUBMISSION_STATUS.DRAFT,
+  SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER,
+  SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+  SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
+  SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+  SUBMISSION_STATUS.VALIDATED
+];
+
+const rotateSubmissionStatusForDemo = (submission, userRole) => {
+  if (!submission) return null;
+  
+  // Only rotate for data contributor roles (demo purposes)
+  const isDataContributor = ['Data Contributor', 'Institute Data Contributor'].includes(userRole);
+  
+  if (!isDataContributor) return submission;
+  
+  // Get current rotation index from localStorage
+  // Rotate to next status on every page visit/load
+  const storageKey = `demo_status_index_${submission.submissionId}`;
+  const visitKey = `demo_visit_count_${submission.submissionId}`;
+  
+  let currentIndex = 0;
+  const storedIndex = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
+  const visitCount = typeof window !== 'undefined' ? parseInt(localStorage.getItem(visitKey) || '0') : 0;
+  
+  // Increment visit count
+  const newVisitCount = visitCount + 1;
+  
+  // Rotate to next status on every visit
+  if (storedIndex !== null) {
+    currentIndex = (parseInt(storedIndex) + 1) % DEMO_STATUSES.length;
+  } else {
+    // First visit - start with current status or first in rotation
+    const currentStatusIndex = DEMO_STATUSES.indexOf(submission.submissionStatus);
+    currentIndex = currentStatusIndex >= 0 ? (currentStatusIndex + 1) % DEMO_STATUSES.length : 0;
+  }
+  
+  // Get the status for this rotation
+  const newStatus = DEMO_STATUSES[currentIndex];
+  
+  // Always update to the next status in rotation
+  updateSubmission(submission.submissionId, { 
+    submissionStatus: newStatus,
+    updatedAt: new Date().toISOString()
+  });
+  
+  // Update the stored index and visit count
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(storageKey, currentIndex.toString());
+    localStorage.setItem(visitKey, newVisitCount.toString());
+  }
+  
+  // Return updated submission
+  return getSubmissionById(submission.submissionId);
+};
+
 export default function DataSubmission() {
   const { user } = useAuth();
   const { isCollapsed, setCollapsed } = useSidebar();
@@ -53,7 +111,7 @@ export default function DataSubmission() {
   const loadSubmission = useCallback(() => {
     if (!user || !user.officialUnitId) return;
     
-    // Check if there's a submissionId in the query parameters
+    // Check if there's a submissionId in the query parameters (for backward compatibility)
     const submissionIdParam = router.query.submissionId;
     
     if (submissionIdParam) {
@@ -61,43 +119,27 @@ export default function DataSubmission() {
       const specificSubmission = getSubmissionById(parseInt(submissionIdParam));
       
       if (specificSubmission) {
-      // Verify user owns this submission
-      if (specificSubmission.contributorUserId !== user.userId) {
-        alert('You do not have permission to access this submission.');
-        router.replace('/data/submission');
-        return;
-      }
-      
-      // For read-only view (approved/validated), allow viewing even if not editable
-      const isReadOnlyView = router.query.view === 'detail' && (
-        specificSubmission.submissionStatus === SUBMISSION_STATUS.VALIDATED ||
-        specificSubmission.submissionStatus === SUBMISSION_STATUS.SCORING_COMPLETE ||
-        specificSubmission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION
-      );
-      
-      // Verify submission can be edited (unless it's a read-only view)
-      if (!isReadOnlyView && 
-          specificSubmission.submissionStatus !== SUBMISSION_STATUS.DRAFT &&
-          specificSubmission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER &&
-          specificSubmission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) {
-        // Allow viewing but not editing
-        if (router.query.view !== 'detail') {
-          router.replace(`/data/submission?submissionId=${submissionIdParam}&view=detail`);
+        // Verify user owns this submission
+        if (specificSubmission.contributorUserId !== user.userId) {
+          alert('You do not have permission to access this submission.');
+          router.replace('/data/submission');
           return;
         }
-      }
+        
+        // Rotate status for demo purposes (only for data contributors)
+        let updatedSubmission = rotateSubmissionStatusForDemo(specificSubmission, user.role) || specificSubmission;
         
         // Set the year for this submission
-        const submissionYear = getAllAssessmentYears().find(y => y.assessmentYearId === specificSubmission.assessmentYearId);
+        const submissionYear = getAllAssessmentYears().find(y => y.assessmentYearId === updatedSubmission.assessmentYearId);
         if (submissionYear) {
           setSelectedYear(submissionYear);
         }
         
-        setSubmission(specificSubmission);
-        setSubmissionName(specificSubmission.submissionName || '');
+        setSubmission(updatedSubmission);
+        setSubmissionName(updatedSubmission.submissionName || '');
         
         // Load existing responses
-        const existingResponses = getResponsesBySubmission(specificSubmission.submissionId);
+        const existingResponses = getResponsesBySubmission(updatedSubmission.submissionId);
         const responseMap = {};
         const evidenceMap = {};
         existingResponses.forEach(r => {
@@ -110,13 +152,12 @@ export default function DataSubmission() {
         setEvidenceLinks(evidenceMap);
         return;
       } else {
-        // Submission not found, clear query param
+        // Submission not found, clear query param and continue with auto-load logic
         router.replace('/data/submission', undefined, { shallow: true });
       }
     }
     
-    // If no specific submission ID, start with a fresh empty form
-    // Don't auto-load existing drafts - user must explicitly select them from the list
+    // Auto-load submission for selected year if no specific submissionId in query
     if (!selectedYear) {
       // Clear form when no year is selected
       setSubmission(null);
@@ -126,21 +167,56 @@ export default function DataSubmission() {
       return;
     }
     
-    // Only create a new submission object when user starts filling the form
-    // Don't create it automatically - keep form empty until user interacts
-    if (!submission) {
-      // Form is fresh and empty - submission will be created when user first saves
+    // Find existing submission for this year and user
+    const allSubmissions = getSubmissionsByUnit(user.officialUnitId);
+    let existingSubmission = allSubmissions.find(s => 
+      s.assessmentYearId === selectedYear.assessmentYearId &&
+      s.contributorUserId === user.userId
+    );
+    
+    if (existingSubmission) {
+      // Rotate status for demo purposes (only for data contributors)
+      existingSubmission = rotateSubmissionStatusForDemo(existingSubmission, user.role) || existingSubmission;
+      
+      // Load existing submission
+      setSubmission(existingSubmission);
+      setSubmissionName(existingSubmission.submissionName || '');
+      
+      // Load existing responses
+      const existingResponses = getResponsesBySubmission(existingSubmission.submissionId);
+      const responseMap = {};
+      const evidenceMap = {};
+      existingResponses.forEach(r => {
+        responseMap[r.subQuestionId] = r.responseValue;
+        if (r.evidenceLink) {
+          evidenceMap[r.subQuestionId] = r.evidenceLink;
+        }
+      });
+      setResponses(responseMap);
+      setEvidenceLinks(evidenceMap);
+    } else {
+      // No existing submission - start with clean form
       setSubmission(null);
       setSubmissionName('');
       setResponses({});
       setEvidenceLinks({});
     }
-  }, [selectedYear, user, submissionName, router]);
+  }, [selectedYear, user, router]);
 
   useEffect(() => {
     // Reload assessment years to get newly created ones
     const years = getAllAssessmentYears();
     setAssessmentYears(years);
+    
+    // Check if year is passed in query params
+    const yearParam = router.query.year;
+    if (yearParam) {
+      const year = years.find(y => y.assessmentYearId === parseInt(yearParam));
+      if (year) {
+        setSelectedYear(year);
+        return;
+      }
+    }
     
     // Auto-select active year if no year is selected and no specific submission in query
     const submissionIdParam = router.query.submissionId;
@@ -150,7 +226,7 @@ export default function DataSubmission() {
         setSelectedYear(activeYear);
       }
     }
-  }, [router.query.submissionId]);
+  }, [router.query.submissionId, router.query.year]);
 
   // Listen for assessment framework updates
   useEffect(() => {
@@ -274,7 +350,7 @@ export default function DataSubmission() {
   // Early return if no user - ProtectedRoute will handle redirect
   if (!user) {
     return (
-      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor']}>
+      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
         <div></div>
       </ProtectedRoute>
     );
@@ -291,7 +367,7 @@ export default function DataSubmission() {
   // Check if user has unit assigned
   if (!user.officialUnitId) {
     return (
-      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor']}>
+      <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
         <Layout title="Data Submission">
           <div className="flex">
             <Sidebar />
@@ -467,17 +543,23 @@ export default function DataSubmission() {
     setErrorMessage('');
     setSuccessMessage('');
     
-    // Validate that all required questions are answered - STRICT: no submission without all answers
+    // Validate that all required questions are answered - STRICT: no submission without all answers and evidence
     const unanswered = subQuestions.filter(sq => {
       const response = responses[sq.subQuestionId];
-      return !response || response === '' || response.trim() === '';
+      const evidence = evidenceLinks[sq.subQuestionId];
+      // Check if answer is provided
+      const hasAnswer = response && response !== '' && response.trim() !== '';
+      // Check if evidence link is provided
+      const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
+      // Both answer and evidence must be provided
+      return !hasAnswer || !hasEvidence;
     });
     
     if (unanswered.length > 0) {
       // Show clear error message - do not allow submission
       setErrorMessage(
-        `⚠️ Cannot submit: You have ${unanswered.length} unanswered question(s) out of ${subQuestions.length} total. ` +
-        `Please answer ALL required questions before submitting.`
+        `⚠️ Cannot submit: You have ${unanswered.length} incomplete question(s) out of ${subQuestions.length} total. ` +
+        `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting.`
       );
       // Scroll to first unanswered question
       if (unanswered.length > 0 && dimensions.length > 0) {
@@ -511,16 +593,22 @@ export default function DataSubmission() {
     try {
       setIsSaving(true);
       
-      // Final validation - ensure ALL required questions are answered
+      // Final validation - ensure ALL required questions are answered (both answer and evidence link)
       const unanswered = subQuestions.filter(sq => {
         const response = responses[sq.subQuestionId];
-        return !response || response === '' || response.trim() === '';
+        const evidence = evidenceLinks[sq.subQuestionId];
+        // Check if answer is provided
+        const hasAnswer = response && response !== '' && response.trim() !== '';
+        // Check if evidence link is provided
+        const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
+        // Both answer and evidence must be provided
+        return !hasAnswer || !hasEvidence;
       });
       
       if (unanswered.length > 0) {
         setErrorMessage(
-          `⚠️ Cannot submit: You still have ${unanswered.length} unanswered question(s). ` +
-          `Please answer ALL required questions before submitting.`
+          `⚠️ Cannot submit: You have ${unanswered.length} incomplete question(s). ` +
+          `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting.`
         );
         setIsSaving(false);
         return;
@@ -589,17 +677,30 @@ export default function DataSubmission() {
     
     // Check if this question was rejected
     const isRejected = responseObj && (
-      (submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER && 
+      (submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER && 
        responseObj.regionalApprovalStatus === 'Rejected') ||
       (submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE && 
        responseObj.validationStatus === 'Rejected')
     );
     
+    // Get rejection reason and approver comments
     const rejectionReason = responseObj ? (
-      submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER 
+      submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER 
         ? responseObj.regionalRejectionReason 
         : responseObj.centralRejectionReason
     ) : null;
+    
+    // Get approver comments/notes (shown for all questions in rejected submissions)
+    const approverComment = responseObj ? (
+      submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER 
+        ? (responseObj.regionalNote || responseObj.regionalRejectionReason)
+        : (responseObj.generalNote || responseObj.centralRejectionReason)
+    ) : null;
+    
+    // Show approver comments if submission is rejected and comment exists
+    const showApproverComment = (submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
+                                  submission?.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) &&
+                                  approverComment;
     
     const isSubmissionLocked = isReadOnly;
 
@@ -611,8 +712,25 @@ export default function DataSubmission() {
       case 'Yes/No': // Fallback for backward compatibility
         return (
           <div className="space-y-4">
-            {/* Show rejection comment if rejected */}
-            {showRejectionComment && (
+            {/* Show approver comment for rejected submissions */}
+            {showApproverComment && (
+              <div className={`p-4 border-2 rounded-lg ${isRejected ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-start space-x-2">
+                  <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isRejected ? 'text-red-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold mb-1 ${isRejected ? 'text-red-800' : 'text-blue-800'}`}>
+                      {isRejected ? 'Rejection Reason:' : 'Approver Comment:'}
+                    </p>
+                    <p className={`text-sm whitespace-pre-wrap ${isRejected ? 'text-red-700' : 'text-blue-700'}`}>{approverComment}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Show rejection comment if rejected (legacy support) */}
+            {showRejectionComment && !showApproverComment && (
               <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg">
                 <div className="flex items-start space-x-2">
                   <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -668,7 +786,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+                    <span className="text-red-500 font-normal ml-1">*</span>
                   </label>
                   <input
                     type="url"
@@ -700,8 +818,25 @@ export default function DataSubmission() {
         const selectedOptions = responseValue ? responseValue.split(',').map(v => v.trim()).filter(v => v) : [];
         return (
           <div className="space-y-4">
-            {/* Show rejection comment if rejected */}
-            {showRejectionComment && (
+            {/* Show approver comment for rejected submissions */}
+            {showApproverComment && (
+              <div className={`p-4 border-2 rounded-lg ${isRejected ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-start space-x-2">
+                  <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isRejected ? 'text-red-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold mb-1 ${isRejected ? 'text-red-800' : 'text-blue-800'}`}>
+                      {isRejected ? 'Rejection Reason:' : 'Approver Comment:'}
+                    </p>
+                    <p className={`text-sm whitespace-pre-wrap ${isRejected ? 'text-red-700' : 'text-blue-700'}`}>{approverComment}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Show rejection comment if rejected (legacy support) */}
+            {showRejectionComment && !showApproverComment && (
               <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg">
                 <div className="flex items-start space-x-2">
                   <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -750,7 +885,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+                    <span className="text-red-500 font-normal ml-1">*</span>
                   </label>
                   <input
                     type="url"
@@ -780,8 +915,25 @@ export default function DataSubmission() {
       case 'TextExplanation': // Fallback for backward compatibility
         return (
           <div className="space-y-4">
-            {/* Show rejection comment if rejected */}
-            {showRejectionComment && (
+            {/* Show approver comment for rejected submissions */}
+            {showApproverComment && (
+              <div className={`p-4 border-2 rounded-lg ${isRejected ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-start space-x-2">
+                  <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isRejected ? 'text-red-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold mb-1 ${isRejected ? 'text-red-800' : 'text-blue-800'}`}>
+                      {isRejected ? 'Rejection Reason:' : 'Approver Comment:'}
+                    </p>
+                    <p className={`text-sm whitespace-pre-wrap ${isRejected ? 'text-red-700' : 'text-blue-700'}`}>{approverComment}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Show rejection comment if rejected (legacy support) */}
+            {showRejectionComment && !showApproverComment && (
               <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg">
                 <div className="flex items-start space-x-2">
                   <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -824,7 +976,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
+                    <span className="text-red-500 font-normal ml-1">*</span>
                   </label>
                   <input
                     type="url"
@@ -855,8 +1007,14 @@ export default function DataSubmission() {
     }
   };
 
-  // Calculate progress
-  const totalAnsweredQuestions = Object.keys(responses).filter(k => responses[k] && responses[k] !== '').length;
+  // Calculate progress - count questions with both answer AND evidence link
+  const totalAnsweredQuestions = subQuestions.filter(sq => {
+    const response = responses[sq.subQuestionId];
+    const evidence = evidenceLinks[sq.subQuestionId];
+    const hasAnswer = response && response !== '' && response.trim() !== '';
+    const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
+    return hasAnswer && hasEvidence;
+  }).length;
   const totalQuestions = subQuestions.length;
   const progressPercentage = totalQuestions > 0 ? (totalAnsweredQuestions / totalQuestions) * 100 : 0;
 
@@ -866,8 +1024,6 @@ export default function DataSubmission() {
       setCurrentDimensionIndex(index);
       const dimension = groupedQuestions[index].dimension;
       setActiveSection(dimension.dimensionId);
-      // Scroll to top of main content
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -890,6 +1046,16 @@ export default function DataSubmission() {
     const index = groupedQuestions.findIndex(g => g.dimension.dimensionId === dimensionId);
     if (index !== -1) {
       goToDimension(index);
+      // Ensure the dimension content is visible after state update
+      setTimeout(() => {
+        const dimensionElement = document.getElementById(`dimension-${dimensionId}`);
+        if (dimensionElement) {
+          dimensionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          // Fallback: scroll to top of main content area
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
     }
   };
 
@@ -948,7 +1114,7 @@ export default function DataSubmission() {
 
               {/* Action Button */}
               {submission && (submission.submissionStatus === SUBMISSION_STATUS.DRAFT || 
-                submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER ||
+                submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
                 submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) && (
                 <div className="pt-4 mt-4">
                   {totalAnsweredQuestions === totalQuestions && totalQuestions > 0 ? (
@@ -1014,7 +1180,7 @@ export default function DataSubmission() {
                     }}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
                     disabled={submission && submission.submissionStatus !== SUBMISSION_STATUS.DRAFT && 
-                      submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER &&
+                      submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER &&
                       submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE}
                   >
                     <option value="">Select Assessment Year</option>
@@ -1066,74 +1232,12 @@ export default function DataSubmission() {
                     placeholder="e.g., Q1 2024 Assessment, Annual Review 2024"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
                     disabled={submission && submission.submissionStatus !== SUBMISSION_STATUS.DRAFT && 
-                      submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER &&
+                      submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER &&
                       submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE}
                   />
                   <p className="text-xs text-gray-500 mt-1">Give your submission a name to easily identify it later</p>
                 </div>
               </div>
-              
-              {/* Show existing submissions for this year (drafts and rejected) */}
-              {selectedYear && !router.query.submissionId && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Existing Submissions for {selectedYear.yearName}:</h3>
-                  {(() => {
-                    const allSubmissions = getSubmissionsByUnit(currentUser.unitId);
-                    const yearSubmissions = allSubmissions.filter(s => 
-                      s.assessmentYearId === selectedYear.assessmentYearId &&
-                      s.contributorUserId === user.userId &&
-                      (s.submissionStatus === SUBMISSION_STATUS.DRAFT || 
-                       s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER ||
-                       s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE)
-                    );
-                    
-                    if (yearSubmissions.length > 0) {
-                      return (
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-600 mb-2">You have existing submissions. Click to continue editing:</p>
-                          {yearSubmissions.map(sub => {
-                            const isRejected = sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER ||
-                                              sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
-                            return (
-                              <div 
-                                key={sub.submissionId} 
-                                className={`p-3 border rounded-lg ${isRejected ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className={`text-sm font-semibold ${isRejected ? 'text-red-800' : 'text-yellow-800'}`}>
-                                      {sub.submissionName || `Submission #${sub.submissionId}`}
-                                    </p>
-                                    <p className={`text-xs ${isRejected ? 'text-red-600' : 'text-yellow-600'} mt-1`}>
-                                      Status: {sub.submissionStatus} | 
-                                      Updated: {sub.updatedAt ? new Date(sub.updatedAt).toLocaleDateString() : 'N/A'}
-                                    </p>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      router.push(`/data/submission?submissionId=${sub.submissionId}`);
-                                    }}
-                                    className={`px-3 py-1 text-white text-xs font-semibold rounded transition-colors ${
-                                      isRejected 
-                                        ? 'bg-red-600 hover:bg-red-700' 
-                                        : 'bg-yellow-600 hover:bg-yellow-700'
-                                    }`}
-                                  >
-                                    Continue
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                    return (
-                      <p className="text-xs text-gray-500 italic">No existing submissions for this year. Start a new submission above.</p>
-                    );
-                  })()}
-                </div>
-              )}
             </div>
 
             {/* Submission Status */}
@@ -1158,9 +1262,15 @@ export default function DataSubmission() {
                   </div>
                   {(() => {
                     const isEditable = submission.submissionStatus === SUBMISSION_STATUS.DRAFT || 
-                      submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER ||
+                      submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
                       submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
-                    const isReadOnly = router.query.view === 'detail' && !isEditable;
+                    const isReadOnly = !isEditable && (
+                      submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL ||
+                      submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION ||
+                      submission.submissionStatus === SUBMISSION_STATUS.VALIDATED ||
+                      submission.submissionStatus === SUBMISSION_STATUS.SCORING_COMPLETE ||
+                      router.query.view === 'detail'
+                    );
                     
                     if (isReadOnly) {
                       return (
@@ -1214,7 +1324,7 @@ export default function DataSubmission() {
                     )}
                     
                     {/* Show per-question rejection reasons from Regional Approver */}
-                    {submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER && (
+                    {submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER && (
                       <div className="mb-4">
                         <p className="font-semibold text-red-800 mb-2">Question-Specific Rejection Reasons:</p>
                         <div className="space-y-2">
@@ -1439,7 +1549,7 @@ export default function DataSubmission() {
             <div className="px-6 py-5">
               <div className="space-y-4 text-gray-700">
                 <p className="text-base leading-relaxed">
-                  Your submission will be sent to the Initial Approver for review.
+                  Your submission will be sent to the Regional Approver for review.
                 </p>
                 <p className="text-base leading-relaxed">
                   After approval, it will proceed to the Central Committee for final validation.

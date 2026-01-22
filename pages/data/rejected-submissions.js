@@ -29,7 +29,7 @@ export default function RejectedSubmissions() {
     
     // Filter for rejected submissions
     const rejected = allSubmissions.filter(s => 
-      s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER ||
+      s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
       s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE
     );
     
@@ -71,7 +71,7 @@ export default function RejectedSubmissions() {
   };
 
   const getRejectedResponses = (responses, rejectionType) => {
-    if (rejectionType === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER) {
+    if (rejectionType === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER) {
       return responses.filter(r => r.regionalApprovalStatus === 'Rejected' && r.regionalRejectionReason);
     } else if (rejectionType === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) {
       return responses.filter(r => r.validationStatus === 'Rejected' && r.centralRejectionReason);
@@ -95,7 +95,7 @@ export default function RejectedSubmissions() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor', 'Federal Data Contributor']}>
+    <ProtectedRoute allowedRoles={['Data Contributor', 'Institute Data Contributor']}>
       <Layout title="Rejected Submissions">
         <div className="flex">
           <Sidebar />
@@ -137,7 +137,7 @@ export default function RejectedSubmissions() {
                         </div>
                       ) : (
                         submissions.map((submission) => {
-                          const isRejectedByInitial = submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER;
+                          const isRejectedByInitial = submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER;
                           const isRejectedByCentral = submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
                           
                           return (
@@ -203,7 +203,7 @@ export default function RejectedSubmissions() {
                       {/* Rejection Reasons */}
                       <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                         <h3 className="font-semibold text-red-800 mb-3">
-                          {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
+                          {submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER
                             ? 'Regional Approver Rejection Reasons:'
                             : 'Central Committee Rejection Reasons:'}
                         </h3>
@@ -222,7 +222,7 @@ export default function RejectedSubmissions() {
                             submissionDetails.submission.submissionStatus
                           ).map((response) => {
                             const subQuestion = getSubQuestionById(response.subQuestionId);
-                            const rejectionReason = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
+                            const rejectionReason = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER
                               ? response.regionalRejectionReason
                               : response.centralRejectionReason;
                             
@@ -262,7 +262,7 @@ export default function RejectedSubmissions() {
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
                           {submissionDetails.responses.map((response) => {
                             const subQuestion = getSubQuestionById(response.subQuestionId);
-                            const isRejected = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER
+                            const isRejected = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER
                               ? response.regionalApprovalStatus === 'Rejected'
                               : response.validationStatus === 'Rejected';
                             

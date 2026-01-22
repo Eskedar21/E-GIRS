@@ -94,8 +94,27 @@ export function AuthProvider({ children }) {
     return allowedRoles.includes(user.role);
   }, [user]);
 
+  const refreshUser = useCallback(() => {
+    // Refresh user from localStorage
+    const storedUser = localStorage.getItem('egirs_user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        return userData;
+      } catch (e) {
+        localStorage.removeItem('egirs_user');
+        setUser(null);
+        return null;
+      }
+    } else {
+      setUser(null);
+      return null;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, hasRole, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, hasRole, isLoading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

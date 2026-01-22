@@ -159,7 +159,7 @@ export default function FederalInstitutesOverview() {
         return 'bg-[#0d6670]/10 text-[#0d6670]';
       case SUBMISSION_STATUS.DRAFT:
         return 'bg-yellow-100 text-yellow-800';
-      case SUBMISSION_STATUS.REJECTED_BY_INITIAL_APPROVER:
+      case SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER:
       case SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE:
         return 'bg-red-100 text-red-800';
       default:
@@ -168,7 +168,7 @@ export default function FederalInstitutesOverview() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor', 'Federal Data Contributor']}>
+    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
       <Layout title="Federal Institute Submissions Overview">
         <div className="flex">
           <Sidebar />

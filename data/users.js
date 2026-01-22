@@ -109,23 +109,6 @@ const defaultUsers = [
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
   {
-    userId: 8,
-    username: 'federal_contributor',
-    email: 'federal.contributor@health.gov.et',
-    password: 'Federal123!',
-    officialUnitId: 2, // Ministry of Health
-    role: 'Federal Data Contributor',
-    isEmailVerified: true,
-    isAccountLocked: false,
-    isTwoFactorEnabled: false,
-    phoneNumber: null,
-    emailVerificationToken: null,
-    passwordResetToken: null,
-    passwordResetExpires: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
     userId: 9,
     username: 'federal_approver',
     email: 'federal.approver@health.gov.et',
@@ -176,23 +159,6 @@ const defaultUsers = [
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
-  {
-    userId: 12,
-    username: 'initial_approver',
-    email: 'initial.approver@mint.gov.et',
-    password: 'Initial123!',
-    officialUnitId: 10, // Addis Ababa City Administration
-    role: 'Initial Approver',
-    isEmailVerified: true,
-    isAccountLocked: false,
-    isTwoFactorEnabled: false,
-    phoneNumber: null,
-    emailVerificationToken: null,
-    passwordResetToken: null,
-    passwordResetExpires: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  }
 ];
 
 // Load users from localStorage or use defaults
@@ -217,18 +183,47 @@ const loadUsers = () => {
         isTwoFactorEnabled: user.isTwoFactorEnabled !== undefined ? user.isTwoFactorEnabled : false,
       }));
       
-      // Merge with default users - add any new users from defaults that don't exist in stored
+      // Merge with default users - update existing users from defaults and add new ones
+      const defaultUserIds = new Set(defaultUsers.map(u => u.userId));
+      const defaultUsernames = new Set(defaultUsers.map(u => u.username));
       const storedUserIds = new Set(storedUsers.map(u => u.userId));
-      const newUsersFromDefaults = defaultUsers.filter(u => !storedUserIds.has(u.userId));
+      const storedUsernames = new Set(storedUsers.map(u => u.username));
       
-      if (newUsersFromDefaults.length > 0) {
-        // Add new users from defaults
-        storedUsers = [...storedUsers, ...newUsersFromDefaults];
-        // Update stored users in localStorage
-        saveUsers(storedUsers);
-      }
+      // Remove users that are no longer in defaults (e.g., removed roles)
+      const validStoredUsers = storedUsers.filter(storedUser => 
+        defaultUserIds.has(storedUser.userId) || defaultUsernames.has(storedUser.username)
+      );
       
-      return storedUsers;
+      // Update existing users from defaults (to ensure password and other fields are correct)
+      const updatedUsers = validStoredUsers.map(storedUser => {
+        const defaultUser = defaultUsers.find(du => du.userId === storedUser.userId || du.username === storedUser.username);
+        if (defaultUser) {
+          // Merge: keep stored user's data but update with default user's password and critical fields
+          return {
+            ...storedUser,
+            password: defaultUser.password, // Always use default password
+            role: defaultUser.role, // Always use default role
+            email: defaultUser.email, // Always use default email
+            officialUnitId: defaultUser.officialUnitId, // Always use default unit
+            isEmailVerified: defaultUser.isEmailVerified !== undefined ? defaultUser.isEmailVerified : storedUser.isEmailVerified,
+            isAccountLocked: defaultUser.isAccountLocked !== undefined ? defaultUser.isAccountLocked : storedUser.isAccountLocked,
+            isTwoFactorEnabled: defaultUser.isTwoFactorEnabled !== undefined ? defaultUser.isTwoFactorEnabled : storedUser.isTwoFactorEnabled,
+          };
+        }
+        return storedUser;
+      });
+      
+      // Add new users from defaults that don't exist in stored
+      const newUsersFromDefaults = defaultUsers.filter(du => 
+        !storedUserIds.has(du.userId) && !storedUsernames.has(du.username)
+      );
+      
+      const finalUsers = [...updatedUsers, ...newUsersFromDefaults];
+      
+      // Always save to ensure localStorage is synced with defaults
+      saveUsers(finalUsers);
+      
+      return finalUsers;
     }
   } catch (error) {
     console.error('Error loading users from localStorage:', error);
@@ -274,8 +269,7 @@ export const USER_ROLES = {
   SUPER_ADMIN: 'Super Admin',
   MINT_ADMIN: 'MInT Admin',
   REGIONAL_ADMIN: 'Regional Admin',
-  INSTITUTE_ADMIN: 'Institute Admin',
-  INITIAL_APPROVER: 'Initial Approver'
+  INSTITUTE_ADMIN: 'Institute Admin'
 };
 
 // Get roles based on unit type
@@ -293,7 +287,6 @@ export const getRolesForUnitType = (unitType) => {
     case 'Federal Institute':
       return [
         USER_ROLES.INSTITUTE_DATA_CONTRIBUTOR,
-        USER_ROLES.FEDERAL_DATA_CONTRIBUTOR,
         USER_ROLES.FEDERAL_APPROVER
       ];
     case 'Region':
@@ -555,9 +548,9 @@ export const verifyEmail = (userId, token) => {
       return { success: false, error: 'User not found' };
     }
     
-    // Check if already verified
+    // Check if already verified - return success if already verified
     if (user.isEmailVerified) {
-      return { success: false, error: 'Email is already verified' };
+      return { success: true, message: 'Email is already verified' };
     }
     
     if (!user.emailVerificationToken) {
@@ -565,8 +558,36 @@ export const verifyEmail = (userId, token) => {
     }
     
     // Compare tokens (handle both encoded and decoded, and exact match)
+    // Try multiple decoding strategies to handle URL encoding
     const storedToken = user.emailVerificationToken;
-    const tokensMatch = storedToken === decodedToken || storedToken === token;
+    let tokensMatch = false;
+    
+    // Try exact match first
+    if (storedToken === decodedToken || storedToken === token) {
+      tokensMatch = true;
+    } else {
+      // Try decoding the stored token as well (in case it was stored encoded)
+      try {
+        const decodedStoredToken = decodeURIComponent(storedToken);
+        if (decodedStoredToken === decodedToken || decodedStoredToken === token) {
+          tokensMatch = true;
+        }
+      } catch (e) {
+        // If decoding fails, tokens don't match
+      }
+      
+      // Try encoding the received token
+      if (!tokensMatch) {
+        try {
+          const encodedReceivedToken = encodeURIComponent(token);
+          if (storedToken === encodedReceivedToken) {
+            tokensMatch = true;
+          }
+        } catch (e) {
+          // If encoding fails, tokens don't match
+        }
+      }
+    }
     
     if (!tokensMatch) {
       // Debug logging (remove in production)
@@ -758,5 +779,33 @@ export const disable2FA = (userId) => {
   });
   
   return { success: true };
+};
+
+// Utility function to ensure institute_contributor account exists
+export const ensureInstituteContributorExists = () => {
+  users = loadUsers(); // Reload to ensure latest data
+  
+  // Check if user already exists
+  const existingUser = getUserByUsername('institute_contributor');
+  if (existingUser) {
+    console.log('Institute Contributor account already exists:', existingUser);
+    return existingUser;
+  }
+  
+  // Create the account if it doesn't exist
+  const newUser = createUser({
+    username: 'institute_contributor',
+    email: 'institute.contributor@health.gov.et',
+    password: 'Institute123!',
+    officialUnitId: 2, // Ministry of Health
+    role: 'Institute Data Contributor',
+    phoneNumber: null
+  });
+  
+  // Set email as verified for convenience
+  updateUser(newUser.userId, { isEmailVerified: true });
+  
+  console.log('Institute Contributor account created successfully:', newUser);
+  return newUser;
 };
 

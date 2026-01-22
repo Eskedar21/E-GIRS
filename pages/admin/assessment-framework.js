@@ -46,6 +46,11 @@ export default function AssessmentFramework() {
   const [showIndicatorForm, setShowIndicatorForm] = useState(false);
   const [showSubQuestionForm, setShowSubQuestionForm] = useState(false);
   
+  const [editingYearId, setEditingYearId] = useState(null);
+  const [editingDimensionId, setEditingDimensionId] = useState(null);
+  const [editingIndicatorId, setEditingIndicatorId] = useState(null);
+  const [editingSubQuestionId, setEditingSubQuestionId] = useState(null);
+  
   const [yearForm, setYearForm] = useState({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
   const [dimensionForm, setDimensionForm] = useState({ dimensionName: '', dimensionWeight: '' });
   const [indicatorForm, setIndicatorForm] = useState({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
@@ -91,16 +96,49 @@ export default function AssessmentFramework() {
       return;
     }
 
-    createAssessmentYear(yearForm);
+    if (editingYearId) {
+      updateAssessmentYear(editingYearId, yearForm);
+      setSuccessMessage('Assessment Year updated successfully!');
+      setEditingYearId(null);
+    } else {
+      createAssessmentYear(yearForm);
+      setSuccessMessage('Assessment Year created successfully!');
+    }
     refreshData();
     setShowYearForm(false);
     setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
-    setSuccessMessage('Assessment Year created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
+  };
+
+  const handleEditYear = (year) => {
+    setEditingYearId(year.assessmentYearId);
+    setYearForm({ yearName: year.yearName, status: year.status });
+    setShowYearForm(true);
+    setShowDimensionForm(false);
+    setShowIndicatorForm(false);
+    setShowSubQuestionForm(false);
+    setEditingDimensionId(null);
+    setEditingIndicatorId(null);
+    setEditingSubQuestionId(null);
+    setErrors({});
+  };
+
+  const handleCancelYearEdit = () => {
+    setEditingYearId(null);
+    setShowYearForm(false);
+    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+    setErrors({});
+  };
+
+  const handleCreateYear = () => {
+    setEditingYearId(null);
+    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+    setShowYearForm(true);
+    setErrors({});
   };
 
   const handleStatusChange = (yearId, newStatus) => {
@@ -131,8 +169,12 @@ export default function AssessmentFramework() {
         newErrors.dimensionWeight = 'Weight must be between 0 and 100';
       } else {
         const currentTotal = getTotalDimensionWeight(selectedYear.assessmentYearId);
-        if (currentTotal + weight > 100) {
-          newErrors.dimensionWeight = `Total weight would exceed 100. Current total: ${currentTotal.toFixed(2)}%`;
+        const existingDimension = editingDimensionId 
+          ? dimensions.find(d => d.dimensionId === editingDimensionId)
+          : null;
+        const existingWeight = existingDimension ? existingDimension.dimensionWeight : 0;
+        if (currentTotal - existingWeight + weight > 100) {
+          newErrors.dimensionWeight = `Total weight would exceed 100. Current total: ${(currentTotal - existingWeight).toFixed(2)}%`;
         }
       }
     }
@@ -142,21 +184,51 @@ export default function AssessmentFramework() {
       return;
     }
 
-    createDimension({
-      ...dimensionForm,
-      assessmentYearId: selectedYear.assessmentYearId,
-      dimensionWeight: parseFloat(dimensionForm.dimensionWeight)
-    });
+    if (editingDimensionId) {
+      updateDimension(editingDimensionId, {
+        ...dimensionForm,
+        dimensionWeight: parseFloat(dimensionForm.dimensionWeight)
+      });
+      setSuccessMessage('Dimension updated successfully!');
+      setEditingDimensionId(null);
+    } else {
+      createDimension({
+        ...dimensionForm,
+        assessmentYearId: selectedYear.assessmentYearId,
+        dimensionWeight: parseFloat(dimensionForm.dimensionWeight)
+      });
+      setSuccessMessage('Dimension created successfully!');
+    }
     refreshData();
     setShowDimensionForm(false);
     setDimensionForm({ dimensionName: '', dimensionWeight: '' });
     setErrors({});
-    setSuccessMessage('Dimension created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
+  };
+
+  const handleEditDimension = (dimension) => {
+    setEditingDimensionId(dimension.dimensionId);
+    setDimensionForm({ 
+      dimensionName: dimension.dimensionName, 
+      dimensionWeight: dimension.dimensionWeight.toString() 
+    });
+    setShowDimensionForm(true);
+    setShowIndicatorForm(false);
+    setShowSubQuestionForm(false);
+    setEditingIndicatorId(null);
+    setEditingSubQuestionId(null);
+    setErrors({});
+  };
+
+  const handleCancelDimensionEdit = () => {
+    setEditingDimensionId(null);
+    setShowDimensionForm(false);
+    setDimensionForm({ dimensionName: '', dimensionWeight: '' });
+    setErrors({});
   };
 
   // Indicator Management
@@ -176,8 +248,12 @@ export default function AssessmentFramework() {
         newErrors.indicatorWeight = 'Weight must be between 0 and 100';
       } else {
         const currentTotal = getTotalIndicatorWeight(selectedDimension.dimensionId);
-        if (currentTotal + weight > 100) {
-          newErrors.indicatorWeight = `Total weight would exceed 100. Current total: ${currentTotal.toFixed(2)}%`;
+        const existingIndicator = editingIndicatorId 
+          ? indicators.find(i => i.indicatorId === editingIndicatorId)
+          : null;
+        const existingWeight = existingIndicator ? existingIndicator.indicatorWeight : 0;
+        if (currentTotal - existingWeight + weight > 100) {
+          newErrors.indicatorWeight = `Total weight would exceed 100. Current total: ${(currentTotal - existingWeight).toFixed(2)}%`;
         }
       }
     }
@@ -191,21 +267,50 @@ export default function AssessmentFramework() {
       return;
     }
 
-    createIndicator({
-      ...indicatorForm,
-      dimensionId: selectedDimension.dimensionId,
-      indicatorWeight: parseFloat(indicatorForm.indicatorWeight)
-    });
+    if (editingIndicatorId) {
+      updateIndicator(editingIndicatorId, {
+        ...indicatorForm,
+        indicatorWeight: parseFloat(indicatorForm.indicatorWeight)
+      });
+      setSuccessMessage('Indicator updated successfully!');
+      setEditingIndicatorId(null);
+    } else {
+      createIndicator({
+        ...indicatorForm,
+        dimensionId: selectedDimension.dimensionId,
+        indicatorWeight: parseFloat(indicatorForm.indicatorWeight)
+      });
+      setSuccessMessage('Indicator created successfully!');
+    }
     refreshData();
     setShowIndicatorForm(false);
     setIndicatorForm({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
     setErrors({});
-    setSuccessMessage('Indicator created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
+  };
+
+  const handleEditIndicator = (indicator) => {
+    setEditingIndicatorId(indicator.indicatorId);
+    setIndicatorForm({ 
+      indicatorName: indicator.indicatorName, 
+      indicatorWeight: indicator.indicatorWeight.toString(),
+      applicableUnitType: indicator.applicableUnitType
+    });
+    setShowIndicatorForm(true);
+    setShowSubQuestionForm(false);
+    setEditingSubQuestionId(null);
+    setErrors({});
+  };
+
+  const handleCancelIndicatorEdit = () => {
+    setEditingIndicatorId(null);
+    setShowIndicatorForm(false);
+    setIndicatorForm({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
+    setErrors({});
   };
 
   // Sub-Question Management
@@ -225,8 +330,12 @@ export default function AssessmentFramework() {
         newErrors.subWeightPercentage = 'Weight must be between 0 and 100';
       } else {
         const currentTotal = getTotalSubQuestionWeight(selectedIndicator.indicatorId);
-        if (currentTotal + weight > 100) {
-          newErrors.subWeightPercentage = `Total weight would exceed 100. Current total: ${currentTotal.toFixed(2)}%`;
+        const existingSubQuestion = editingSubQuestionId 
+          ? subQuestions.find(sq => sq.subQuestionId === editingSubQuestionId)
+          : null;
+        const existingWeight = existingSubQuestion ? existingSubQuestion.subWeightPercentage : 0;
+        if (currentTotal - existingWeight + weight > 100) {
+          newErrors.subWeightPercentage = `Total weight would exceed 100. Current total: ${(currentTotal - existingWeight).toFixed(2)}%`;
         }
       }
     }
@@ -247,16 +356,31 @@ export default function AssessmentFramework() {
       return;
     }
 
-    createSubQuestion({
-      ...subQuestionForm,
-      parentIndicatorId: selectedIndicator.indicatorId,
-      subWeightPercentage: parseFloat(subQuestionForm.subWeightPercentage),
-      checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX 
-        ? (Array.isArray(subQuestionForm.checkboxOptions) 
-            ? subQuestionForm.checkboxOptions.join(',') 
-            : subQuestionForm.checkboxOptions)
-        : null
-    });
+    if (editingSubQuestionId) {
+      updateSubQuestion(editingSubQuestionId, {
+        ...subQuestionForm,
+        subWeightPercentage: parseFloat(subQuestionForm.subWeightPercentage),
+        checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX 
+          ? (Array.isArray(subQuestionForm.checkboxOptions) 
+              ? subQuestionForm.checkboxOptions.join(',') 
+              : subQuestionForm.checkboxOptions)
+          : null
+      });
+      setSuccessMessage('Sub-Question updated successfully!');
+      setEditingSubQuestionId(null);
+    } else {
+      createSubQuestion({
+        ...subQuestionForm,
+        parentIndicatorId: selectedIndicator.indicatorId,
+        subWeightPercentage: parseFloat(subQuestionForm.subWeightPercentage),
+        checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX 
+          ? (Array.isArray(subQuestionForm.checkboxOptions) 
+              ? subQuestionForm.checkboxOptions.join(',') 
+              : subQuestionForm.checkboxOptions)
+          : null
+      });
+      setSuccessMessage('Sub-Question created successfully!');
+    }
     refreshData();
     setShowSubQuestionForm(false);
     setSubQuestionForm({ 
@@ -267,12 +391,41 @@ export default function AssessmentFramework() {
     });
     setNewCheckboxOption('');
     setErrors({});
-    setSuccessMessage('Sub-Question created successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
+  };
+
+  const handleEditSubQuestion = (subQuestion) => {
+    setEditingSubQuestionId(subQuestion.subQuestionId);
+    const checkboxOptions = subQuestion.checkboxOptions 
+      ? (typeof subQuestion.checkboxOptions === 'string' 
+          ? subQuestion.checkboxOptions.split(',').map(opt => opt.trim())
+          : subQuestion.checkboxOptions)
+      : [];
+    setSubQuestionForm({ 
+      subQuestionText: subQuestion.subQuestionText, 
+      subWeightPercentage: subQuestion.subWeightPercentage.toString(),
+      responseType: subQuestion.responseType,
+      checkboxOptions: checkboxOptions
+    });
+    setShowSubQuestionForm(true);
+    setErrors({});
+  };
+
+  const handleCancelSubQuestionEdit = () => {
+    setEditingSubQuestionId(null);
+    setShowSubQuestionForm(false);
+    setSubQuestionForm({ 
+      subQuestionText: '', 
+      subWeightPercentage: '', 
+      responseType: RESPONSE_TYPES.YES_NO,
+      checkboxOptions: []
+    });
+    setNewCheckboxOption('');
+    setErrors({});
   };
 
   const dimensionTotalWeight = selectedYear ? getTotalDimensionWeight(selectedYear.assessmentYearId) : 0;
@@ -357,7 +510,13 @@ export default function AssessmentFramework() {
                         <CardDescription>Select or create an assessment year to manage dimensions</CardDescription>
                       </div>
                       <Button
-                        onClick={() => setShowYearForm(!showYearForm)}
+                        onClick={() => {
+                          if (showYearForm) {
+                            handleCancelYearEdit();
+                          } else {
+                            handleCreateYear();
+                          }
+                        }}
                         variant={showYearForm ? "outline" : "default"}
                         className={showYearForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
                       >
@@ -369,6 +528,9 @@ export default function AssessmentFramework() {
 
                     {showYearForm && (
                       <form onSubmit={handleYearSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
+                        <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
+                          {editingYearId ? 'Edit Assessment Year' : 'Create New Assessment Year'}
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="yearName" className="mb-2">
@@ -403,7 +565,7 @@ export default function AssessmentFramework() {
                           type="submit"
                           className="mt-4 bg-mint-secondary-blue hover:bg-mint-primary-blue"
                         >
-                          Save Year
+                          {editingYearId ? 'Update Year' : 'Save Year'}
                         </Button>
                       </form>
                     )}
@@ -450,6 +612,19 @@ export default function AssessmentFramework() {
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleEditYear(year);
+                                }}
+                                variant="outline"
+                                className="text-xs px-3"
+                                title="Edit Year"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedYear(year);
                                 }}
                                 variant="outline"
@@ -483,7 +658,16 @@ export default function AssessmentFramework() {
                         </CardDescription>
                       </div>
                       <Button
-                        onClick={() => setShowDimensionForm(!showDimensionForm)}
+                        onClick={() => {
+                          if (showDimensionForm) {
+                            handleCancelDimensionEdit();
+                          } else {
+                            setEditingDimensionId(null);
+                            setDimensionForm({ dimensionName: '', dimensionWeight: '' });
+                            setShowDimensionForm(true);
+                            setErrors({});
+                          }
+                        }}
                         variant={showDimensionForm ? "outline" : "default"}
                         className={showDimensionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
                       >
@@ -495,6 +679,9 @@ export default function AssessmentFramework() {
 
                     {showDimensionForm && (
                       <form onSubmit={handleDimensionSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
+                        <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
+                          {editingDimensionId ? 'Edit Dimension' : 'Create New Dimension'}
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="dimensionName" className="mb-2">
@@ -535,7 +722,7 @@ export default function AssessmentFramework() {
                           type="submit"
                           className="mt-4 bg-mint-secondary-blue hover:bg-mint-primary-blue"
                         >
-                          Save Dimension
+                          {editingDimensionId ? 'Update Dimension' : 'Save Dimension'}
                         </Button>
                       </form>
                     )}
@@ -544,18 +731,46 @@ export default function AssessmentFramework() {
                       {dimensions.map((dimension) => (
                         <Card
                           key={dimension.dimensionId}
-                          onClick={() => setSelectedDimension(dimension)}
-                          className="cursor-pointer hover:border-mint-primary-blue hover:shadow-md transition-all"
+                          className="hover:border-mint-primary-blue hover:shadow-md transition-all"
                         >
                           <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
+                            <div className="flex justify-between items-start mb-3">
+                              <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => setSelectedDimension(dimension)}
+                              >
                                 <h3 className="font-semibold text-mint-dark-text mb-1">{dimension.dimensionName}</h3>
                                 <p className="text-sm text-mint-dark-text/70">Weight: {dimension.dimensionWeight}%</p>
                               </div>
                               <span className="px-2 py-1 bg-mint-primary-blue/10 text-mint-primary-blue rounded text-sm font-semibold">
                                 {dimension.dimensionWeight}%
                               </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditDimension(dimension);
+                                }}
+                                variant="outline"
+                                className="flex-1 text-xs px-3"
+                                title="Edit Dimension"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDimension(dimension);
+                                }}
+                                variant="outline"
+                                className="flex-1 text-xs px-3"
+                              >
+                                Manage
+                              </Button>
                             </div>
                           </CardContent>
                         </Card>
@@ -582,7 +797,16 @@ export default function AssessmentFramework() {
                         </CardDescription>
                       </div>
                       <Button
-                        onClick={() => setShowIndicatorForm(!showIndicatorForm)}
+                        onClick={() => {
+                          if (showIndicatorForm) {
+                            handleCancelIndicatorEdit();
+                          } else {
+                            setEditingIndicatorId(null);
+                            setIndicatorForm({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
+                            setShowIndicatorForm(true);
+                            setErrors({});
+                          }
+                        }}
                         variant={showIndicatorForm ? "outline" : "default"}
                         className={showIndicatorForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
                       >
@@ -651,7 +875,7 @@ export default function AssessmentFramework() {
                           type="submit"
                           className="mt-4 bg-mint-secondary-blue hover:bg-mint-primary-blue"
                         >
-                          Save Indicator
+                          {editingIndicatorId ? 'Update Indicator' : 'Save Indicator'}
                         </Button>
                       </form>
                     )}
@@ -660,12 +884,14 @@ export default function AssessmentFramework() {
                       {indicators.map((indicator) => (
                         <Card
                           key={indicator.indicatorId}
-                          onClick={() => setSelectedIndicator(indicator)}
-                          className="cursor-pointer hover:border-mint-primary-blue hover:shadow-md transition-all"
+                          className="hover:border-mint-primary-blue hover:shadow-md transition-all"
                         >
                           <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
+                            <div className="flex justify-between items-start mb-3">
+                              <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => setSelectedIndicator(indicator)}
+                              >
                                 <h3 className="font-semibold text-mint-dark-text mb-1">{indicator.indicatorName}</h3>
                                 <p className="text-sm text-mint-dark-text/70">
                                   Weight: {indicator.indicatorWeight}% | Unit Type: {indicator.applicableUnitType}
@@ -674,6 +900,32 @@ export default function AssessmentFramework() {
                               <span className="px-2 py-1 bg-mint-primary-blue/10 text-mint-primary-blue rounded text-sm font-semibold">
                                 {indicator.indicatorWeight}%
                               </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditIndicator(indicator);
+                                }}
+                                variant="outline"
+                                className="flex-1 text-xs px-3"
+                                title="Edit Indicator"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedIndicator(indicator);
+                                }}
+                                variant="outline"
+                                className="flex-1 text-xs px-3"
+                              >
+                                Manage
+                              </Button>
                             </div>
                           </CardContent>
                         </Card>
@@ -700,7 +952,22 @@ export default function AssessmentFramework() {
                         </CardDescription>
                       </div>
                       <Button
-                        onClick={() => setShowSubQuestionForm(!showSubQuestionForm)}
+                        onClick={() => {
+                          if (showSubQuestionForm) {
+                            handleCancelSubQuestionEdit();
+                          } else {
+                            setEditingSubQuestionId(null);
+                            setSubQuestionForm({ 
+                              subQuestionText: '', 
+                              subWeightPercentage: '', 
+                              responseType: RESPONSE_TYPES.YES_NO,
+                              checkboxOptions: []
+                            });
+                            setNewCheckboxOption('');
+                            setShowSubQuestionForm(true);
+                            setErrors({});
+                          }
+                        }}
                         variant={showSubQuestionForm ? "outline" : "default"}
                         className={showSubQuestionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
                       >
@@ -712,6 +979,9 @@ export default function AssessmentFramework() {
 
                     {showSubQuestionForm && (
                       <form onSubmit={handleSubQuestionSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
+                        <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
+                          {editingSubQuestionId ? 'Edit Sub-Question' : 'Create New Sub-Question'}
+                        </h3>
                         <div className="space-y-4">
                           <div>
                             <Label htmlFor="subQuestionText" className="mb-2">
@@ -859,7 +1129,7 @@ export default function AssessmentFramework() {
                           type="submit"
                           className="mt-4 bg-mint-secondary-blue hover:bg-mint-primary-blue"
                         >
-                          Save Sub-Question
+                          {editingSubQuestionId ? 'Update Sub-Question' : 'Save Sub-Question'}
                         </Button>
                       </form>
                     )}
@@ -868,7 +1138,7 @@ export default function AssessmentFramework() {
                       {subQuestions.map((sq) => (
                         <Card key={sq.subQuestionId} className="hover:bg-mint-light-gray">
                           <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start mb-3">
                               <div className="flex-1">
                                 <h3 className="font-semibold text-mint-dark-text mb-2">{sq.subQuestionText}</h3>
                                 <div className="flex gap-4 text-sm text-mint-dark-text/70">
@@ -883,6 +1153,17 @@ export default function AssessmentFramework() {
                                 {sq.subWeightPercentage}%
                               </span>
                             </div>
+                            <Button
+                              onClick={() => handleEditSubQuestion(sq)}
+                              variant="outline"
+                              className="w-full text-xs px-3"
+                              title="Edit Sub-Question"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
+                            </Button>
                           </CardContent>
                         </Card>
                       ))}
