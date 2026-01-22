@@ -70,15 +70,15 @@ export default function AdministrativeUnitsManagement() {
   // Get unit type color for badges
   const getUnitTypeColor = (unitType) => {
     const colors = {
-      'Federal Institute': 'bg-blue-100 text-blue-800 border-blue-200',
-      'Region': 'bg-blue-100 text-blue-800 border-blue-200',
-      'City Administration': 'bg-blue-100 text-blue-800 border-blue-200',
-      'Zone': 'bg-green-100 text-green-800 border-green-200',
-      'Sub-city': 'bg-green-100 text-green-800 border-green-200',
-      'Woreda': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'Kebele': 'bg-orange-100 text-orange-800 border-orange-200'
+      'Federal Institute': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'Region': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'City Administration': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'Zone': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'Sub-city': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'Woreda': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20',
+      'Kebele': 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20'
     };
-    return colors[unitType] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return colors[unitType] || 'bg-[#0d6670]/10 text-[#0d6670] border-[#0d6670]/20';
   };
 
   const toggleNode = (unitId, event) => {
