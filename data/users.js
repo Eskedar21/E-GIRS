@@ -189,13 +189,16 @@ const loadUsers = () => {
       const storedUserIds = new Set(storedUsers.map(u => u.userId));
       const storedUsernames = new Set(storedUsers.map(u => u.username));
       
-      // Remove users that are no longer in defaults (e.g., removed roles)
-      const validStoredUsers = storedUsers.filter(storedUser => 
+      // Separate stored users into: default users (to be updated) and custom users (to be preserved)
+      const defaultStoredUsers = storedUsers.filter(storedUser => 
         defaultUserIds.has(storedUser.userId) || defaultUsernames.has(storedUser.username)
       );
+      const customStoredUsers = storedUsers.filter(storedUser => 
+        !defaultUserIds.has(storedUser.userId) && !defaultUsernames.has(storedUser.username)
+      );
       
-      // Update existing users from defaults (to ensure password and other fields are correct)
-      const updatedUsers = validStoredUsers.map(storedUser => {
+      // Update existing default users from defaults (to ensure password and other fields are correct)
+      const updatedDefaultUsers = defaultStoredUsers.map(storedUser => {
         const defaultUser = defaultUsers.find(du => du.userId === storedUser.userId || du.username === storedUser.username);
         if (defaultUser) {
           // Merge: keep stored user's data but update with default user's password and critical fields
@@ -218,7 +221,8 @@ const loadUsers = () => {
         !storedUserIds.has(du.userId) && !storedUsernames.has(du.username)
       );
       
-      const finalUsers = [...updatedUsers, ...newUsersFromDefaults];
+      // Combine: updated default users + custom stored users (newly created) + new default users
+      const finalUsers = [...updatedDefaultUsers, ...customStoredUsers, ...newUsersFromDefaults];
       
       // Always save to ensure localStorage is synced with defaults
       saveUsers(finalUsers);
@@ -376,6 +380,9 @@ export const validatePassword = (password) => {
 
 // Create a new user
 export const createUser = (userData) => {
+  // Reload users from localStorage to ensure we have the latest data
+  users = loadUsers();
+  
   // Generate email verification token if not provided
   const emailVerificationToken = userData.emailVerificationToken || generateEmailVerificationToken();
   

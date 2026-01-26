@@ -19,10 +19,59 @@ export default function UserManagement() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
+  const loadUsersData = () => {
     setUsers(getAllUsers());
     setUnits(getAllUnits());
-  }, []);
+  };
+
+  useEffect(() => {
+    // Initial load
+    loadUsersData();
+    
+    // Refresh when route changes (e.g., coming back from create page)
+    const handleRouteChange = (url) => {
+      if (url === '/admin/users') {
+        // Small delay to ensure localStorage is updated
+        setTimeout(() => {
+          loadUsersData();
+        }, 100);
+      }
+    };
+    
+    // Refresh when page becomes visible (e.g., switching tabs or coming back)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadUsersData();
+      }
+    };
+    
+    // Refresh on window focus
+    const handleFocus = () => {
+      loadUsersData();
+    };
+    
+    // Set up event listeners
+    if (router.events) {
+      router.events.on('routeChangeComplete', handleRouteChange);
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      if (router.events) {
+        router.events.off('routeChangeComplete', handleRouteChange);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [router]);
+
+  // Also refresh when router is ready and pathname matches
+  useEffect(() => {
+    if (router.isReady && router.pathname === '/admin/users') {
+      loadUsersData();
+    }
+  }, [router.isReady, router.pathname]);
 
   const handleDeleteClick = (user) => {
     setUserToDelete(user);
@@ -75,12 +124,21 @@ export default function UserManagement() {
                   </h1>
                   <p className="text-mint-dark-text/70">Create and manage user accounts with role-based access</p>
                 </div>
-                <Button
-                  onClick={() => router.push('/admin/users/create')}
-                  className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
-                >
-                  + Create New User
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={loadUsersData}
+                    variant="outline"
+                    className="border-mint-primary-blue text-mint-primary-blue hover:bg-mint-light-gray"
+                  >
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={() => router.push('/admin/users/create')}
+                    className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
+                  >
+                    + Create New User
+                  </Button>
+                </div>
               </div>
             </div>
 

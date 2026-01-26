@@ -196,9 +196,10 @@ export default function CreateUser() {
     setFormKey(prev => prev + 1); // Force form remount to clear browser autofill
     
     // Clear success message and redirect to users list after 3 seconds
+    // Use router.replace to ensure the page refreshes
     setTimeout(() => {
       setSuccessMessage('');
-      router.push('/admin/users');
+      router.replace('/admin/users');
     }, 3000);
   };
 
