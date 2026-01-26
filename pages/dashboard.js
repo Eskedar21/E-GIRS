@@ -1419,13 +1419,6 @@ export default function Dashboard() {
                   <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">Submit Data</h4>
                   <p className="text-sm text-mint-dark-text/70">Create or edit your data submission</p>
                 </a>
-                <a
-                  href="/public-dashboard"
-                  className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200 hover:bg-mint-light-gray"
-                >
-                  <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">View Public Dashboard</h4>
-                  <p className="text-sm text-mint-dark-text/70">View national e-government performance</p>
-                </a>
               </div>
             </div>
           </div>

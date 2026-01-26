@@ -4,7 +4,7 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAllUnits, getUnitById, getUnitsByType } from '../../data/administrativeUnits';
-import { getAllSubmissions, SUBMISSION_STATUS } from '../../data/submissions';
+import { getAllSubmissions, SUBMISSION_STATUS, getResponsesBySubmission } from '../../data/submissions';
 import { getAllAssessmentYears, getAssessmentYearById } from '../../data/assessmentFramework';
 import { filterSubmissionsByAccess, canAccessUnit } from '../../utils/permissions';
 import { 
@@ -313,16 +313,14 @@ export default function ReportsIndex() {
                   >
                     Unit Index Results
                   </button>
-                  <button
-                    onClick={() => setActiveView('federal')}
+                  <Link
+                    href="/reports/federal-institutes-overview"
                     className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                      activeView === 'federal'
-                        ? 'bg-mint-primary-blue text-white'
-                        : 'bg-gray-100 text-mint-dark-text hover:bg-gray-200'
+                      'bg-gray-100 text-mint-dark-text hover:bg-gray-200'
                     }`}
                   >
                     Federal Submissions
-                  </button>
+                  </Link>
                 </div>
               )}
 

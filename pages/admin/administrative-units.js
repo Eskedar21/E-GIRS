@@ -51,11 +51,19 @@ export default function AdministrativeUnitsManagement() {
 
   // Build tree structure with breadcrumb paths
   const treeStructure = useMemo(() => {
-    const allUnits = getAllUnits();
+    const allUnits = units.length > 0 ? units : getAllUnits();
     const rootUnits = allUnits.filter(unit => !unit.parentUnitId);
     
+    // Helper function to get children from the current units array
+    const getChildrenForUnit = (parentUnitId) => {
+      return allUnits.filter(unit => 
+        unit.parentUnitId === parentUnitId || 
+        (unit.parentUnitId && String(unit.parentUnitId) === String(parentUnitId))
+      );
+    };
+    
     const buildTree = (unit, breadcrumb = []) => {
-      const children = getChildUnits(unit.unitId);
+      const children = getChildrenForUnit(unit.unitId);
       const currentBreadcrumb = [...breadcrumb, { unitId: unit.unitId, name: unit.officialUnitName, type: unit.unitType }];
       return {
         ...unit,
