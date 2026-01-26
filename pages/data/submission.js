@@ -472,8 +472,8 @@ export default function DataSubmission() {
   };
 
   const handleSaveDraft = async () => {
-    if (!submission) {
-      setErrorMessage('No submission found. Please select an assessment year first.');
+    if (!selectedYear || !user || !user.officialUnitId) {
+      setErrorMessage('Please select an assessment year first.');
       setTimeout(() => setErrorMessage(''), 5000);
       return;
     }
@@ -483,11 +483,30 @@ export default function DataSubmission() {
     setSuccessMessage('');
     
     try {
+      // Create submission if it doesn't exist
+      let currentSubmission = submission;
+      if (!currentSubmission) {
+        if (canPerformAction(user, 'submit_data')) {
+          currentSubmission = createSubmission({
+            unitId: user.officialUnitId,
+            assessmentYearId: selectedYear.assessmentYearId,
+            contributorUserId: user.userId,
+            submissionName: submissionName || null
+          });
+          setSubmission(currentSubmission);
+        } else {
+          setErrorMessage('You do not have permission to create submissions.');
+          setTimeout(() => setErrorMessage(''), 5000);
+          setIsSaving(false);
+          return;
+        }
+      }
+      
       // Save all responses (including empty ones to clear previous answers)
       if (subQuestions && subQuestions.length > 0) {
         subQuestions.forEach(sq => {
           saveResponse({
-            submissionId: submission.submissionId,
+            submissionId: currentSubmission.submissionId,
             subQuestionId: sq.subQuestionId,
             responseValue: responses[sq.subQuestionId] || '',
             evidenceLink: evidenceLinks[sq.subQuestionId] || null
@@ -497,7 +516,7 @@ export default function DataSubmission() {
         // Fallback: save any responses that exist
         Object.keys(responses).forEach(subQuestionId => {
           saveResponse({
-            submissionId: submission.submissionId,
+            submissionId: currentSubmission.submissionId,
             subQuestionId: parseInt(subQuestionId),
             responseValue: responses[subQuestionId] || '',
             evidenceLink: evidenceLinks[subQuestionId] || null
@@ -508,13 +527,24 @@ export default function DataSubmission() {
         Object.keys(evidenceLinks).forEach(subQuestionId => {
           if (!responses[subQuestionId] && evidenceLinks[subQuestionId]) {
             saveResponse({
-              submissionId: submission.submissionId,
+              submissionId: currentSubmission.submissionId,
               subQuestionId: parseInt(subQuestionId),
               responseValue: '',
               evidenceLink: evidenceLinks[subQuestionId]
             });
           }
         });
+      }
+      
+      // Update submission name if provided
+      if (submissionName && submissionName.trim()) {
+        updateSubmission(currentSubmission.submissionId, { submissionName: submissionName.trim() });
+      }
+      
+      // Reload submission to get updated state
+      const updatedSubmission = getSubmissionById(currentSubmission.submissionId);
+      if (updatedSubmission) {
+        setSubmission(updatedSubmission);
       }
       
       setSuccessMessage('✅ Draft saved successfully! Your progress has been saved. You can continue editing and submit when ready.');
@@ -528,8 +558,8 @@ export default function DataSubmission() {
   };
 
   const handleSubmitForApproval = () => {
-    if (!submission) {
-      setErrorMessage('No submission found. Please select an assessment year first.');
+    if (!selectedYear || !user || !user.officialUnitId) {
+      setErrorMessage('Please select an assessment year first.');
       setTimeout(() => setErrorMessage(''), 5000);
       return;
     }
@@ -538,6 +568,24 @@ export default function DataSubmission() {
       setErrorMessage('Please wait for the form to load completely before submitting.');
       setTimeout(() => setErrorMessage(''), 5000);
       return;
+    }
+    
+    // Create submission if it doesn't exist
+    let currentSubmission = submission;
+    if (!currentSubmission) {
+      if (canPerformAction(user, 'submit_data')) {
+        currentSubmission = createSubmission({
+          unitId: user.officialUnitId,
+          assessmentYearId: selectedYear.assessmentYearId,
+          contributorUserId: user.userId,
+          submissionName: submissionName || null
+        });
+        setSubmission(currentSubmission);
+      } else {
+        setErrorMessage('You do not have permission to create submissions.');
+        setTimeout(() => setErrorMessage(''), 5000);
+        return;
+      }
     }
     
     setErrorMessage('');
@@ -593,6 +641,30 @@ export default function DataSubmission() {
     try {
       setIsSaving(true);
       
+      if (!selectedYear || !user || !user.officialUnitId) {
+        setErrorMessage('Please select an assessment year first.');
+        setIsSaving(false);
+        return;
+      }
+      
+      // Create submission if it doesn't exist
+      let currentSubmission = submission;
+      if (!currentSubmission) {
+        if (canPerformAction(user, 'submit_data')) {
+          currentSubmission = createSubmission({
+            unitId: user.officialUnitId,
+            assessmentYearId: selectedYear.assessmentYearId,
+            contributorUserId: user.userId,
+            submissionName: submissionName || null
+          });
+          setSubmission(currentSubmission);
+        } else {
+          setErrorMessage('You do not have permission to create submissions.');
+          setIsSaving(false);
+          return;
+        }
+      }
+      
       // Final validation - ensure ALL required questions are answered (both answer and evidence link)
       const unanswered = subQuestions.filter(sq => {
         const response = responses[sq.subQuestionId];
@@ -617,24 +689,29 @@ export default function DataSubmission() {
       // Save all responses first
       subQuestions.forEach(sq => {
         saveResponse({
-          submissionId: submission.submissionId,
+          submissionId: currentSubmission.submissionId,
           subQuestionId: sq.subQuestionId,
           responseValue: responses[sq.subQuestionId] || '',
           evidenceLink: evidenceLinks[sq.subQuestionId] || null
         });
       });
       
+      // Update submission name if provided
+      if (submissionName && submissionName.trim()) {
+        updateSubmission(currentSubmission.submissionId, { submissionName: submissionName.trim() });
+      }
+      
       // Submit for approval - this changes status to PENDING_INITIAL_APPROVAL
-      submitForApproval(submission.submissionId);
+      submitForApproval(currentSubmission.submissionId);
       
       // Trigger real-time update event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('submissionUpdated', {
-          detail: { submissionId: submission.submissionId }
+          detail: { submissionId: currentSubmission.submissionId }
         }));
       }
       
-      const updatedSubmission = getSubmissionById(submission.submissionId);
+      const updatedSubmission = getSubmissionById(currentSubmission.submissionId);
       if (updatedSubmission) {
         setSubmission(updatedSubmission);
         setSuccessMessage(
@@ -1240,27 +1317,60 @@ export default function DataSubmission() {
               </div>
             </div>
 
-            {/* Submission Status */}
-            {submission && (
+            {/* Submission Status and Action Buttons */}
+            {selectedYear && (
               <div className="mb-6 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div>
-                    <span className="text-sm font-semibold text-gray-700">Submission Status: </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      submission.submissionStatus === SUBMISSION_STATUS.DRAFT
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL
-                        ? 'bg-[#0d6670]/10 text-[#0d6670]'
-                        : submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION
-                        ? 'bg-orange-100 text-orange-800'
-                        : submission.submissionStatus === SUBMISSION_STATUS.VALIDATED
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {submission.submissionStatus}
-                    </span>
+                    {submission ? (
+                      <>
+                        <span className="text-sm font-semibold text-gray-700">Submission Status: </span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          submission.submissionStatus === SUBMISSION_STATUS.DRAFT
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL
+                            ? 'bg-[#0d6670]/10 text-[#0d6670]'
+                            : submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION
+                            ? 'bg-orange-100 text-orange-800'
+                            : submission.submissionStatus === SUBMISSION_STATUS.VALIDATED
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {submission.submissionStatus}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-700">New Submission - Ready to Start</span>
+                    )}
                   </div>
                   {(() => {
+                    // For fresh submissions (no submission exists yet), show buttons if user can submit
+                    if (!submission) {
+                      const canSubmit = canPerformAction(user, 'submit_data');
+                      if (canSubmit) {
+                        return (
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={handleSaveDraft}
+                              disabled={isSaving}
+                              className="px-6 py-2.5 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSaving ? '⏳ Saving...' : 'Save Draft'}
+                            </button>
+                            <button
+                              onClick={handleSubmitForApproval}
+                              disabled={isSaving}
+                              className="px-6 py-2.5 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Submit for Approval
+                            </button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }
+                    
+                    // For existing submissions, check if editable
                     const isEditable = submission.submissionStatus === SUBMISSION_STATUS.DRAFT || 
                       submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
                       submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
@@ -1284,7 +1394,9 @@ export default function DataSubmission() {
                       );
                     }
                     
-                    if (isEditable) {
+                    // Show buttons if editable AND user has submit_data permission (for data contributors)
+                    const canSubmit = canPerformAction(user, 'submit_data');
+                    if (isEditable && canSubmit) {
                       return (
                         <div className="flex space-x-3">
                           <button
@@ -1309,7 +1421,7 @@ export default function DataSubmission() {
                   })()}
                 </div>
                 {/* Rejection Reasons Display */}
-                {(submission.rejectionReason || submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) && (
+                {submission && (submission.rejectionReason || submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) && (
                   <div className="mt-4 p-5 bg-red-50 border-2 border-red-300 rounded-lg">
                     <div className="flex items-center mb-3">
                       <span className="text-2xl mr-2">⚠️</span>

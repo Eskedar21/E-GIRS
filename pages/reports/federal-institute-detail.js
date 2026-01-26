@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
   getSubmissionById, 
   getResponsesBySubmission,
+  getAllSubmissions,
   SUBMISSION_STATUS
 } from '../../data/submissions';
 import { getUnitById } from '../../data/administrativeUnits';
@@ -28,6 +29,7 @@ export default function FederalInstituteDetail() {
   const [submission, setSubmission] = useState(null);
   const [submissionDetails, setSubmissionDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sampleSubmissions, setSampleSubmissions] = useState([]);
 
   // Find submission - prefer submissionId if provided, otherwise find by year and unit
   useEffect(() => {
@@ -85,7 +87,31 @@ export default function FederalInstituteDetail() {
 
     setSubmission(foundSubmission);
     loadSubmissionDetails(foundSubmission.submissionId, assessmentYearId || foundSubmission.assessmentYearId);
+    
+    // Load sample submissions for the same institute
+    if (foundSubmission) {
+      loadSampleSubmissions(foundSubmission.unitId, foundSubmission.assessmentYearId);
+    }
   }, [router.isReady, year, unit, submissionId, user]);
+
+  const loadSampleSubmissions = (unitId, assessmentYearId) => {
+    const allSubmissions = getAllSubmissions();
+    const instituteSubmissions = allSubmissions.filter(s => 
+      s.unitId === unitId && s.assessmentYearId === assessmentYearId
+    ).sort((a, b) => {
+      const aDate = new Date(b.updatedAt || b.submittedDate || b.createdAt);
+      const bDate = new Date(a.updatedAt || a.submittedDate || a.createdAt);
+      return aDate - bDate;
+    });
+    
+    // Show all existing submissions for this institute (these are the "sample" submissions)
+    // They represent different statuses and can be viewed by clicking on them
+    setSampleSubmissions(instituteSubmissions);
+  };
+
+  const handleSelectSubmission = (selectedSubmissionId) => {
+    router.push(`/reports/federal-institute-detail?submissionId=${selectedSubmissionId}`);
+  };
 
   const loadSubmissionDetails = (submissionId, assessmentYearId) => {
     const submission = getSubmissionById(submissionId);
@@ -131,11 +157,25 @@ export default function FederalInstituteDetail() {
               };
             });
             
-            // For draft: show all questions (some may not be answered)
+            // For draft: show all questions but only some have answers (partial completion)
             // For other statuses: only show questions that have responses (all should be answered)
-            const filteredQuestions = isDraft 
-              ? questionsWithResponses 
-              : questionsWithResponses.filter(q => q.response && q.response.responseValue);
+            let filteredQuestions;
+            if (isDraft) {
+              // For draft, show all questions but only answer some (e.g., first 60% of questions)
+              const totalQuestions = questionsWithResponses.length;
+              const answeredCount = Math.floor(totalQuestions * 0.6); // 60% answered
+              filteredQuestions = questionsWithResponses.map((q, idx) => {
+                if (idx < answeredCount && q.response && q.response.responseValue) {
+                  return q;
+                } else if (idx >= answeredCount) {
+                  return { ...q, response: null }; // No answer for remaining questions
+                }
+                return q;
+              });
+            } else {
+              // For approved/validated/rejected: all questions must be answered
+              filteredQuestions = questionsWithResponses.filter(q => q.response && q.response.responseValue);
+            }
             
             return {
               indicator,
@@ -249,12 +289,76 @@ export default function FederalInstituteDetail() {
     );
   }
 
+  const getStatusColor = (status) => {
+    const statusConfig = {
+      [SUBMISSION_STATUS.DRAFT]: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      [SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL]: 'bg-blue-100 text-blue-800 border-blue-300',
+      [SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION]: 'bg-orange-100 text-orange-800 border-orange-300',
+      [SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER]: 'bg-red-100 text-red-800 border-red-300',
+      [SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE]: 'bg-red-100 text-red-800 border-red-300',
+      [SUBMISSION_STATUS.VALIDATED]: 'bg-green-100 text-green-800 border-green-300',
+      [SUBMISSION_STATUS.SCORING_COMPLETE]: 'bg-blue-100 text-blue-800 border-blue-300',
+    };
+    return statusConfig[status] || 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+
   return (
     <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
       <Layout title={`Federal Institute Submission - ${getUnitName(submission.unitId)}`}>
-        <div className="flex">
+        <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
-          <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
+          {/* Sample Submissions Sidebar - Matching Approver Interface Style */}
+          {sampleSubmissions.length > 0 && (
+            <aside className="w-80 bg-white border-r border-gray-200 p-6 h-screen sticky top-0 overflow-y-auto">
+              <div className="mb-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Institute Submissions</h2>
+                <p className="text-xs text-gray-600 mb-4">
+                  View different submission statuses for this institute. Click to view details. Read-only view for admins.
+                </p>
+                <div className="space-y-2">
+                  {sampleSubmissions.map((sampleSub) => {
+                    const isActive = sampleSub.submissionId === submission.submissionId;
+                    return (
+                      <button
+                        key={sampleSub.submissionId}
+                        onClick={() => handleSelectSubmission(sampleSub.submissionId)}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                          isActive
+                            ? 'bg-[#0d6670]/10 border-[#0d6670] shadow-md'
+                            : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className={`text-sm font-semibold mb-1 ${
+                              isActive ? 'text-[#0d6670]' : 'text-gray-900'
+                            }`}>
+                              {sampleSub.submissionName || `Submission ${sampleSub.submissionId}`}
+                            </p>
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${getStatusColor(sampleSub.submissionStatus)}`}>
+                              {sampleSub.submissionStatus}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">
+                          {sampleSub.submittedDate 
+                            ? formatDate(sampleSub.submittedDate)
+                            : 'Not submitted'}
+                        </div>
+                        {sampleSub.rejectionReason && (
+                          <div className="mt-2 text-xs text-red-600 line-clamp-2">
+                            {sampleSub.rejectionReason.substring(0, 80)}...
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+          )}
+          <div className={`flex flex-grow transition-all duration-300 ${sampleSubmissions.length > 0 ? 'ml-80' : ''}`}>
+            <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
             <div className="w-full">
               {/* Header Section */}
               <div className="mb-6">
@@ -632,6 +736,7 @@ export default function FederalInstituteDetail() {
               )}
             </div>
           </main>
+          </div>
         </div>
       </Layout>
     </ProtectedRoute>
