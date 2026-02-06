@@ -18,7 +18,7 @@ export default function EvaluateCentralSubmission() {
   const { user } = useAuth();
   const { isCollapsed, setCollapsed } = useSidebar();
   const userRole = user ? user.role : '';
-  const isReadOnly = ['Chairman (CC)', 'Secretary (CC)'].includes(userRole);
+  const isReadOnly = userRole === 'Secretary (CC)';
   
   // Force sidebar to be collapsed on this page
   useEffect(() => {

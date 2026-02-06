@@ -45,6 +45,16 @@ export default function Sidebar() {
       roles: ['Regional Approver', 'Federal Approver', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']
     },
     {
+      title: 'Pending Subjective Scoring',
+      path: '/scoring/queue',
+      roles: ['Central Committee Member', 'Secretary (CC)']
+    },
+    {
+      title: 'Scores for Final Approval',
+      path: '/scoring/final-approval',
+      roles: ['Chairman (CC)', 'Secretary (CC)']
+    },
+    {
       title: 'Reports',
       path: '/reports',
       roles: ['all']

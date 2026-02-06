@@ -10,8 +10,6 @@ import {
   getSubmissionsByStatus, 
   getSubmissionsByUser,
   getSubmissionsByUnit,
-  getSubmissionById,
-  updateSubmission,
   SUBMISSION_STATUS 
 } from '../data/submissions';
 import { getAllAssessmentYears, getAssessmentYearById } from '../data/assessmentFramework';
@@ -41,63 +39,6 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [selectedYear, setSelectedYear] = useState(null);
   const [assessmentYears, setAssessmentYears] = useState([]);
-
-  // Demo status rotation for showing different submission statuses (same as submission page)
-  const DEMO_STATUSES = [
-    SUBMISSION_STATUS.DRAFT,
-    SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER,
-    SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
-    SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
-    SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
-    SUBMISSION_STATUS.VALIDATED
-  ];
-
-  const rotateSubmissionStatusForDemo = (submission, userRole) => {
-    if (!submission) return null;
-    
-    // Only rotate for data contributor roles (demo purposes)
-    const isDataContributor = ['Data Contributor', 'Institute Data Contributor'].includes(userRole);
-    
-    if (!isDataContributor) return submission;
-    
-    // Get current rotation index from localStorage
-    const storageKey = `demo_status_index_${submission.submissionId}`;
-    const visitKey = `demo_visit_count_${submission.submissionId}`;
-    
-    let currentIndex = 0;
-    const storedIndex = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
-    const visitCount = typeof window !== 'undefined' ? parseInt(localStorage.getItem(visitKey) || '0') : 0;
-    
-    // Increment visit count
-    const newVisitCount = visitCount + 1;
-    
-    // Rotate to next status on every visit
-    if (storedIndex !== null) {
-      currentIndex = (parseInt(storedIndex) + 1) % DEMO_STATUSES.length;
-    } else {
-      // First visit - start with current status or first in rotation
-      const currentStatusIndex = DEMO_STATUSES.indexOf(submission.submissionStatus);
-      currentIndex = currentStatusIndex >= 0 ? (currentStatusIndex + 1) % DEMO_STATUSES.length : 0;
-    }
-    
-    // Get the status for this rotation
-    const newStatus = DEMO_STATUSES[currentIndex];
-    
-    // Always update to the next status in rotation
-    updateSubmission(submission.submissionId, { 
-      submissionStatus: newStatus,
-      updatedAt: new Date().toISOString()
-    });
-    
-    // Update the stored index and visit count
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(storageKey, currentIndex.toString());
-      localStorage.setItem(visitKey, newVisitCount.toString());
-    }
-    
-    // Return updated submission
-    return getSubmissionById(submission.submissionId);
-  };
 
   // Load assessment years
   useEffect(() => {
@@ -1199,11 +1140,6 @@ export default function Dashboard() {
               selectedYear ? s.assessmentYearId === selectedYear.assessmentYearId : true
             ) : null)
           : null;
-        
-        // Rotate status for demo purposes (same as submission page)
-        if (currentSubmission) {
-          currentSubmission = rotateSubmissionStatusForDemo(currentSubmission, userRole) || currentSubmission;
-        }
         
         return (
           <div className="space-y-6">

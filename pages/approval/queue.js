@@ -409,18 +409,17 @@ export default function ApprovalQueue() {
   };
 
   const handleReview = (submissionId) => {
-    // Chairman and Secretary have read-only access
-    if (['Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
-      // Read-only: just view, no actions allowed
+    // Secretary has read-only access; Chairman has full approve/reject like Central Committee Member
+    if (userRole === 'Secretary (CC)') {
       router.push(`/validation/evaluate/${submissionId}`);
-    } else if (userRole === 'Central Committee Member') {
+    } else if (['Chairman (CC)', 'Central Committee Member'].includes(userRole)) {
       router.push(`/validation/evaluate/${submissionId}`);
     } else {
       router.push(`/approval/evaluate/${submissionId}`);
     }
   };
 
-  const isReadOnly = ['Chairman (CC)', 'Secretary (CC)'].includes(userRole);
+  const isReadOnly = userRole === 'Secretary (CC)';
 
   return (
     <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)']}>

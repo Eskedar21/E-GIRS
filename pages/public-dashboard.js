@@ -25,6 +25,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import NationalMaturityMap from '../components/NationalMaturityMap';
 
 export default function PublicDashboard() {
   const router = useRouter();
@@ -392,42 +393,17 @@ export default function PublicDashboard() {
           </div>
         </div>
 
-        {/* Visualization 3: National Maturity Map */}
+        {/* Visualization 2: National Maturity Map (Geographic Map) */}
         <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray mb-8">
           <h3 className="text-lg font-bold text-mint-primary-blue mb-4">National Maturity Map</h3>
           <p className="text-sm text-mint-dark-text/70 mb-4">
-            Click on any region to view detailed scorecard. Regions are color-coded by maturity level.
+            Geographic map of Ethiopia: each region is colored by maturity level for the selected year. Hover for Unit Name, Rank, and E-GIRS Score. Click a region to open the Unit Scorecard (Report 2).
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {rankedUnits.map((unit) => {
-              const maturityLevel = getMaturityLevel(unit.score);
-              return (
-                <Link
-                  key={unit.id}
-                  href={`/reports/unit-scorecard?year=${selectedYearId}&unit=${unit.id}`}
-                  className={`block p-4 rounded-lg border-2 transition-all hover:shadow-lg hover:scale-105 cursor-pointer ${getMaturityColor(maturityLevel)}`}
-                  title={`${unit.name}: ${unit.score.toFixed(3)} (Rank: ${unit.rank})`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-mint-dark-text/50">#{unit.rank}</span>
-                    <span className="text-xs font-bold text-mint-primary-blue">{unit.score.toFixed(3)}</span>
-                  </div>
-                  <p className="text-sm font-semibold mb-1">{unit.name}</p>
-                  <p className="text-xs mt-1 font-medium">{maturityLevel}</p>
-                  <div className="mt-2 w-full bg-white/50 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full ${
-                        unit.score >= 0.75 ? 'bg-green-600' :
-                        unit.score >= 0.50 ? 'bg-[#0d6670]' :
-                        unit.score >= 0.25 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${unit.score * 100}%` }}
-                    ></div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <NationalMaturityMap
+            rankedUnits={rankedUnits}
+            selectedYearId={selectedYearId}
+            getMaturityLevel={getMaturityLevel}
+          />
         </div>
 
         {/* Data Table: Ranking Table with Dimension Scores */}

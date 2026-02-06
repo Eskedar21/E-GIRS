@@ -13,9 +13,10 @@ import {
 } from '../../data/submissions';
 import { getUnitById } from '../../data/administrativeUnits';
 import { canPerformAction } from '../../utils/permissions';
-import { 
-  getSubQuestionById, 
+import {
+  getSubQuestionById,
   getSubQuestionsByIndicator,
+  getSubQuestionsInTreeOrder,
   getIndicatorsByDimension,
   getDimensionsByYear,
   getAssessmentYearById
@@ -148,7 +149,7 @@ export default function FederalInstituteDetail() {
         return {
           dimension,
           indicators: applicableIndicators.map(indicator => {
-            const subQuestions = getSubQuestionsByIndicator(indicator.indicatorId);
+            const subQuestions = getSubQuestionsInTreeOrder(indicator.indicatorId);
             const questionsWithResponses = subQuestions.map(sq => {
               const response = responses.find(r => r.subQuestionId === sq.subQuestionId);
               return {
@@ -547,11 +548,12 @@ export default function FederalInstituteDetail() {
                               {indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
                                 const globalQuestionNumber = questionNumber + sqIdx;
                                 const answerText = response?.responseValue || '';
-                                
+                                const depth = subQuestion.depth ?? (subQuestion.parentSubQuestionId != null ? 2 : 1);
+                                const indentClass = depth === 2 ? 'ml-6 border-l-4 border-mint-primary-blue/40' : depth === 3 ? 'ml-10 border-l-4 border-mint-primary-blue/30' : '';
                                 return (
-                                  <div 
-                                    key={subQuestion.subQuestionId} 
-                                    className="p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6"
+                                  <div
+                                    key={subQuestion.subQuestionId}
+                                    className={`p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6 ${indentClass}`}
                                   >
                                     {/* Question Header with Answer */}
                                     <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">

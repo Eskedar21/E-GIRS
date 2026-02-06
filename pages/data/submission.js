@@ -5,12 +5,14 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
-import { 
-  getAllAssessmentYears, 
+import {
+  getAllAssessmentYears,
+  getActiveAssessmentYears,
   getAssessmentYearById,
   getDimensionsByYear,
   getIndicatorsByDimension,
   getSubQuestionsByIndicator,
+  getSubQuestionsInTreeOrder,
   RESPONSE_TYPES
 } from '../../data/assessmentFramework';
 import { getAllUnits, getUnitById } from '../../data/administrativeUnits';
@@ -26,64 +28,6 @@ import {
   SUBMISSION_STATUS
 } from '../../data/submissions';
 import { getSubQuestionById } from '../../data/assessmentFramework';
-
-// Demo status rotation for showing different submission statuses
-const DEMO_STATUSES = [
-  SUBMISSION_STATUS.DRAFT,
-  SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER,
-  SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
-  SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE,
-  SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
-  SUBMISSION_STATUS.VALIDATED
-];
-
-const rotateSubmissionStatusForDemo = (submission, userRole) => {
-  if (!submission) return null;
-  
-  // Only rotate for data contributor roles (demo purposes)
-  const isDataContributor = ['Data Contributor', 'Institute Data Contributor'].includes(userRole);
-  
-  if (!isDataContributor) return submission;
-  
-  // Get current rotation index from localStorage
-  // Rotate to next status on every page visit/load
-  const storageKey = `demo_status_index_${submission.submissionId}`;
-  const visitKey = `demo_visit_count_${submission.submissionId}`;
-  
-  let currentIndex = 0;
-  const storedIndex = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
-  const visitCount = typeof window !== 'undefined' ? parseInt(localStorage.getItem(visitKey) || '0') : 0;
-  
-  // Increment visit count
-  const newVisitCount = visitCount + 1;
-  
-  // Rotate to next status on every visit
-  if (storedIndex !== null) {
-    currentIndex = (parseInt(storedIndex) + 1) % DEMO_STATUSES.length;
-  } else {
-    // First visit - start with current status or first in rotation
-    const currentStatusIndex = DEMO_STATUSES.indexOf(submission.submissionStatus);
-    currentIndex = currentStatusIndex >= 0 ? (currentStatusIndex + 1) % DEMO_STATUSES.length : 0;
-  }
-  
-  // Get the status for this rotation
-  const newStatus = DEMO_STATUSES[currentIndex];
-  
-  // Always update to the next status in rotation
-  updateSubmission(submission.submissionId, { 
-    submissionStatus: newStatus,
-    updatedAt: new Date().toISOString()
-  });
-  
-  // Update the stored index and visit count
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(storageKey, currentIndex.toString());
-    localStorage.setItem(visitKey, newVisitCount.toString());
-  }
-  
-  // Return updated submission
-  return getSubmissionById(submission.submissionId);
-};
 
 export default function DataSubmission() {
   const { user } = useAuth();
@@ -106,6 +50,7 @@ export default function DataSubmission() {
   const [activeSection, setActiveSection] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
+  const [incompleteDimensionIds, setIncompleteDimensionIds] = useState(new Set());
 
   // Memoize loadSubmission to avoid infinite loops - must be defined before conditional returns
   const loadSubmission = useCallback(() => {
@@ -126,20 +71,17 @@ export default function DataSubmission() {
           return;
         }
         
-        // Rotate status for demo purposes (only for data contributors)
-        let updatedSubmission = rotateSubmissionStatusForDemo(specificSubmission, user.role) || specificSubmission;
-        
-        // Set the year for this submission
-        const submissionYear = getAllAssessmentYears().find(y => y.assessmentYearId === updatedSubmission.assessmentYearId);
+        // Set the year for this submission (by id so it works even if year is no longer Active)
+        const submissionYear = getAssessmentYearById(specificSubmission.assessmentYearId);
         if (submissionYear) {
           setSelectedYear(submissionYear);
         }
         
-        setSubmission(updatedSubmission);
-        setSubmissionName(updatedSubmission.submissionName || '');
+        setSubmission(specificSubmission);
+        setSubmissionName(specificSubmission.submissionName || '');
         
         // Load existing responses
-        const existingResponses = getResponsesBySubmission(updatedSubmission.submissionId);
+        const existingResponses = getResponsesBySubmission(specificSubmission.submissionId);
         const responseMap = {};
         const evidenceMap = {};
         existingResponses.forEach(r => {
@@ -175,10 +117,7 @@ export default function DataSubmission() {
     );
     
     if (existingSubmission) {
-      // Rotate status for demo purposes (only for data contributors)
-      existingSubmission = rotateSubmissionStatusForDemo(existingSubmission, user.role) || existingSubmission;
-      
-      // Load existing submission
+      // Load existing submission (real status, no demo rotation)
       setSubmission(existingSubmission);
       setSubmissionName(existingSubmission.submissionName || '');
       
@@ -204,11 +143,11 @@ export default function DataSubmission() {
   }, [selectedYear, user, router]);
 
   useEffect(() => {
-    // Reload assessment years to get newly created ones
-    const years = getAllAssessmentYears();
+    // Only Active assessment years for data contributors
+    const years = getActiveAssessmentYears();
     setAssessmentYears(years);
-    
-    // Check if year is passed in query params
+
+    // Check if year is passed in query params (must be Active to appear in list)
     const yearParam = router.query.year;
     if (yearParam) {
       const year = years.find(y => y.assessmentYearId === parseInt(yearParam));
@@ -217,25 +156,20 @@ export default function DataSubmission() {
         return;
       }
     }
-    
-    // Auto-select active year if no year is selected and no specific submission in query
+
+    // Auto-select first active year if no year is selected and no specific submission in query
     const submissionIdParam = router.query.submissionId;
-    if (!selectedYear && !submissionIdParam) {
-      const activeYear = years.find(y => y.status === 'Active');
-      if (activeYear) {
-        setSelectedYear(activeYear);
-      }
+    if (!selectedYear && !submissionIdParam && years.length > 0) {
+      setSelectedYear(years[0]);
     }
   }, [router.query.submissionId, router.query.year]);
 
   // Listen for assessment framework updates
   useEffect(() => {
     const handleFrameworkUpdate = () => {
-      // Reload assessment years
-      const years = getAllAssessmentYears();
+      const years = getActiveAssessmentYears();
       setAssessmentYears(years);
-      
-      // If a year is selected, reload its dimensions and questions
+
       if (selectedYear) {
         const updatedYear = years.find(y => y.assessmentYearId === selectedYear.assessmentYearId);
         if (updatedYear) {
@@ -251,6 +185,30 @@ export default function DataSubmission() {
       };
     }
   }, [selectedYear]);
+
+  // Listen for submission updates (e.g. approver rejected/approved) so submitter sees current status and rejection reasons
+  useEffect(() => {
+    const handleSubmissionUpdate = (e) => {
+      const updatedId = e?.detail?.submissionId;
+      if (!updatedId || !submission || submission.submissionId !== updatedId) return;
+      const updated = getSubmissionById(updatedId);
+      if (!updated) return;
+      setSubmission(updated);
+      const existingResponses = getResponsesBySubmission(updatedId);
+      const responseMap = {};
+      const evidenceMap = {};
+      existingResponses.forEach(r => {
+        responseMap[r.subQuestionId] = r.responseValue;
+        if (r.evidenceLink) evidenceMap[r.subQuestionId] = r.evidenceLink;
+      });
+      setResponses(responseMap);
+      setEvidenceLinks(evidenceMap);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('submissionUpdated', handleSubmissionUpdate);
+      return () => window.removeEventListener('submissionUpdated', handleSubmissionUpdate);
+    }
+  }, [submission?.submissionId]);
 
   // Load submission when query param or selectedYear changes
   useEffect(() => {
@@ -318,7 +276,7 @@ export default function DataSubmission() {
     }
   }, [selectedYear, user, loadSubmission, router.query.submissionId]);
 
-  // Group sub-questions by dimension and indicator - must be computed before conditional returns
+  // Group sub-questions by dimension and indicator (tree order: parent then nested children)
   const groupedQuestions = useMemo(() => {
     return dimensions.map(dimension => {
       const dimIndicators = indicators.filter(ind => ind.dimensionId === dimension.dimensionId);
@@ -326,7 +284,7 @@ export default function DataSubmission() {
         dimension,
         indicators: dimIndicators.map(indicator => ({
           indicator,
-          subQuestions: subQuestions.filter(sq => sq.parentIndicatorId === indicator.indicatorId)
+          subQuestions: getSubQuestionsInTreeOrder(indicator.indicatorId)
         }))
       };
     }).filter(group => group.indicators.length > 0);
@@ -346,6 +304,20 @@ export default function DataSubmission() {
       setCurrentDimensionIndex(0);
     }
   }, [selectedYear?.assessmentYearId, groupedQuestions]);
+
+  // Clear incomplete dimension flags when all questions are answered (so flags update in real time)
+  const totalAnsweredQuestionsForEffect = subQuestions.filter(sq => {
+    const response = responses[sq.subQuestionId];
+    const evidence = evidenceLinks[sq.subQuestionId];
+    const hasAnswer = response && response !== '' && response.trim() !== '';
+    const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
+    return hasAnswer && hasEvidence;
+  }).length;
+  useEffect(() => {
+    if (subQuestions.length > 0 && totalAnsweredQuestionsForEffect === subQuestions.length) {
+      setIncompleteDimensionIds(new Set());
+    }
+  }, [subQuestions.length, totalAnsweredQuestionsForEffect]);
   
   // Early return if no user - ProtectedRoute will handle redirect
   if (!user) {
@@ -604,10 +576,21 @@ export default function DataSubmission() {
     });
     
     if (unanswered.length > 0) {
+      // Flag dimensions that contain unanswered questions
+      const dimensionIdsWithUnanswered = [...new Set(
+        unanswered
+          .map(sq => {
+            const ind = indicators.find(i => i.indicatorId === sq.parentIndicatorId);
+            return ind ? ind.dimensionId : null;
+          })
+          .filter(Boolean)
+      )];
+      setIncompleteDimensionIds(new Set(dimensionIdsWithUnanswered));
       // Show clear error message - do not allow submission
       setErrorMessage(
         `⚠️ Cannot submit: You have ${unanswered.length} incomplete question(s) out of ${subQuestions.length} total. ` +
-        `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting.`
+        `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting. ` +
+        `Dimensions with missing answers are flagged in the list on the left.`
       );
       // Scroll to first unanswered question
       if (unanswered.length > 0 && dimensions.length > 0) {
@@ -714,6 +697,7 @@ export default function DataSubmission() {
       const updatedSubmission = getSubmissionById(currentSubmission.submissionId);
       if (updatedSubmission) {
         setSubmission(updatedSubmission);
+        setIncompleteDimensionIds(new Set());
         setSuccessMessage(
           '✅ Submission sent for approval successfully!\n\n' +
           'Your submission has been sent to the Regional Approver for review.\n\n' +
@@ -1161,27 +1145,39 @@ export default function DataSubmission() {
               {/* Dimensions Navigation */}
               {selectedYear && groupedQuestions.length > 0 ? (
                 <div className="space-y-1">
-                  {groupedQuestions.map((group, index) => (
-                    <div key={group.dimension.dimensionId}>
-                      <button
-                        onClick={() => scrollToSection(group.dimension.dimensionId)}
-                        className={`w-full flex items-center text-left p-2 rounded-lg transition-all ${
-                          activeSection === group.dimension.dimensionId
-                            ? 'bg-[#0d6670]/10 text-[#0d6670] border-l-4 border-[#0d6670]'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 ${
-                          activeSection === group.dimension.dimensionId
-                            ? 'bg-[#0d6670] text-white'
-                            : 'bg-gray-200 text-gray-600'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <span className="text-sm font-medium flex-1">{group.dimension.dimensionName}</span>
-                      </button>
-                    </div>
-                  ))}
+                  {groupedQuestions.map((group, index) => {
+                    const isIncomplete = incompleteDimensionIds.has(group.dimension.dimensionId);
+                    return (
+                      <div key={group.dimension.dimensionId}>
+                        <button
+                          onClick={() => scrollToSection(group.dimension.dimensionId)}
+                          className={`w-full flex items-center text-left p-2 rounded-lg transition-all ${
+                            activeSection === group.dimension.dimensionId
+                              ? 'bg-[#0d6670]/10 text-[#0d6670] border-l-4 border-[#0d6670]'
+                              : isIncomplete
+                                ? 'bg-amber-50/80 text-amber-900 border-l-4 border-amber-500 hover:bg-amber-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 flex-shrink-0 ${
+                            activeSection === group.dimension.dimensionId
+                              ? 'bg-[#0d6670] text-white'
+                              : isIncomplete
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <span className="text-sm font-medium flex-1">{group.dimension.dimensionName}</span>
+                          {isIncomplete && (
+                            <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0" title="Has unanswered questions">
+                              Incomplete
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -1227,6 +1223,35 @@ export default function DataSubmission() {
                 Complete the assessment form for <span className="font-semibold">{currentUnit?.officialUnitName || currentUser.unitId || 'Your Unit'}</span>. 
                 Only questions applicable to your unit type ({currentUser.unitType || 'N/A'}) are displayed.
               </p>
+              {/* Progress: questions answered and remaining (updates in real time as user fills answers and evidence) */}
+              {subQuestions.length > 0 && (
+                <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-3" aria-live="polite" aria-atomic="true">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {totalAnsweredQuestions} of {totalQuestions} questions answered
+                      {totalQuestions > 0 && (
+                        <span className="text-gray-500 font-normal ml-1">
+                          ({totalQuestions - totalAnsweredQuestions} remaining)
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-sm font-semibold text-[#0d6670]">
+                      {Math.round(progressPercentage)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-[#0d6670] h-3 rounded-full transition-[width] duration-300 ease-out"
+                      style={{ width: `${Math.min(progressPercentage, 100)}%` }}
+                      role="progressbar"
+                      aria-valuenow={totalAnsweredQuestions}
+                      aria-valuemin={0}
+                      aria-valuemax={totalQuestions}
+                      aria-label={`${totalAnsweredQuestions} of ${totalQuestions} questions answered`}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {successMessage && (
@@ -1252,7 +1277,7 @@ export default function DataSubmission() {
                   <select
                     value={selectedYear?.assessmentYearId || ''}
                     onChange={(e) => {
-                      const year = getAllAssessmentYears().find(y => y.assessmentYearId === parseInt(e.target.value));
+                      const year = getActiveAssessmentYears().find(y => y.assessmentYearId === parseInt(e.target.value));
                       setSelectedYear(year);
                     }}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
@@ -1261,7 +1286,11 @@ export default function DataSubmission() {
                       submission.submissionStatus !== SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE}
                   >
                     <option value="">Select Assessment Year</option>
-                    {assessmentYears.map((year) => (
+                    {(
+                      selectedYear && !assessmentYears.some(y => y.assessmentYearId === selectedYear.assessmentYearId)
+                        ? [selectedYear, ...assessmentYears]
+                        : assessmentYears
+                    ).map((year) => (
                       <option key={year.assessmentYearId} value={year.assessmentYearId}>
                         {year.yearName} ({year.status})
                       </option>
@@ -1565,8 +1594,13 @@ export default function DataSubmission() {
                         <div className="space-y-6">
                           {indicatorSubQuestions.map((subQuestion) => {
                             const hasResponse = responses[subQuestion.subQuestionId] && responses[subQuestion.subQuestionId] !== '';
+                            const depth = subQuestion.depth ?? (subQuestion.parentSubQuestionId != null ? 2 : 1);
+                            const indentClass = depth === 2 ? 'ml-6 border-l-2 border-mint-primary-blue/30' : depth === 3 ? 'ml-10 border-l-2 border-mint-primary-blue/20' : '';
                             return (
-                              <div key={subQuestion.subQuestionId} className="p-6 rounded-lg border border-gray-200 bg-white transition-all">
+                              <div
+                                key={subQuestion.subQuestionId}
+                                className={`p-6 rounded-lg border border-gray-200 bg-white transition-all ${indentClass}`}
+                              >
                                 <div className="mb-4">
                                   <label className="block text-base font-semibold text-gray-900 mb-3">
                                     {subQuestion.subQuestionText}

@@ -159,6 +159,42 @@ const defaultUsers = [
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
+  {
+    userId: 12,
+    username: 'committee2',
+    fullName: 'Committee Member 2',
+    email: 'committee2@mint.gov.et',
+    password: 'Committee123!',
+    officialUnitId: null,
+    role: 'Central Committee Member',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 13,
+    username: 'committee3',
+    fullName: 'Committee Member 3',
+    email: 'committee3@mint.gov.et',
+    password: 'Committee123!',
+    officialUnitId: null,
+    role: 'Central Committee Member',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
 ];
 
 // Load users from localStorage or use defaults
@@ -216,13 +252,18 @@ const loadUsers = () => {
         return storedUser;
       });
       
-      // Add new users from defaults that don't exist in stored
-      const newUsersFromDefaults = defaultUsers.filter(du => 
+      // Add new users from defaults that don't exist in stored (by userId or username)
+      const newUsersFromDefaults = defaultUsers.filter(du =>
         !storedUserIds.has(du.userId) && !storedUsernames.has(du.username)
       );
+
+      // Ensure every default user exists in final list (fixes missing committee2/committee3 after adding new defaults)
+      const combinedDefault = [...updatedDefaultUsers, ...newUsersFromDefaults];
+      const defaultUsernamesInCombined = new Set(combinedDefault.map(u => u.username));
+      const missingDefaults = defaultUsers.filter(du => !defaultUsernamesInCombined.has(du.username));
       
-      // Combine: updated default users + custom stored users (newly created) + new default users
-      const finalUsers = [...updatedDefaultUsers, ...customStoredUsers, ...newUsersFromDefaults];
+      // Combine: updated default users + new default users + any missing defaults + custom stored users
+      const finalUsers = [...combinedDefault, ...missingDefaults, ...customStoredUsers];
       
       // Always save to ensure localStorage is synced with defaults
       saveUsers(finalUsers);

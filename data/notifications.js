@@ -1,6 +1,8 @@
 // Notifications Data Store
 // This will be replaced with a database in production
 
+import { getUsersByRole } from './users';
+
 // Load notifications from localStorage or initialize empty array
 const loadNotificationsFromStorage = () => {
   if (typeof window !== 'undefined') {
@@ -174,6 +176,24 @@ export const sendEmailNotification = async (recipientEmail, subject, message, li
   console.log(`[Email Notification] To: ${recipientEmail}, Subject: ${subject}`);
   
   return { success: true };
+};
+
+/** Notify all Data Contributors and Institute Data Contributors that an assessment is now active and when it ends. */
+export const notifyDataContributorsAssessmentActivated = (yearName, endDateIso) => {
+  const endDateStr = endDateIso ? new Date(endDateIso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'TBD';
+  const message = `Assessment "${yearName}" is now active. Please complete your submission before the deadline: ${endDateStr}.`;
+  const linkURL = '/data/submission';
+  const contributors = [
+    ...(getUsersByRole('Data Contributor') || []),
+    ...(getUsersByRole('Institute Data Contributor') || [])
+  ];
+  const seen = new Set();
+  contributors.forEach(u => {
+    if (u.userId && !seen.has(u.userId)) {
+      seen.add(u.userId);
+      createInAppNotification(u.userId, message, linkURL);
+    }
+  });
 };
 
 // Notification helper functions for workflow events

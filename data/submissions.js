@@ -9,6 +9,7 @@ export const SUBMISSION_STATUS = {
   REJECTED_BY_REGIONAL_APPROVER: 'Rejected by Regional Approver',
   REJECTED_BY_CENTRAL_COMMITTEE: 'Rejected by Central Committee',
   VALIDATED: 'Validated',
+  PENDING_CHAIRMAN_APPROVAL: 'Pending Chairman Approval',
   SCORING_COMPLETE: 'Scoring Complete'
 };
 
@@ -31756,9 +31757,136 @@ export const getResponsesBySubmission = (submissionId) => {
 
 // Get response by sub-question
 export const getResponseBySubQuestion = (submissionId, subQuestionId) => {
-  return responses.find(r => 
-    r.submissionId === submissionId && r.subQuestionId === subQuestionId
+  return responses.find(r =>
+    r && r.submissionId === submissionId && r.subQuestionId === subQuestionId
   );
+};
+
+// --- Subjective scoring (User Story 001) ---
+// Store: { responseId, committeeMemberId, assignedScore } (AssignedScore: 0 | 0.5 | 1)
+let subjectiveScores = [];
+
+const RESPONSE_TYPE_TEXT_EXPLANATION = 'TextExplanation';
+
+/** Submissions that are Validated and have at least one response to a sub-question with ResponseType Text Explanation. */
+export const getSubmissionsForSubjectiveScoring = () => {
+  const { getSubQuestionById } = require('./assessmentFramework');
+  const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
+  return validated.filter(sub => {
+    const submissionResponses = getResponsesBySubmission(sub.submissionId);
+    return submissionResponses.some(r => {
+      const sq = getSubQuestionById(r.subQuestionId);
+      return sq && sq.responseType === RESPONSE_TYPE_TEXT_EXPLANATION && r.responseValue && String(r.responseValue).trim() !== '';
+    });
+  });
+};
+
+/** Responses for this submission where the sub-question has ResponseType Text Explanation (with subQuestion attached). */
+export const getSubjectiveResponsesForSubmission = (submissionId) => {
+  const { getSubQuestionById } = require('./assessmentFramework');
+  const submissionResponses = getResponsesBySubmission(submissionId);
+  return submissionResponses
+    .filter(r => r.responseValue != null && String(r.responseValue).trim() !== '')
+    .map(r => {
+      const sq = getSubQuestionById(r.subQuestionId);
+      return sq && sq.responseType === RESPONSE_TYPE_TEXT_EXPLANATION ? { ...r, subQuestion: sq } : null;
+    })
+    .filter(Boolean);
+};
+
+/** All assigned scores for a response (for averaging). */
+export const getSubjectiveScoresByResponse = (responseId) => {
+  return subjectiveScores.filter(s => s.responseId === responseId);
+};
+
+/** Computed average of committee scores (before chairman override). */
+export const getComputedAverageScore = (responseId) => {
+  const scores = getSubjectiveScoresByResponse(responseId);
+  if (!scores.length) return null;
+  const sum = scores.reduce((acc, s) => acc + Number(s.assignedScore), 0);
+  const avg = sum / scores.length;
+  return Math.round(avg * 10000) / 10000;
+};
+
+/** Final score for a sub-question response = chairman override if set, else average of assigned scores (Decimal 5,4). */
+export const getFinalSubQuestionScore = (responseId) => {
+  const response = responses.find(r => r && r.responseId === responseId);
+  if (response && response.chairmanOverrideScore != null && !Number.isNaN(response.chairmanOverrideScore)) {
+    return Math.round(Number(response.chairmanOverrideScore) * 10000) / 10000;
+  }
+  return getComputedAverageScore(responseId);
+};
+
+/** Assign or update a committee member's score for a response; recomputes displayed average (no auto status change). */
+export const assignSubjectiveScore = (responseId, committeeMemberId, assignedScore) => {
+  const parsed = parseFloat(assignedScore);
+  if (Number.isNaN(parsed) || ![0, 0.5, 1].includes(parsed)) {
+    throw new Error('AssignedScore must be 0, 0.5, or 1.');
+  }
+  const existing = subjectiveScores.find(
+    s => s.responseId === responseId && s.committeeMemberId === committeeMemberId
+  );
+  if (existing) {
+    existing.assignedScore = parsed;
+  } else {
+    subjectiveScores.push({
+      responseId: Number(responseId),
+      committeeMemberId: Number(committeeMemberId),
+      assignedScore: parsed
+    });
+  }
+  const response = responses.find(r => r && r.responseId === responseId);
+  if (response) {
+    response.updatedAt = new Date().toISOString();
+  }
+  return { responseId, committeeMemberId, assignedScore: parsed };
+};
+
+/** Submit scoring to Chairman: only when all subjective responses have at least one score. Sets status to Pending Chairman Approval. */
+export const submitScoringToChairman = (submissionId) => {
+  const submission = getSubmissionById(submissionId);
+  if (!submission || submission.submissionStatus !== SUBMISSION_STATUS.VALIDATED) {
+    throw new Error('Submission not found or not in Validated status.');
+  }
+  const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
+  const allScored = subjectiveResponses.length > 0 && subjectiveResponses.every(
+    r => getSubjectiveScoresByResponse(r.responseId).length > 0
+  );
+  if (!allScored) {
+    throw new Error('All subjective responses must have at least one score before submitting to the Chairman.');
+  }
+  submission.submissionStatus = SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL;
+  submission.updatedAt = new Date().toISOString();
+  return submission;
+};
+
+/** Submissions awaiting Chairman's final approval of scores (status = Pending Chairman Approval). */
+export const getSubmissionsPendingChairmanScoringApproval = () => {
+  return getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL);
+};
+
+/** Chairman submits final scores: overrides optional per responseId, then sets submission to Scoring Complete. */
+export const submitChairmanScoringApproval = (submissionId, overrides) => {
+  const submission = getSubmissionById(submissionId);
+  if (!submission || submission.submissionStatus !== SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL) {
+    throw new Error('Submission not found or not pending Chairman approval.');
+  }
+  const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
+  subjectiveResponses.forEach(r => {
+    const response = responses.find(res => res && res.responseId === r.responseId);
+    if (!response) return;
+    const overrideVal = overrides && overrides[r.responseId] != null
+      ? parseFloat(overrides[r.responseId])
+      : null;
+    if (overrideVal !== null && !Number.isNaN(overrideVal) && overrideVal >= 0 && overrideVal <= 1) {
+      response.chairmanOverrideScore = Math.round(overrideVal * 10000) / 10000;
+    }
+    response.finalSubQuestionScore = getFinalSubQuestionScore(r.responseId);
+    response.updatedAt = new Date().toISOString();
+  });
+  submission.submissionStatus = SUBMISSION_STATUS.SCORING_COMPLETE;
+  submission.updatedAt = new Date().toISOString();
+  return submission;
 };
 
 // Create or update a response (Real-time database operation)

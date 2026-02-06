@@ -36,6 +36,7 @@ import {
   Radar
 } from 'recharts';
 import Link from 'next/link';
+import NationalMaturityMap from '../../components/NationalMaturityMap';
 
 const COLORS = ['#10b981', '#0d6670', '#eab308', '#ef4444']; // Very High, High, Medium, Low
 
@@ -528,6 +529,22 @@ export default function ReportsIndex() {
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* National Maturity Map (Geographic) */}
+                  <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-mint-dark-text">National Maturity Map</h3>
+                        <p className="text-sm text-mint-dark-text/60">Regions colored by maturity level. Hover for details; click to open Unit Scorecard.</p>
+                      </div>
+                      <span className="text-mint-dark-text/40">...</span>
+                    </div>
+                    <NationalMaturityMap
+                      rankedUnits={rankedUnits}
+                      selectedYearId={selectedYearId}
+                      getMaturityLevel={getMaturityLevel}
+                    />
                   </div>
 
                   {/* Units Table */}

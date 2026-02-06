@@ -22,14 +22,21 @@ import {
   deleteIndicator,
   getTotalIndicatorWeight,
   getSubQuestionsByIndicator,
+  buildSubQuestionTree,
   createSubQuestion,
   updateSubQuestion,
   deleteSubQuestion,
   getTotalSubQuestionWeight,
+  getTotalSubQuestionWeightUnderParent,
+  MAX_SUB_QUESTION_DEPTH,
+  validateAssessmentYearForActivation,
+  closeAssessmentYearsPastDeadline,
+  getAssessmentYearTimeRemaining,
   ASSESSMENT_STATUS,
   RESPONSE_TYPES,
   APPLICABLE_UNIT_TYPES
 } from '../../data/assessmentFramework';
+import { notifyDataContributorsAssessmentActivated } from '../../data/notifications';
 
 export default function AssessmentFramework() {
   const [selectedYear, setSelectedYear] = useState(null);
@@ -60,14 +67,51 @@ export default function AssessmentFramework() {
     responseType: RESPONSE_TYPES.YES_NO,
     checkboxOptions: []
   });
+  /** When adding: null = Level 1 under indicator, number = under this sub-question. */
+  const [parentSubQuestionIdForNew, setParentSubQuestionIdForNew] = useState(null);
+  /** Depth of parent when adding (1 or 2). New item will be Level (parentDepthForNew + 1). */
+  const [parentDepthForNew, setParentDepthForNew] = useState(null);
   const [newCheckboxOption, setNewCheckboxOption] = useState('');
   
   const [errors, setErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [activationBlocked, setActivationBlocked] = useState(null);
+  /** When set, show modal to set start/end date before activating. { yearId, yearName } */
+  const [pendingActivation, setPendingActivation] = useState(null);
+  const [activationEndDate, setActivationEndDate] = useState('');
+  const [activationStartDate, setActivationStartDate] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
+  const [activationDateError, setActivationDateError] = useState('');
 
   useEffect(() => {
     refreshData();
   }, [selectedYear, selectedDimension, selectedIndicator]);
+
+  // Auto-close assessment years past their deadline on load and every minute
+  useEffect(() => {
+    const run = () => {
+      const closed = closeAssessmentYearsPastDeadline();
+      if (closed.length > 0) {
+        refreshData();
+        setSelectedYear(prev => {
+          if (prev && closed.includes(prev.assessmentYearId)) {
+            const updated = getAllAssessmentYears().find(y => y.assessmentYearId === prev.assessmentYearId);
+            return updated || prev;
+          }
+          return prev;
+        });
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+        }
+      }
+    };
+    run();
+    const interval = setInterval(run, 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const refreshData = () => {
     setYears(getAllAssessmentYears());
@@ -97,6 +141,20 @@ export default function AssessmentFramework() {
     }
 
     if (editingYearId) {
+      if (yearForm.status === ASSESSMENT_STATUS.ACTIVE) {
+        const { valid, errors: validationErrors } = validateAssessmentYearForActivation(editingYearId);
+        if (!valid) {
+          setActivationBlocked({ yearId: editingYearId, yearName: yearForm.yearName, errors: validationErrors });
+          return;
+        }
+        setShowYearForm(false);
+        setEditingYearId(null);
+        setPendingActivation({ yearId: editingYearId, yearName: yearForm.yearName });
+        setActivationStartDate(new Date().toISOString().slice(0, 10));
+        setActivationEndDate('');
+        setActivationDateError('');
+        return;
+      }
       updateAssessmentYear(editingYearId, yearForm);
       setSuccessMessage('Assessment Year updated successfully!');
       setEditingYearId(null);
@@ -142,14 +200,68 @@ export default function AssessmentFramework() {
   };
 
   const handleStatusChange = (yearId, newStatus) => {
+    if (newStatus === ASSESSMENT_STATUS.ACTIVE) {
+      const { valid, errors: validationErrors } = validateAssessmentYearForActivation(yearId);
+      if (!valid) {
+        setActivationBlocked({ yearId, yearName: years.find(y => y.assessmentYearId === yearId)?.yearName || 'This year', errors: validationErrors });
+        return;
+      }
+      const year = years.find(y => y.assessmentYearId === yearId);
+      setPendingActivation({ yearId, yearName: year?.yearName || 'This year' });
+      const today = new Date().toISOString().slice(0, 10);
+      setActivationStartDate(today);
+      setActivationEndDate('');
+      setActivationDateError('');
+      return;
+    }
+    setActivationBlocked(null);
     updateAssessmentYear(yearId, { status: newStatus });
     refreshData();
     setSuccessMessage('Assessment Year status updated successfully!');
     setTimeout(() => setSuccessMessage(''), 5000);
-    // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
+  };
+
+  const handleActivationConfirm = () => {
+    if (!pendingActivation) return;
+    const end = activationEndDate.trim();
+    if (!end) {
+      setActivationDateError('End date is required.');
+      return;
+    }
+    const endDate = new Date(end);
+    if (Number.isNaN(endDate.getTime())) {
+      setActivationDateError('Please enter a valid end date.');
+      return;
+    }
+    const start = activationStartDate.trim() || new Date().toISOString().slice(0, 10);
+    const startDateIso = new Date(start).toISOString();
+    const endDateIso = new Date(end).toISOString();
+    if (endDateIso <= startDateIso) {
+      setActivationDateError('End date must be after start date.');
+      return;
+    }
+    setActivationDateError('');
+    updateAssessmentYear(pendingActivation.yearId, {
+      status: ASSESSMENT_STATUS.ACTIVE,
+      startDate: startDateIso,
+      endDate: endDateIso
+    });
+    notifyDataContributorsAssessmentActivated(pendingActivation.yearName, endDateIso);
+    setPendingActivation(null);
+    refreshData();
+    setSuccessMessage('Assessment activated. Data contributors have been notified.');
+    setTimeout(() => setSuccessMessage(''), 5000);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
+  };
+
+  const handleActivationCancel = () => {
+    setPendingActivation(null);
+    setActivationDateError('');
   };
 
   // Dimension Management
@@ -323,23 +435,27 @@ export default function AssessmentFramework() {
     }
     
     if (!subQuestionForm.subWeightPercentage) {
-      newErrors.subWeightPercentage = 'Sub-Weight Percentage is required';
+      newErrors.subWeightPercentage = 'Weight (%) is required';
     } else {
       const weight = parseFloat(subQuestionForm.subWeightPercentage);
       if (isNaN(weight) || weight < 0 || weight > 100) {
         newErrors.subWeightPercentage = 'Weight must be between 0 and 100';
       } else {
-        const currentTotal = getTotalSubQuestionWeight(selectedIndicator.indicatorId);
-        const existingSubQuestion = editingSubQuestionId 
-          ? subQuestions.find(sq => sq.subQuestionId === editingSubQuestionId)
-          : null;
-        const existingWeight = existingSubQuestion ? existingSubQuestion.subWeightPercentage : 0;
-        if (currentTotal - existingWeight + weight > 100) {
-          newErrors.subWeightPercentage = `Total weight would exceed 100. Current total: ${(currentTotal - existingWeight).toFixed(2)}%`;
+        // At every level (1, 2, 3), sibling weights under the same parent must sum to 100%
+        const parentId = editingSubQuestionId
+          ? subQuestions.find(sq => sq.subQuestionId === editingSubQuestionId)?.parentSubQuestionId ?? null
+          : parentSubQuestionIdForNew;
+        const currentTotal = getTotalSubQuestionWeightUnderParent(parentId, selectedIndicator.indicatorId);
+        const existingWeight = editingSubQuestionId
+          ? (subQuestions.find(sq => sq.subQuestionId === editingSubQuestionId)?.subWeightPercentage ?? 0)
+          : 0;
+        const newTotal = currentTotal - existingWeight + weight;
+        if (newTotal > 100) {
+          newErrors.subWeightPercentage = `Sibling weights under this parent must sum to 100%. Current total would be ${newTotal.toFixed(2)}%.`;
         }
       }
     }
-    
+
     if (!subQuestionForm.responseType) {
       newErrors.responseType = 'Response Type is required';
     }
@@ -372,10 +488,11 @@ export default function AssessmentFramework() {
       createSubQuestion({
         ...subQuestionForm,
         parentIndicatorId: selectedIndicator.indicatorId,
+        parentSubQuestionId: parentSubQuestionIdForNew,
         subWeightPercentage: parseFloat(subQuestionForm.subWeightPercentage),
-        checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX 
-          ? (Array.isArray(subQuestionForm.checkboxOptions) 
-              ? subQuestionForm.checkboxOptions.join(',') 
+        checkboxOptions: subQuestionForm.responseType === RESPONSE_TYPES.MULTIPLE_SELECT_CHECKBOX
+          ? (Array.isArray(subQuestionForm.checkboxOptions)
+              ? subQuestionForm.checkboxOptions.join(',')
               : subQuestionForm.checkboxOptions)
           : null
       });
@@ -383,9 +500,11 @@ export default function AssessmentFramework() {
     }
     refreshData();
     setShowSubQuestionForm(false);
-    setSubQuestionForm({ 
-      subQuestionText: '', 
-      subWeightPercentage: '', 
+    setParentSubQuestionIdForNew(null);
+    setParentDepthForNew(null);
+    setSubQuestionForm({
+      subQuestionText: '',
+      subWeightPercentage: '',
       responseType: RESPONSE_TYPES.YES_NO,
       checkboxOptions: []
     });
@@ -400,13 +519,14 @@ export default function AssessmentFramework() {
 
   const handleEditSubQuestion = (subQuestion) => {
     setEditingSubQuestionId(subQuestion.subQuestionId);
-    const checkboxOptions = subQuestion.checkboxOptions 
-      ? (typeof subQuestion.checkboxOptions === 'string' 
+    setParentSubQuestionIdForNew(null);
+    const checkboxOptions = subQuestion.checkboxOptions
+      ? (typeof subQuestion.checkboxOptions === 'string'
           ? subQuestion.checkboxOptions.split(',').map(opt => opt.trim())
           : subQuestion.checkboxOptions)
       : [];
-    setSubQuestionForm({ 
-      subQuestionText: subQuestion.subQuestionText, 
+    setSubQuestionForm({
+      subQuestionText: subQuestion.subQuestionText,
       subWeightPercentage: subQuestion.subWeightPercentage.toString(),
       responseType: subQuestion.responseType,
       checkboxOptions: checkboxOptions
@@ -417,10 +537,12 @@ export default function AssessmentFramework() {
 
   const handleCancelSubQuestionEdit = () => {
     setEditingSubQuestionId(null);
+    setParentSubQuestionIdForNew(null);
+    setParentDepthForNew(null);
     setShowSubQuestionForm(false);
-    setSubQuestionForm({ 
-      subQuestionText: '', 
-      subWeightPercentage: '', 
+    setSubQuestionForm({
+      subQuestionText: '',
+      subWeightPercentage: '',
       responseType: RESPONSE_TYPES.YES_NO,
       checkboxOptions: []
     });
@@ -428,9 +550,34 @@ export default function AssessmentFramework() {
     setErrors({});
   };
 
+  const handleAddSubQuestionUnder = (parentSq) => {
+    setEditingSubQuestionId(null);
+    setParentSubQuestionIdForNew(parentSq.subQuestionId);
+    setParentDepthForNew(parentSq.depth ?? 1);
+    setSubQuestionForm({
+      subQuestionText: '',
+      subWeightPercentage: '',
+      responseType: RESPONSE_TYPES.YES_NO,
+      checkboxOptions: []
+    });
+    setNewCheckboxOption('');
+    setShowSubQuestionForm(true);
+    setErrors({});
+  };
+
+  const handleDeleteSubQuestion = (sq) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Delete this sub-question and any nested sub-questions under it?`)) return;
+    deleteSubQuestion(sq.subQuestionId);
+    refreshData();
+    setSuccessMessage('Sub-Question deleted.');
+    setTimeout(() => setSuccessMessage(''), 5000);
+    window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+  };
+
   const dimensionTotalWeight = selectedYear ? getTotalDimensionWeight(selectedYear.assessmentYearId) : 0;
   const indicatorTotalWeight = selectedDimension ? getTotalIndicatorWeight(selectedDimension.dimensionId) : 0;
   const subQuestionTotalWeight = selectedIndicator ? getTotalSubQuestionWeight(selectedIndicator.indicatorId) : 0;
+  const isFrameworkLocked = selectedYear?.status === ASSESSMENT_STATUS.ACTIVE;
 
   return (
     <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
@@ -449,6 +596,77 @@ export default function AssessmentFramework() {
             {successMessage && (
               <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
                 {successMessage}
+              </div>
+            )}
+
+            {/* Modal: Activation blocked when weights don't total 100% */}
+            {activationBlocked && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setActivationBlocked(null)}>
+                <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-xl font-bold text-mint-primary-blue">
+                      Cannot activate &quot;{activationBlocked.yearName}&quot;
+                    </h2>
+                    <p className="mt-2 text-sm text-mint-dark-text/80">
+                      All weights for this assessment year must total 100% before it can be used for the survey. Please fix the following:
+                    </p>
+                  </div>
+                  <ul className="p-6 overflow-y-auto flex-1 space-y-2 text-sm text-mint-dark-text">
+                    {activationBlocked.errors.map((msg, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-amber-600 mt-0.5">•</span>
+                        <span>{msg}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="p-6 border-t border-gray-200 bg-gray-50">
+                    <Button
+                      onClick={() => setActivationBlocked(null)}
+                      className="w-full bg-mint-secondary-blue hover:bg-mint-primary-blue"
+                    >
+                      OK, I&apos;ll fix these
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Set assessment period when activating */}
+            {pendingActivation && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={handleActivationCancel}>
+                <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                  <h2 className="text-xl font-bold text-mint-primary-blue mb-2">Set assessment period</h2>
+                  <p className="text-sm text-mint-dark-text/80 mb-4">
+                    &quot;{pendingActivation.yearName}&quot; will become active. Set the period so the system can count down and auto-close when the deadline is reached. Data contributors will be notified.
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="activationStartDate">Start date</Label>
+                      <Input
+                        id="activationStartDate"
+                        type="date"
+                        value={activationStartDate}
+                        onChange={(e) => setActivationStartDate(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="activationEndDate">End date (deadline) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="activationEndDate"
+                        type="date"
+                        value={activationEndDate}
+                        onChange={(e) => { setActivationEndDate(e.target.value); setActivationDateError(''); }}
+                        className="mt-1"
+                      />
+                      {activationDateError && <p className="mt-1 text-sm text-red-500">{activationDateError}</p>}
+                    </div>
+                  </div>
+                  <div className="mt-6 flex gap-2 justify-end">
+                    <Button variant="outline" onClick={handleActivationCancel}>Cancel</Button>
+                    <Button className="bg-mint-secondary-blue hover:bg-mint-primary-blue" onClick={handleActivationConfirm}>Activate</Button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -498,6 +716,20 @@ export default function AssessmentFramework() {
                 </>
               )}
             </div>
+
+            {isFrameworkLocked && (
+              <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
+                <span className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center" aria-hidden>
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="font-semibold text-amber-800">Framework locked</p>
+                  <p className="text-sm text-amber-700">This assessment year is Active. Editing is disabled. Change its status to Draft or Archived to edit dimensions, indicators, or questions.</p>
+                </div>
+              </div>
+            )}
 
             {/* Assessment Years View */}
             {!selectedYear && (
@@ -584,6 +816,15 @@ export default function AssessmentFramework() {
                               >
                                 <h3 className="font-semibold text-mint-dark-text mb-1">{year.yearName}</h3>
                                 <p className="text-sm text-mint-dark-text/70">Status: {year.status}</p>
+                                {year.status === ASSESSMENT_STATUS.ACTIVE && year.endDate && (() => {
+                                  const remaining = getAssessmentYearTimeRemaining(year);
+                                  if (!remaining) return null;
+                                  return (
+                                    <p className="text-xs mt-1 text-mint-dark-text/70">
+                                      {remaining.isOverdue ? 'Deadline passed (will auto-close)' : `Ends in ${remaining.days}d ${remaining.hours}h`}
+                                    </p>
+                                  );
+                                })()}
                               </div>
                               <span className={`px-2 py-1 rounded text-xs font-semibold ${
                                 year.status === ASSESSMENT_STATUS.ACTIVE
@@ -612,11 +853,12 @@ export default function AssessmentFramework() {
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleEditYear(year);
+                                  if (year.status !== ASSESSMENT_STATUS.ACTIVE) handleEditYear(year);
                                 }}
                                 variant="outline"
                                 className="text-xs px-3"
-                                title="Edit Year"
+                                title={year.status === ASSESSMENT_STATUS.ACTIVE ? 'Locked: set to Draft or Archived to edit' : 'Edit Year'}
+                                disabled={year.status === ASSESSMENT_STATUS.ACTIVE}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -657,27 +899,29 @@ export default function AssessmentFramework() {
                           </span>
                         </CardDescription>
                       </div>
-                      <Button
-                        onClick={() => {
-                          if (showDimensionForm) {
-                            handleCancelDimensionEdit();
-                          } else {
-                            setEditingDimensionId(null);
-                            setDimensionForm({ dimensionName: '', dimensionWeight: '' });
-                            setShowDimensionForm(true);
-                            setErrors({});
-                          }
-                        }}
-                        variant={showDimensionForm ? "outline" : "default"}
-                        className={showDimensionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
-                      >
-                        {showDimensionForm ? 'Cancel' : '+ Add Dimension'}
-                      </Button>
+                      {!isFrameworkLocked && (
+                        <Button
+                          onClick={() => {
+                            if (showDimensionForm) {
+                              handleCancelDimensionEdit();
+                            } else {
+                              setEditingDimensionId(null);
+                              setDimensionForm({ dimensionName: '', dimensionWeight: '' });
+                              setShowDimensionForm(true);
+                              setErrors({});
+                            }
+                          }}
+                          variant={showDimensionForm ? "outline" : "default"}
+                          className={showDimensionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
+                        >
+                          {showDimensionForm ? 'Cancel' : '+ Add Dimension'}
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
 
-                    {showDimensionForm && (
+                    {!isFrameworkLocked && showDimensionForm && (
                       <form onSubmit={handleDimensionSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
                         <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
                           {editingDimensionId ? 'Edit Dimension' : 'Create New Dimension'}
@@ -747,20 +991,22 @@ export default function AssessmentFramework() {
                               </span>
                             </div>
                             <div className="flex gap-2">
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditDimension(dimension);
-                                }}
-                                variant="outline"
-                                className="flex-1 text-xs px-3"
-                                title="Edit Dimension"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Edit
-                              </Button>
+                              {!isFrameworkLocked && (
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditDimension(dimension);
+                                  }}
+                                  variant="outline"
+                                  className="flex-1 text-xs px-3"
+                                  title="Edit Dimension"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  Edit
+                                </Button>
+                              )}
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -796,27 +1042,29 @@ export default function AssessmentFramework() {
                           </span>
                         </CardDescription>
                       </div>
-                      <Button
-                        onClick={() => {
-                          if (showIndicatorForm) {
-                            handleCancelIndicatorEdit();
-                          } else {
-                            setEditingIndicatorId(null);
-                            setIndicatorForm({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
-                            setShowIndicatorForm(true);
-                            setErrors({});
-                          }
-                        }}
-                        variant={showIndicatorForm ? "outline" : "default"}
-                        className={showIndicatorForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
-                      >
-                        {showIndicatorForm ? 'Cancel' : '+ Add Indicator'}
-                      </Button>
+                      {!isFrameworkLocked && (
+                        <Button
+                          onClick={() => {
+                            if (showIndicatorForm) {
+                              handleCancelIndicatorEdit();
+                            } else {
+                              setEditingIndicatorId(null);
+                              setIndicatorForm({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
+                              setShowIndicatorForm(true);
+                              setErrors({});
+                            }
+                          }}
+                          variant={showIndicatorForm ? "outline" : "default"}
+                          className={showIndicatorForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
+                        >
+                          {showIndicatorForm ? 'Cancel' : '+ Add Indicator'}
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
 
-                    {showIndicatorForm && (
+                    {!isFrameworkLocked && showIndicatorForm && (
                       <form onSubmit={handleIndicatorSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
@@ -902,20 +1150,22 @@ export default function AssessmentFramework() {
                               </span>
                             </div>
                             <div className="flex gap-2">
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditIndicator(indicator);
-                                }}
-                                variant="outline"
-                                className="flex-1 text-xs px-3"
-                                title="Edit Indicator"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Edit
-                              </Button>
+                              {!isFrameworkLocked && (
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditIndicator(indicator);
+                                  }}
+                                  variant="outline"
+                                  className="flex-1 text-xs px-3"
+                                  title="Edit Indicator"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  Edit
+                                </Button>
+                              )}
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -946,46 +1196,57 @@ export default function AssessmentFramework() {
                         <CardTitle className="text-xl text-mint-primary-blue">Sub-Questions</CardTitle>
                         <CardDescription>
                           Indicator: {selectedIndicator.indicatorName} | 
-                          Total Weight: <span className={`font-bold ${subQuestionTotalWeight === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                          Level 1 total: <span className={`font-bold ${subQuestionTotalWeight === 100 ? 'text-green-600' : 'text-red-600'}`}>
                             {subQuestionTotalWeight.toFixed(2)} / 100%
                           </span>
+                          <span className="text-mint-dark-text/60 ml-1">(Level 2 & 3 under each parent must also sum to 100%)</span>
                         </CardDescription>
                       </div>
-                      <Button
-                        onClick={() => {
-                          if (showSubQuestionForm) {
-                            handleCancelSubQuestionEdit();
-                          } else {
-                            setEditingSubQuestionId(null);
-                            setSubQuestionForm({ 
-                              subQuestionText: '', 
-                              subWeightPercentage: '', 
-                              responseType: RESPONSE_TYPES.YES_NO,
-                              checkboxOptions: []
-                            });
-                            setNewCheckboxOption('');
-                            setShowSubQuestionForm(true);
-                            setErrors({});
-                          }
-                        }}
-                        variant={showSubQuestionForm ? "outline" : "default"}
-                        className={showSubQuestionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
-                      >
-                        {showSubQuestionForm ? 'Cancel' : '+ Add Sub-Question'}
-                      </Button>
+                      {!isFrameworkLocked && (
+                        <Button
+                          onClick={() => {
+                            if (showSubQuestionForm) {
+                              handleCancelSubQuestionEdit();
+                            } else {
+                              setEditingSubQuestionId(null);
+                              setParentSubQuestionIdForNew(null);
+                              setParentDepthForNew(null);
+                              setSubQuestionForm({
+                                subQuestionText: '',
+                                subWeightPercentage: '',
+                                responseType: RESPONSE_TYPES.YES_NO,
+                                checkboxOptions: []
+                              });
+                              setNewCheckboxOption('');
+                              setShowSubQuestionForm(true);
+                              setErrors({});
+                            }
+                          }}
+                          variant={showSubQuestionForm ? "outline" : "default"}
+                          className={showSubQuestionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
+                        >
+                          {showSubQuestionForm ? 'Cancel' : '+ Add Level 1 question'}
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
 
-                    {showSubQuestionForm && (
+                    {!isFrameworkLocked && showSubQuestionForm && (
                       <form onSubmit={handleSubQuestionSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
                         <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
-                          {editingSubQuestionId ? 'Edit Sub-Question' : 'Create New Sub-Question'}
+                          {editingSubQuestionId
+                            ? 'Edit question'
+                            : parentSubQuestionIdForNew == null
+                              ? 'Add Level 1 question (under indicator)'
+                              : parentDepthForNew === 1
+                                ? 'Add Level 2 question (under Level 1)'
+                                : 'Add Level 3 question (under Level 2)'}
                         </h3>
                         <div className="space-y-4">
                           <div>
                             <Label htmlFor="subQuestionText" className="mb-2">
-                              Sub-Question Text <span className="text-red-500">*</span>
+                              Question text <span className="text-red-500">*</span>
                             </Label>
                             <textarea
                               id="subQuestionText"
@@ -1014,9 +1275,14 @@ export default function AssessmentFramework() {
                                 placeholder="e.g., 50.00"
                               />
                               {errors.subWeightPercentage && <p className="mt-1 text-sm text-red-500">{errors.subWeightPercentage}</p>}
-                              <p className="mt-1 text-xs text-mint-dark-text/60">
-                                Remaining: {(100 - subQuestionTotalWeight).toFixed(2)}%
-                              </p>
+                              {selectedIndicator && (
+                                <p className="mt-1 text-xs text-mint-dark-text/60">
+                                  Sibling total under this parent: {getTotalSubQuestionWeightUnderParent(
+                                    editingSubQuestionId ? subQuestions.find(sq => sq.subQuestionId === editingSubQuestionId)?.parentSubQuestionId ?? null : parentSubQuestionIdForNew,
+                                    selectedIndicator.indicatorId
+                                  ).toFixed(2)}%. Weights at this level must sum to 100%.
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label htmlFor="responseType" className="mb-2">
@@ -1129,44 +1395,78 @@ export default function AssessmentFramework() {
                           type="submit"
                           className="mt-4 bg-mint-secondary-blue hover:bg-mint-primary-blue"
                         >
-                          {editingSubQuestionId ? 'Update Sub-Question' : 'Save Sub-Question'}
+                          {editingSubQuestionId ? 'Update question' : 'Save question'}
                         </Button>
                       </form>
                     )}
 
                     <div className="space-y-2">
-                      {subQuestions.map((sq) => (
-                        <Card key={sq.subQuestionId} className="hover:bg-mint-light-gray">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-mint-dark-text mb-2">{sq.subQuestionText}</h3>
-                                <div className="flex gap-4 text-sm text-mint-dark-text/70">
-                                  <span>Weight: {sq.subWeightPercentage}%</span>
-                                  <span>Type: {sq.responseType}</span>
-                                  {sq.checkboxOptions && (
-                                    <span>Options: {sq.checkboxOptions}</span>
-                                  )}
+                      {selectedIndicator && (function renderSubQuestionTree(nodes) {
+                        if (!nodes || !nodes.length) return null;
+                        return nodes.map((sq) => (
+                          <div key={sq.subQuestionId}>
+                            <Card className={`hover:bg-mint-light-gray ${sq.depth > 1 ? 'bg-gray-50/80' : ''}`}>
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-mint-primary-blue/15 text-mint-primary-blue">
+                                        Level {sq.depth}
+                                      </span>
+                                      <h3 className="font-semibold text-mint-dark-text">{sq.subQuestionText}</h3>
+                                    </div>
+                                    <div className="flex gap-4 text-sm text-mint-dark-text/70">
+                                      <span>Weight: {sq.subWeightPercentage}%</span>
+                                      <span>Type: {sq.responseType}</span>
+                                      {sq.checkboxOptions && (
+                                        <span>Options: {sq.checkboxOptions}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="px-3 py-1 bg-mint-primary-blue/10 text-mint-primary-blue rounded text-sm font-semibold">
+                                    {sq.subWeightPercentage}%
+                                  </span>
                                 </div>
+                                {!isFrameworkLocked && (
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      onClick={() => handleEditSubQuestion(sq)}
+                                      variant="outline"
+                                      className="text-xs px-3"
+                                      title="Edit"
+                                    >
+                                      Edit
+                                    </Button>
+                                    {sq.depth < MAX_SUB_QUESTION_DEPTH && (
+                                      <Button
+                                        onClick={() => handleAddSubQuestionUnder(sq)}
+                                        variant="outline"
+                                        className="text-xs px-3"
+                                        title={`Add Level ${sq.depth + 1} question under this`}
+                                      >
+                                        + Add Level {sq.depth + 1} under this
+                                      </Button>
+                                    )}
+                                    <Button
+                                      onClick={() => handleDeleteSubQuestion(sq)}
+                                      variant="outline"
+                                      className="text-xs px-3 text-red-600 hover:text-red-700"
+                                      title="Delete"
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                            {sq.children && sq.children.length > 0 && (
+                              <div className="ml-6 mt-2 space-y-2 border-l-2 border-mint-medium-gray pl-4">
+                                {renderSubQuestionTree(sq.children)}
                               </div>
-                              <span className="px-3 py-1 bg-mint-primary-blue/10 text-mint-primary-blue rounded text-sm font-semibold">
-                                {sq.subWeightPercentage}%
-                              </span>
-                            </div>
-                            <Button
-                              onClick={() => handleEditSubQuestion(sq)}
-                              variant="outline"
-                              className="w-full text-xs px-3"
-                              title="Edit Sub-Question"
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Edit
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            )}
+                          </div>
+                        ));
+                      })(buildSubQuestionTree(selectedIndicator.indicatorId))}
                     </div>
                   </CardContent>
                 </Card>

@@ -8,1241 +8,11 @@ const STORAGE_KEYS = {
   SUB_QUESTIONS: 'egirs_sub_questions'
 };
 
-// Default assessment years (only used if localStorage is empty)
-const defaultAssessmentYears = [
-  // Example data
-  {
-    assessmentYearId: 1,
-    yearName: '2024 Assessment',
-    status: 'Active',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    assessmentYearId: 2,
-    yearName: '2025 Assessment',
-    status: 'Draft',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  }
-];
-
-// Default dimensions (only used if localStorage is empty)
-const defaultDimensions = [
-  // Dimensions for 2024 Assessment (based on UN EGDI)
-  {
-    dimensionId: 1,
-    assessmentYearId: 1,
-    dimensionName: 'Institutional Framework',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 2,
-    assessmentYearId: 1,
-    dimensionName: 'Content Provision',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 3,
-    assessmentYearId: 1,
-    dimensionName: 'Service Delivery',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 4,
-    assessmentYearId: 1,
-    dimensionName: 'Participation & Citizen Engagement',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 5,
-    assessmentYearId: 1,
-    dimensionName: 'Technology Enablement',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 6,
-    assessmentYearId: 1,
-    dimensionName: 'Digital Inclusion',
-    dimensionWeight: 16.65,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  // Dimensions for 2025 Assessment (same structure as 2024)
-  {
-    dimensionId: 7,
-    assessmentYearId: 2,
-    dimensionName: 'Institutional Framework',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 8,
-    assessmentYearId: 2,
-    dimensionName: 'Content Provision',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 9,
-    assessmentYearId: 2,
-    dimensionName: 'Service Delivery',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 10,
-    assessmentYearId: 2,
-    dimensionName: 'Participation & Citizen Engagement',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 11,
-    assessmentYearId: 2,
-    dimensionName: 'Technology Enablement',
-    dimensionWeight: 16.67,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    dimensionId: 12,
-    assessmentYearId: 2,
-    dimensionName: 'Digital Inclusion',
-    dimensionWeight: 16.65,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  }
-];
-
-// Default indicators (only used if localStorage is empty)
-const defaultIndicators = [
-  // Institutional Framework Indicators
-  {
-    indicatorId: 1,
-    dimensionId: 1,
-    indicatorName: 'E-Government Policy and Strategy',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 2,
-    dimensionId: 1,
-    indicatorName: 'Legal and Regulatory Framework',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 3,
-    dimensionId: 1,
-    indicatorName: 'Institutional Capacity and Coordination',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 4,
-    dimensionId: 1,
-    indicatorName: 'Data Governance and Privacy',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Content Provision Indicators
-  {
-    indicatorId: 5,
-    dimensionId: 2,
-    indicatorName: 'Government Website Availability',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 6,
-    dimensionId: 2,
-    indicatorName: 'Information Accessibility and Transparency',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 7,
-    dimensionId: 2,
-    indicatorName: 'Multilingual Content',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 8,
-    dimensionId: 2,
-    indicatorName: 'Content Currency and Updates',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 9,
-    dimensionId: 2,
-    indicatorName: 'Open Data Availability',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Service Delivery Indicators
-  {
-    indicatorId: 10,
-    dimensionId: 3,
-    indicatorName: 'Online Service Availability',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 11,
-    dimensionId: 3,
-    indicatorName: 'Service Integration and One-Stop Portal',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 12,
-    dimensionId: 3,
-    indicatorName: 'Mobile Service Delivery',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 13,
-    dimensionId: 3,
-    indicatorName: 'Service Quality and User Experience',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 14,
-    dimensionId: 3,
-    indicatorName: 'Digital Payment Integration',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Participation & Citizen Engagement Indicators
-  {
-    indicatorId: 15,
-    dimensionId: 4,
-    indicatorName: 'Citizen Feedback Mechanisms',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 16,
-    dimensionId: 4,
-    indicatorName: 'Public Consultation Platforms',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 17,
-    dimensionId: 4,
-    indicatorName: 'Social Media Engagement',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 18,
-    dimensionId: 4,
-    indicatorName: 'E-Participation Tools',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Technology Enablement Indicators
-  {
-    indicatorId: 19,
-    dimensionId: 5,
-    indicatorName: 'ICT Infrastructure',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Zone',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 20,
-    dimensionId: 5,
-    indicatorName: 'Network Connectivity and Bandwidth',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Zone',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 21,
-    dimensionId: 5,
-    indicatorName: 'Data Center and Cloud Services',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 22,
-    dimensionId: 5,
-    indicatorName: 'Cybersecurity Measures',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 23,
-    dimensionId: 5,
-    indicatorName: 'System Interoperability',
-    indicatorWeight: 20.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Digital Inclusion Indicators
-  {
-    indicatorId: 24,
-    dimensionId: 6,
-    indicatorName: 'Digital Literacy Programs',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 25,
-    dimensionId: 6,
-    indicatorName: 'Accessibility for Persons with Disabilities',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Woreda',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 26,
-    dimensionId: 6,
-    indicatorName: 'Rural and Remote Access',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Zone',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    indicatorId: 27,
-    dimensionId: 6,
-    indicatorName: 'Affordable Access Initiatives',
-    indicatorWeight: 25.00,
-    applicableUnitType: 'Region',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  }
-];
-
-// Default sub questions (only used if localStorage is empty)
-const defaultSubQuestions = [
-  // E-Government Policy and Strategy (Indicator 1)
-  {
-    subQuestionId: 1,
-    parentIndicatorId: 1,
-    subQuestionText: 'Does the organization have a documented e-government policy?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 2,
-    parentIndicatorId: 1,
-    subQuestionText: 'Is there a dedicated e-government strategy document?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 3,
-    parentIndicatorId: 1,
-    subQuestionText: 'What is the implementation status of the e-government strategy?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Not Started, In Planning, Partially Implemented, Fully Implemented',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 4,
-    parentIndicatorId: 1,
-    subQuestionText: 'Describe the key objectives and targets of the e-government strategy.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Legal and Regulatory Framework (Indicator 2)
-  {
-    subQuestionId: 5,
-    parentIndicatorId: 2,
-    subQuestionText: 'Are there laws governing electronic transactions and digital signatures?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 6,
-    parentIndicatorId: 2,
-    subQuestionText: 'Is there data protection and privacy legislation in place?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 7,
-    parentIndicatorId: 2,
-    subQuestionText: 'Describe the legal framework supporting e-government initiatives.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Institutional Capacity and Coordination (Indicator 3)
-  {
-    subQuestionId: 8,
-    parentIndicatorId: 3,
-    subQuestionText: 'Is there a dedicated e-government unit or department?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 9,
-    parentIndicatorId: 3,
-    subQuestionText: 'What mechanisms exist for inter-agency coordination?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Regular Meetings, Shared Platforms, Joint Committees, No Coordination',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 10,
-    parentIndicatorId: 3,
-    subQuestionText: 'What is the level of technical staff capacity?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Insufficient, Basic, Adequate, Advanced',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 11,
-    parentIndicatorId: 3,
-    subQuestionText: 'Describe the organizational structure for e-government management.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Data Governance and Privacy (Indicator 4)
-  {
-    subQuestionId: 12,
-    parentIndicatorId: 4,
-    subQuestionText: 'Is there a data governance policy in place?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 13,
-    parentIndicatorId: 4,
-    subQuestionText: 'Are privacy protection measures implemented?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 14,
-    parentIndicatorId: 4,
-    subQuestionText: 'Describe the data security and privacy measures implemented.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Government Website Availability (Indicator 5)
-  {
-    subQuestionId: 15,
-    parentIndicatorId: 5,
-    subQuestionText: 'Does the administrative unit have an official website?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 16,
-    parentIndicatorId: 5,
-    subQuestionText: 'What is the website availability status?',
-    subWeightPercentage: 50.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Fully Operational, Partially Operational, Under Development, Not Available',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Information Accessibility and Transparency (Indicator 6)
-  {
-    subQuestionId: 17,
-    parentIndicatorId: 6,
-    subQuestionText: 'Is organizational information publicly accessible online?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 18,
-    parentIndicatorId: 6,
-    subQuestionText: 'What types of information are published online?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Contact Information, Organizational Structure, Budget and Finance, Policies and Regulations, Service Information, Annual Reports',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 19,
-    parentIndicatorId: 6,
-    subQuestionText: 'Is there a freedom of information mechanism?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 20,
-    parentIndicatorId: 6,
-    subQuestionText: 'Describe the transparency and information disclosure practices.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Multilingual Content (Indicator 7)
-  {
-    subQuestionId: 21,
-    parentIndicatorId: 7,
-    subQuestionText: 'Is the website available in multiple languages?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 22,
-    parentIndicatorId: 7,
-    subQuestionText: 'Which languages are supported?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'English, Amharic, Oromifa, Tigrinya, Somali, Afar, Other Local Languages',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 23,
-    parentIndicatorId: 7,
-    subQuestionText: 'Describe the multilingual content strategy and implementation.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Content Currency and Updates (Indicator 8)
-  {
-    subQuestionId: 24,
-    parentIndicatorId: 8,
-    subQuestionText: 'How frequently is the website content updated?',
-    subWeightPercentage: 50.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Daily, Weekly, Monthly, Quarterly, Annually, Rarely or Never',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 25,
-    parentIndicatorId: 8,
-    subQuestionText: 'Is there a content management system in place?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Open Data Availability (Indicator 9)
-  {
-    subQuestionId: 26,
-    parentIndicatorId: 9,
-    subQuestionText: 'Is there an open data portal or platform?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 27,
-    parentIndicatorId: 9,
-    subQuestionText: 'What types of datasets are published?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Statistical Data, Budget Data, Service Data, Geographic Data, Administrative Data, Other',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 28,
-    parentIndicatorId: 9,
-    subQuestionText: 'Describe the open data initiative and data formats used.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Online Service Availability (Indicator 10)
-  {
-    subQuestionId: 29,
-    parentIndicatorId: 10,
-    subQuestionText: 'How many government services are available online?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'None, 1-5 services, 6-10 services, 11-20 services, More than 20 services',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 30,
-    parentIndicatorId: 10,
-    subQuestionText: 'What types of services are provided online?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Information Services, Download Forms, Online Applications, Payment Services, Status Tracking, Complaint Handling',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 31,
-    parentIndicatorId: 10,
-    subQuestionText: 'Can citizens complete transactions fully online?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 32,
-    parentIndicatorId: 10,
-    subQuestionText: 'Describe the online service delivery capabilities and examples.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Service Integration and One-Stop Portal (Indicator 11)
-  {
-    subQuestionId: 33,
-    parentIndicatorId: 11,
-    subQuestionText: 'Is there a one-stop portal for government services?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 34,
-    parentIndicatorId: 11,
-    subQuestionText: 'Describe the level of service integration across agencies.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Mobile Service Delivery (Indicator 12)
-  {
-    subQuestionId: 35,
-    parentIndicatorId: 12,
-    subQuestionText: 'Are services accessible via mobile devices?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 36,
-    parentIndicatorId: 12,
-    subQuestionText: 'What mobile platforms are supported?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Mobile Website, Android App, iOS App, SMS Services, USSD Services',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 37,
-    parentIndicatorId: 12,
-    subQuestionText: 'Describe mobile service delivery initiatives.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Service Quality and User Experience (Indicator 13)
-  {
-    subQuestionId: 38,
-    parentIndicatorId: 13,
-    subQuestionText: 'Is there a user feedback mechanism for online services?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 39,
-    parentIndicatorId: 13,
-    subQuestionText: 'What is the average service response time?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Same Day, 1-3 Days, 4-7 Days, 1-2 Weeks, More than 2 Weeks',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 40,
-    parentIndicatorId: 13,
-    subQuestionText: 'Are services designed with user-centered principles?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 41,
-    parentIndicatorId: 13,
-    subQuestionText: 'Describe user experience design and accessibility features.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Digital Payment Integration (Indicator 14)
-  {
-    subQuestionId: 42,
-    parentIndicatorId: 14,
-    subQuestionText: 'Are digital payment options available for government services?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 43,
-    parentIndicatorId: 14,
-    subQuestionText: 'What payment methods are supported?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Credit/Debit Cards, Mobile Money, Bank Transfer, Digital Wallets, Other',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 44,
-    parentIndicatorId: 14,
-    subQuestionText: 'Describe the digital payment infrastructure and security measures.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Citizen Feedback Mechanisms (Indicator 15)
-  {
-    subQuestionId: 45,
-    parentIndicatorId: 15,
-    subQuestionText: 'Are there online feedback forms or surveys?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 46,
-    parentIndicatorId: 15,
-    subQuestionText: 'What feedback channels are available?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Online Forms, Email, Phone, Social Media, In-Person, Other',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 47,
-    parentIndicatorId: 15,
-    subQuestionText: 'Describe how citizen feedback is collected and acted upon.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Public Consultation Platforms (Indicator 16)
-  {
-    subQuestionId: 48,
-    parentIndicatorId: 16,
-    subQuestionText: 'Are there online platforms for public consultation?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 49,
-    parentIndicatorId: 16,
-    subQuestionText: 'Describe public consultation mechanisms and participation levels.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Social Media Engagement (Indicator 17)
-  {
-    subQuestionId: 50,
-    parentIndicatorId: 17,
-    subQuestionText: 'Does the organization use social media for citizen engagement?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 51,
-    parentIndicatorId: 17,
-    subQuestionText: 'Which social media platforms are used?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Facebook, Twitter, Instagram, LinkedIn, YouTube, Telegram, Other',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 52,
-    parentIndicatorId: 17,
-    subQuestionText: 'Describe social media engagement strategy and activity levels.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // E-Participation Tools (Indicator 18)
-  {
-    subQuestionId: 53,
-    parentIndicatorId: 18,
-    subQuestionText: 'Are e-participation tools available for citizens?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 54,
-    parentIndicatorId: 18,
-    subQuestionText: 'Describe e-participation initiatives and citizen involvement.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // ICT Infrastructure (Indicator 19)
-  {
-    subQuestionId: 55,
-    parentIndicatorId: 19,
-    subQuestionText: 'What is the level of ICT infrastructure development?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Basic, Developing, Advanced, State-of-the-Art',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 56,
-    parentIndicatorId: 19,
-    subQuestionText: 'Are computer systems available for staff?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 57,
-    parentIndicatorId: 19,
-    subQuestionText: 'What percentage of staff have access to computers?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Less than 25%, 25-50%, 51-75%, 76-100%',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 58,
-    parentIndicatorId: 19,
-    subQuestionText: 'Describe the ICT infrastructure and hardware availability.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Network Connectivity and Bandwidth (Indicator 20)
-  {
-    subQuestionId: 59,
-    parentIndicatorId: 20,
-    subQuestionText: 'What is the internet connectivity status?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'No Internet, Dial-up, Broadband, Fiber Optic, Satellite',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 60,
-    parentIndicatorId: 20,
-    subQuestionText: 'What is the average internet bandwidth?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Less than 1 Mbps, 1-5 Mbps, 6-10 Mbps, 11-50 Mbps, More than 50 Mbps',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 61,
-    parentIndicatorId: 20,
-    subQuestionText: 'Describe network infrastructure and connectivity reliability.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Data Center and Cloud Services (Indicator 21)
-  {
-    subQuestionId: 62,
-    parentIndicatorId: 21,
-    subQuestionText: 'Is there a data center or cloud infrastructure?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 63,
-    parentIndicatorId: 21,
-    subQuestionText: 'Describe data center facilities and cloud service utilization.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Cybersecurity Measures (Indicator 22)
-  {
-    subQuestionId: 64,
-    parentIndicatorId: 22,
-    subQuestionText: 'Are cybersecurity measures implemented?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 65,
-    parentIndicatorId: 22,
-    subQuestionText: 'What cybersecurity measures are in place?',
-    subWeightPercentage: 25.00,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Firewall, Antivirus, Encryption, Access Controls, Security Audits, Incident Response Plan',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 66,
-    parentIndicatorId: 22,
-    subQuestionText: 'Is there a cybersecurity policy?',
-    subWeightPercentage: 25.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 67,
-    parentIndicatorId: 22,
-    subQuestionText: 'Describe cybersecurity framework and incident management.',
-    subWeightPercentage: 25.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // System Interoperability (Indicator 23)
-  {
-    subQuestionId: 68,
-    parentIndicatorId: 23,
-    subQuestionText: 'Are systems interoperable with other government systems?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 69,
-    parentIndicatorId: 23,
-    subQuestionText: 'Describe system interoperability standards and data exchange mechanisms.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Digital Literacy Programs (Indicator 24)
-  {
-    subQuestionId: 70,
-    parentIndicatorId: 24,
-    subQuestionText: 'Are digital literacy programs offered?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 71,
-    parentIndicatorId: 24,
-    subQuestionText: 'What types of digital literacy programs are available?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Basic Computer Skills, Internet Usage, E-Government Services, Mobile Applications, Online Safety',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 72,
-    parentIndicatorId: 24,
-    subQuestionText: 'Describe digital literacy initiatives and participation rates.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Accessibility for Persons with Disabilities (Indicator 25)
-  {
-    subQuestionId: 73,
-    parentIndicatorId: 25,
-    subQuestionText: 'Are websites and services accessible to persons with disabilities?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 74,
-    parentIndicatorId: 25,
-    subQuestionText: 'What accessibility features are implemented?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Screen Reader Support, Keyboard Navigation, Text Alternatives, High Contrast, Font Size Options, Sign Language Videos',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 75,
-    parentIndicatorId: 25,
-    subQuestionText: 'Describe accessibility measures and compliance with standards.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Rural and Remote Access (Indicator 26)
-  {
-    subQuestionId: 76,
-    parentIndicatorId: 26,
-    subQuestionText: 'Are services accessible in rural and remote areas?',
-    subWeightPercentage: 33.33,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 77,
-    parentIndicatorId: 26,
-    subQuestionText: 'What mechanisms exist for rural access?',
-    subWeightPercentage: 33.33,
-    responseType: 'MultipleSelectCheckbox',
-    checkboxOptions: 'Community Access Points, Mobile Units, Satellite Connectivity, Offline Capabilities, Local Service Centers',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 78,
-    parentIndicatorId: 26,
-    subQuestionText: 'Describe initiatives for extending services to rural and remote areas.',
-    subWeightPercentage: 33.34,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  
-  // Affordable Access Initiatives (Indicator 27)
-  {
-    subQuestionId: 79,
-    parentIndicatorId: 27,
-    subQuestionText: 'Are there initiatives to make digital services affordable?',
-    subWeightPercentage: 50.00,
-    responseType: 'Yes/No',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  },
-  {
-    subQuestionId: 80,
-    parentIndicatorId: 27,
-    subQuestionText: 'Describe affordable access programs and subsidies.',
-    subWeightPercentage: 50.00,
-    responseType: 'TextExplanation',
-    checkboxOptions: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z'
-  }
-];
+// No default data: frameworks are created by admin and flow to contributors in real time
+const defaultAssessmentYears = [];
+const defaultDimensions = [];
+const defaultIndicators = [];
+const defaultSubQuestions = [];
 
 // Load functions for localStorage
 const loadAssessmentYears = () => {
@@ -1285,7 +55,11 @@ const loadSubQuestions = () => {
   if (typeof window === 'undefined') return [...defaultSubQuestions];
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.SUB_QUESTIONS);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Normalize: ensure parentSubQuestionId exists (backward compatibility)
+      return parsed.map(sq => ({ ...sq, parentSubQuestionId: sq.parentSubQuestionId ?? null }));
+    }
   } catch (error) {
     console.error('Error loading sub questions from localStorage:', error);
   }
@@ -1365,6 +139,11 @@ export const getAllAssessmentYears = () => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
   return [...assessmentYears];
 };
+/** Returns only assessment years with status Active (for data contributor selection, surveys, etc.). */
+export const getActiveAssessmentYears = () => {
+  assessmentYears = loadAssessmentYears();
+  return assessmentYears.filter(y => y.status === ASSESSMENT_STATUS.ACTIVE);
+};
 export const getAssessmentYearById = (id) => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
   return assessmentYears.find(y => y.assessmentYearId === id);
@@ -1377,6 +156,8 @@ export const createAssessmentYear = (yearData) => {
       : 1,
     yearName: yearData.yearName,
     status: yearData.status || ASSESSMENT_STATUS.DRAFT,
+    startDate: yearData.startDate || null,
+    endDate: yearData.endDate || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -1397,6 +178,45 @@ export const updateAssessmentYear = (id, yearData) => {
     return assessmentYears[index];
   }
   return null;
+};
+
+/**
+ * Closes (sets to Archived) any Active assessment years whose endDate has passed.
+ * Call on app load or periodically so deadlines auto-close.
+ * @returns {number[]} IDs of years that were closed
+ */
+export const closeAssessmentYearsPastDeadline = () => {
+  assessmentYears = loadAssessmentYears();
+  const now = new Date().toISOString();
+  const toClose = assessmentYears.filter(
+    y => y.status === ASSESSMENT_STATUS.ACTIVE && y.endDate && y.endDate < now
+  );
+  toClose.forEach(y => {
+    y.status = ASSESSMENT_STATUS.ARCHIVED;
+    y.updatedAt = new Date().toISOString();
+  });
+  if (toClose.length > 0) {
+    saveAssessmentYears(assessmentYears);
+  }
+  return toClose.map(y => y.assessmentYearId);
+};
+
+/**
+ * Get time remaining until assessment end date (for countdown display).
+ * @param {{ endDate?: string | null }} year - Assessment year with optional endDate (ISO string)
+ * @returns {{ days: number, hours: number, isOverdue: boolean } | null} null if no endDate
+ */
+export const getAssessmentYearTimeRemaining = (year) => {
+  if (!year || !year.endDate) return null;
+  const end = new Date(year.endDate);
+  const now = new Date();
+  const ms = end.getTime() - now.getTime();
+  if (Number.isNaN(ms)) return null;
+  const isOverdue = ms <= 0;
+  const absMs = Math.abs(ms);
+  const days = Math.floor(absMs / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((absMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  return { days, hours, isOverdue };
 };
 
 // Dimensions
@@ -1514,28 +334,87 @@ export const deleteIndicator = (id) => {
   return null;
 };
 
-// Sub-Questions
+// Sub-Questions (up to 3 levels: Level 1 under indicator, Level 2 under Level 1, Level 3 under Level 2)
+export const MAX_SUB_QUESTION_DEPTH = 3;
+
 export const getSubQuestionsByIndicator = (indicatorId) => {
   subQuestions = loadSubQuestions(); // Reload to ensure latest data
   return subQuestions.filter(sq => sq.parentIndicatorId === indicatorId);
+};
+/** Returns direct children of a parent. parentSubQuestionId null = Level 1 under indicator. */
+export const getSubQuestionsByParentSubQuestion = (parentSubQuestionId, indicatorId) => {
+  subQuestions = loadSubQuestions();
+  return subQuestions.filter(sq =>
+    sq.parentIndicatorId === indicatorId && (sq.parentSubQuestionId ?? null) === parentSubQuestionId
+  );
+};
+
+/** Total weight of direct children under a parent. Siblings at each level should sum to 100%. */
+export const getTotalSubQuestionWeightUnderParent = (parentSubQuestionId, indicatorId) => {
+  subQuestions = loadSubQuestions();
+  const children = parentSubQuestionId == null
+    ? subQuestions.filter(sq => sq.parentIndicatorId === indicatorId && (sq.parentSubQuestionId ?? null) === null)
+    : subQuestions.filter(sq => sq.parentSubQuestionId === parentSubQuestionId);
+  return children.reduce((sum, sq) => sum + sq.subWeightPercentage, 0);
+};
+
+/** Builds a tree with up to 3 levels; each node has { ...sq, depth, children }. */
+function buildSubQuestionTreeRecursive(indicatorId, parentSubQuestionId, depth) {
+  if (depth > MAX_SUB_QUESTION_DEPTH) return [];
+  subQuestions = loadSubQuestions();
+  const all = subQuestions.filter(sq => sq.parentIndicatorId === indicatorId);
+  const direct = all.filter(sq => (sq.parentSubQuestionId ?? null) === parentSubQuestionId);
+  return direct.map(sq => ({
+    ...sq,
+    depth,
+    children: buildSubQuestionTreeRecursive(indicatorId, sq.subQuestionId, depth + 1)
+  }));
+}
+
+export const buildSubQuestionTree = (indicatorId) => {
+  return buildSubQuestionTreeRecursive(indicatorId, null, 1);
+};
+
+/** Flattens tree in display order (parent then its children, depth-first). */
+function flattenTree(nodes) {
+  const out = [];
+  function walk(list) {
+    if (!list || !list.length) return;
+    list.forEach(node => {
+      out.push(node);
+      walk(node.children);
+    });
+  }
+  walk(nodes);
+  return out;
+}
+
+/** Returns all sub-questions for an indicator in tree order (Level 1, then each Level 2, then each Level 3). */
+export const getSubQuestionsInTreeOrder = (indicatorId) => {
+  return flattenTree(buildSubQuestionTree(indicatorId));
 };
 export const getSubQuestionById = (id) => {
   subQuestions = loadSubQuestions(); // Reload to ensure latest data
   return subQuestions.find(sq => sq.subQuestionId === id);
 };
+/** Total weight of Level 1 sub-questions under indicator (should sum to 100%). */
 export const getTotalSubQuestionWeight = (indicatorId) => {
-  subQuestions = loadSubQuestions(); // Reload to ensure latest data
-  return subQuestions
-    .filter(sq => sq.parentIndicatorId === indicatorId)
-    .reduce((sum, sq) => sum + sq.subWeightPercentage, 0);
+  return getTotalSubQuestionWeightUnderParent(null, indicatorId);
 };
 export const createSubQuestion = (subQuestionData) => {
   subQuestions = loadSubQuestions(); // Reload to ensure latest data
+  const parentSubQuestionId = subQuestionData.parentSubQuestionId ?? null;
+  let parentIndicatorId = subQuestionData.parentIndicatorId;
+  if (parentSubQuestionId != null) {
+    const parent = subQuestions.find(sq => sq.subQuestionId === parentSubQuestionId);
+    if (parent) parentIndicatorId = parent.parentIndicatorId;
+  }
   const newSubQuestion = {
-    subQuestionId: subQuestions.length > 0 
-      ? Math.max(...subQuestions.map(sq => sq.subQuestionId)) + 1 
+    subQuestionId: subQuestions.length > 0
+      ? Math.max(...subQuestions.map(sq => sq.subQuestionId)) + 1
       : 1,
-    parentIndicatorId: subQuestionData.parentIndicatorId,
+    parentIndicatorId,
+    parentSubQuestionId,
     subQuestionText: subQuestionData.subQuestionText,
     subWeightPercentage: parseFloat(subQuestionData.subWeightPercentage),
     responseType: subQuestionData.responseType,
@@ -1551,10 +430,17 @@ export const updateSubQuestion = (id, subQuestionData) => {
   subQuestions = loadSubQuestions(); // Reload to ensure latest data
   const index = subQuestions.findIndex(sq => sq.subQuestionId === id);
   if (index !== -1) {
+    const existing = subQuestions[index];
+    const payload = { ...subQuestionData };
+    if (payload.parentIndicatorId === undefined) payload.parentIndicatorId = existing.parentIndicatorId;
+    if (payload.parentSubQuestionId === undefined) payload.parentSubQuestionId = existing.parentSubQuestionId ?? null;
+    if (payload.checkboxOptions !== undefined && Array.isArray(payload.checkboxOptions)) {
+      payload.checkboxOptions = payload.checkboxOptions.join(',');
+    }
     subQuestions[index] = {
-      ...subQuestions[index],
-      ...subQuestionData,
-      subWeightPercentage: parseFloat(subQuestionData.subWeightPercentage || subQuestions[index].subWeightPercentage),
+      ...existing,
+      ...payload,
+      subWeightPercentage: parseFloat(payload.subWeightPercentage ?? existing.subWeightPercentage),
       updatedAt: new Date().toISOString()
     };
     saveSubQuestions(subQuestions);
@@ -1562,14 +448,87 @@ export const updateSubQuestion = (id, subQuestionData) => {
   }
   return null;
 };
+/**
+ * Validates that an assessment year is ready to be activated: dimensions, indicators,
+ * and all levels of sub-questions must have weights summing to 100%.
+ * @param {number} yearId - Assessment year ID
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export const validateAssessmentYearForActivation = (yearId) => {
+  const errors = [];
+  dimensions = loadDimensions();
+  indicators = loadIndicators();
+  subQuestions = loadSubQuestions();
+
+  const dims = dimensions.filter(d => d.assessmentYearId === yearId);
+  if (dims.length === 0) {
+    errors.push('Add at least one dimension. Dimension weights must total 100%.');
+    return { valid: false, errors };
+  }
+
+  const dimTotal = dims.reduce((sum, d) => sum + d.dimensionWeight, 0);
+  if (Math.abs(dimTotal - 100) > 0.01) {
+    errors.push(`Dimension weights total ${dimTotal.toFixed(2)}%. They must total 100% for the assessment year to be active.`);
+  }
+
+  dims.forEach(dim => {
+    const inds = indicators.filter(i => i.dimensionId === dim.dimensionId);
+    if (inds.length === 0) {
+      errors.push(`Dimension "${dim.dimensionName}" has no indicators. Add indicators and set their weights to total 100%.`);
+    } else {
+      const indTotal = inds.reduce((sum, i) => sum + i.indicatorWeight, 0);
+      if (Math.abs(indTotal - 100) > 0.01) {
+        errors.push(`Dimension "${dim.dimensionName}": indicator weights total ${indTotal.toFixed(2)}%. They must total 100%.`);
+      }
+    }
+
+    inds.forEach(ind => {
+      const tree = buildSubQuestionTreeRecursive(ind.indicatorId, null, 1);
+      const level1Total = getTotalSubQuestionWeightUnderParent(null, ind.indicatorId);
+      if (tree.length > 0 && Math.abs(level1Total - 100) > 0.01) {
+        errors.push(`Indicator "${ind.indicatorName}": Level 1 question weights total ${level1Total.toFixed(2)}%. They must total 100%.`);
+      }
+      tree.forEach(l1 => {
+        if (l1.children && l1.children.length > 0) {
+          const level2Total = getTotalSubQuestionWeightUnderParent(l1.subQuestionId, ind.indicatorId);
+          if (Math.abs(level2Total - 100) > 0.01) {
+            const label = (l1.subQuestionText && l1.subQuestionText.length > 45) ? l1.subQuestionText.slice(0, 45) + '…' : (l1.subQuestionText || 'Level 1');
+            errors.push(`Indicator "${ind.indicatorName}" (${label}): Level 2 weights total ${level2Total.toFixed(2)}%. They must total 100%.`);
+          }
+          l1.children.forEach(l2 => {
+            if (l2.children && l2.children.length > 0) {
+              const level3Total = getTotalSubQuestionWeightUnderParent(l2.subQuestionId, ind.indicatorId);
+              if (Math.abs(level3Total - 100) > 0.01) {
+                errors.push(`Indicator "${ind.indicatorName}": Level 3 question weights total ${level3Total.toFixed(2)}%. They must total 100%.`);
+              }
+            }
+          });
+        }
+      });
+    });
+  });
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
+/** Collect id and all descendant ids (recursive). */
+function collectDescendantIds(subQuestionsList, parentId, outSet) {
+  subQuestionsList.filter(sq => sq.parentSubQuestionId === parentId).forEach(sq => {
+    outSet.add(sq.subQuestionId);
+    collectDescendantIds(subQuestionsList, sq.subQuestionId, outSet);
+  });
+}
+
 export const deleteSubQuestion = (id) => {
   subQuestions = loadSubQuestions(); // Reload to ensure latest data
-  const index = subQuestions.findIndex(sq => sq.subQuestionId === id);
-  if (index !== -1) {
-    const deleted = subQuestions.splice(index, 1)[0];
-    saveSubQuestions(subQuestions);
-    return deleted;
-  }
-  return null;
+  const idsToRemove = new Set([id]);
+  collectDescendantIds(subQuestions, id, idsToRemove);
+  const deleted = subQuestions.find(sq => sq.subQuestionId === id) || null;
+  const remaining = subQuestions.filter(sq => !idsToRemove.has(sq.subQuestionId));
+  saveSubQuestions(remaining);
+  return deleted;
 };
 

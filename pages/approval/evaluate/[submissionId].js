@@ -140,7 +140,9 @@ export default function EvaluateSubmission() {
       if (result) {
         setShowApproveModal(false);
         loadSubmissionDetails(parseInt(submissionId));
-        
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('submissionUpdated', { detail: { submissionId: result.submissionId } }));
+        }
         if (result.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
           setSuccessMessage('✅ Approval submitted successfully! The submission has been sent to the Central Committee for final validation. You will be redirected to the approval queue.');
           setTimeout(() => {
@@ -195,6 +197,9 @@ export default function EvaluateSubmission() {
         loadSubmissionDetails(parseInt(submissionId));
         setShowRejectModal(false);
         setRejectionReasons(prev => ({ ...prev, ['submission']: '' }));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('submissionUpdated', { detail: { submissionId: result.submissionId } }));
+        }
         setSuccessMessage('⚠️ Submission rejected. The submission has been sent back to the Data Contributor for revision. You will be redirected to the approval queue.');
         setTimeout(() => {
           router.push('/approval/queue');
