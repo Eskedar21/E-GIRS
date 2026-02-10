@@ -31765,20 +31765,41 @@ export const getResponseBySubQuestion = (submissionId, subQuestionId) => {
 // --- Subjective scoring (User Story 001) ---
 // Store: { responseId, committeeMemberId, assignedScore } (AssignedScore: 0 | 0.5 | 1)
 let subjectiveScores = [];
+// Track which committee members have submitted their scoring to the Chairman (submission stays VALIDATED; Chairman sees list and finalizes when ready)
+let scoringSubmittedToChairman = [];
 
 const RESPONSE_TYPE_TEXT_EXPLANATION = 'TextExplanation';
 
-/** Submissions that are Validated and have at least one response to a sub-question with ResponseType Text Explanation. */
+/** For scoring: exclude Federal Institute units (no scoring calc) and keep one submission per (unitId, assessmentYearId). */
+function filterScoringList(submissionList) {
+  const { getUnitById } = require('./administrativeUnits');
+  const nonFederal = submissionList.filter(sub => {
+    const unit = getUnitById(sub.unitId);
+    return unit && unit.unitType !== 'Federal Institute';
+  });
+  const byUnitYear = {};
+  nonFederal.forEach(sub => {
+    const key = `${sub.unitId}-${sub.assessmentYearId}`;
+    const existing = byUnitYear[key];
+    const subDate = new Date(sub.updatedAt || sub.submittedDate || 0).getTime();
+    const existingDate = existing ? new Date(existing.updatedAt || existing.submittedDate || 0).getTime() : -1;
+    if (!existing || subDate > existingDate) byUnitYear[key] = sub;
+  });
+  return Object.values(byUnitYear);
+}
+
+/** Submissions that are Validated and have at least one response to a sub-question with ResponseType Text Explanation. Excludes federal institutes; one per unit per assessment year. */
 export const getSubmissionsForSubjectiveScoring = () => {
   const { getSubQuestionById } = require('./assessmentFramework');
   const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-  return validated.filter(sub => {
+  const withSubjective = validated.filter(sub => {
     const submissionResponses = getResponsesBySubmission(sub.submissionId);
     return submissionResponses.some(r => {
       const sq = getSubQuestionById(r.subQuestionId);
       return sq && sq.responseType === RESPONSE_TYPE_TEXT_EXPLANATION && r.responseValue && String(r.responseValue).trim() !== '';
     });
   });
+  return filterScoringList(withSubjective);
 };
 
 /** Responses for this submission where the sub-question has ResponseType Text Explanation (with subQuestion attached). */
@@ -31842,34 +31863,57 @@ export const assignSubjectiveScore = (responseId, committeeMemberId, assignedSco
   return { responseId, committeeMemberId, assignedScore: parsed };
 };
 
-/** Submit scoring to Chairman: only when all subjective responses have at least one score. Sets status to Pending Chairman Approval. */
-export const submitScoringToChairman = (submissionId) => {
+/** Record that a committee member has submitted their scoring to the Chairman. Submission stays VALIDATED; Chairman queue shows it once at least one member has submitted. */
+export const submitMyScoringToChairman = (submissionId, committeeMemberId) => {
   const submission = getSubmissionById(submissionId);
   if (!submission || submission.submissionStatus !== SUBMISSION_STATUS.VALIDATED) {
     throw new Error('Submission not found or not in Validated status.');
   }
   const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
-  const allScored = subjectiveResponses.length > 0 && subjectiveResponses.every(
-    r => getSubjectiveScoresByResponse(r.responseId).length > 0
-  );
-  if (!allScored) {
-    throw new Error('All subjective responses must have at least one score before submitting to the Chairman.');
+  if (subjectiveResponses.length === 0) {
+    throw new Error('No subjective responses to score.');
   }
-  submission.submissionStatus = SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL;
-  submission.updatedAt = new Date().toISOString();
-  return submission;
+  const mid = Number(committeeMemberId);
+  const hasScoredAll = subjectiveResponses.every(r =>
+    getSubjectiveScoresByResponse(r.responseId).some(s => Number(s.committeeMemberId) === mid)
+  );
+  if (!hasScoredAll) {
+    throw new Error('You must score all answers before submitting to the Chairman.');
+  }
+  const existing = scoringSubmittedToChairman.find(
+    e => e.submissionId === submissionId && e.committeeMemberId === mid
+  );
+  if (!existing) {
+    scoringSubmittedToChairman.push({
+      submissionId: Number(submissionId),
+      committeeMemberId: mid,
+      submittedAt: new Date().toISOString()
+    });
+  }
+  return { submissionId, committeeMemberId };
 };
 
-/** Submissions awaiting Chairman's final approval of scores (status = Pending Chairman Approval). */
+/** Who has submitted their scoring to the Chairman for this submission. */
+export const getScoringSubmissionsToChairman = (submissionId) => {
+  return scoringSubmittedToChairman.filter(e => e.submissionId === Number(submissionId));
+};
+
+/** Submissions that have at least one committee member's scoring submitted to Chairman (so Chairman can see list and finalize when ready). Excludes federal; one per unit per year. */
 export const getSubmissionsPendingChairmanScoringApproval = () => {
-  return getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL);
+  const withSubjective = getSubmissionsForSubjectiveScoring();
+  const filtered = filterScoringList(withSubjective);
+  return filtered.filter(sub => getScoringSubmissionsToChairman(sub.submissionId).length > 0);
 };
 
-/** Chairman submits final scores: overrides optional per responseId, then sets submission to Scoring Complete. */
+/** Chairman finalizes approval: overrides optional per responseId, then sets submission to Scoring Complete. Submission may be VALIDATED (members submitted) or legacy PENDING_CHAIRMAN_APPROVAL. */
 export const submitChairmanScoringApproval = (submissionId, overrides) => {
   const submission = getSubmissionById(submissionId);
-  if (!submission || submission.submissionStatus !== SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL) {
-    throw new Error('Submission not found or not pending Chairman approval.');
+  const canFinalize = submission && (
+    submission.submissionStatus === SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL ||
+    submission.submissionStatus === SUBMISSION_STATUS.VALIDATED
+  );
+  if (!submission || !canFinalize) {
+    throw new Error('Submission not found or not available for Chairman approval.');
   }
   const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
   subjectiveResponses.forEach(r => {

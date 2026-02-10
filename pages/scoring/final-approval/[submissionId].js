@@ -11,6 +11,7 @@ import {
   getSubjectiveResponsesForSubmission,
   getSubjectiveScoresByResponse,
   getComputedAverageScore,
+  getScoringSubmissionsToChairman,
   submitChairmanScoringApproval,
   SUBMISSION_STATUS
 } from '../../../data/submissions';
@@ -161,7 +162,9 @@ export default function ChairmanFinalApprovalEvaluate() {
     );
   }
 
-  const isPending = submission.submissionStatus === SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL;
+  const submittedCount = getScoringSubmissionsToChairman(submission.submissionId).length;
+  const isPending = submission.submissionStatus === SUBMISSION_STATUS.PENDING_CHAIRMAN_APPROVAL ||
+    (submission.submissionStatus === SUBMISSION_STATUS.VALIDATED && submittedCount > 0);
 
   return (
     <ProtectedRoute allowedRoles={['Chairman (CC)', 'Secretary (CC)']}>
@@ -223,7 +226,14 @@ export default function ChairmanFinalApprovalEvaluate() {
                 </div>
                 <div className="mb-6">
                   <h1 className="text-2xl font-bold text-mint-primary-blue">Scoring summary: {getUnitName(submission.unitId)}</h1>
-                  <p className="text-sm text-mint-dark-text/70 mt-1">One aggregated scoring per unit. Submission #{submission.submissionId}</p>
+                  <p className="text-sm text-mint-dark-text/70 mt-1">
+                    One aggregated scoring per unit. Submission #{submission.submissionId}
+                    {submittedCount > 0 && (
+                      <span className="ml-2 text-mint-primary-blue font-medium">
+                        — {submittedCount} of {allCommitteeMembers.length} committee member{submittedCount !== 1 ? 's' : ''} have submitted. Finalize when ready.
+                      </span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="space-y-6">

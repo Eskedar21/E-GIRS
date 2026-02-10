@@ -177,8 +177,24 @@ export default function ApprovalQueue() {
           })
         });
       }
+
+      // Remove the first submission from each approval queue (each status group).
+      // Queue default sort is submittedDate desc, so "first" = latest submitted per status.
+      const byStatus = {};
+      submissions.forEach(s => {
+        if (!byStatus[s.submissionStatus]) byStatus[s.submissionStatus] = [];
+        byStatus[s.submissionStatus].push(s);
+      });
+      const withoutFirstPerQueue = Object.values(byStatus).flatMap(group => {
+        const sorted = [...group].sort((a, b) => {
+          const aDate = new Date(a.submittedDate || a.createdAt || 0).getTime();
+          const bDate = new Date(b.submittedDate || b.createdAt || 0).getTime();
+          return bDate - aDate; // desc
+        });
+        return sorted.slice(1); // drop first
+      });
       
-      setAllSubmissions(submissions);
+      setAllSubmissions(withoutFirstPerQueue);
     };
     
     loadSubmissions();

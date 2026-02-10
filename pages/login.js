@@ -82,18 +82,22 @@ export default function Login() {
       <Head>
         <title>Login | E-GIRS</title>
       </Head>
-      <div className="min-h-screen bg-mint-medium-gray/50 flex">
-        <div className="w-full flex min-h-screen">
-          {/* Left panel - Login form (50%), vertically centered */}
-          <div className="w-full lg:w-1/2 flex-shrink-0 flex items-center justify-center min-h-screen bg-white p-8 md:p-10 lg:p-12">
-            <div className="w-full max-w-md flex flex-col">
-            <div className="flex items-center gap-3 mb-12">
-              <img src="/logo.png" alt="MInT" className="h-10 w-auto object-contain" />
-              <span className="text-xl font-bold text-mint-dark-text">E-GIRS</span>
+      <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+        <div className="w-full flex flex-col lg:flex-row min-h-screen">
+          {/* Left panel - Login form: full width on small, 50% on lg; larger padding at all sizes */}
+          <div className="w-full lg:w-1/2 flex-shrink-0 flex items-center justify-center min-h-0 flex-1 lg:min-h-screen bg-white p-6 sm:p-8 md:p-10 lg:p-16 order-2 lg:order-1">
+            <div className="w-full max-w-lg flex flex-col">
+            <div className="flex items-center gap-4 mb-10 sm:mb-14">
+              <img src="/logo.png" alt="MInT" className="h-12 w-auto object-contain flex-shrink-0" />
+              <div className="w-px self-stretch min-h-[2.5rem] bg-mint-primary-blue flex-shrink-0" aria-hidden />
+              <div className="flex flex-col justify-center leading-tight">
+                <span className="text-xl sm:text-2xl font-bold text-mint-secondary-blue uppercase tracking-tight">E-GIRS</span>
+                <span className="text-sm font-bold text-mint-dark-text mt-0.5">E-Government Index Reporting System</span>
+              </div>
             </div>
 
-            <h1 className="text-3xl font-bold text-mint-dark-text mb-2">Welcome Back</h1>
-            <p className="text-mint-dark-text/70 text-sm mb-8">
+            <h1 className="text-4xl font-bold text-mint-dark-text mb-3">Welcome Back</h1>
+            <p className="text-mint-dark-text/70 text-base mb-8 sm:mb-10">
               Enter your username and password to access your account.
             </p>
 
@@ -127,7 +131,7 @@ export default function Login() {
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {loginError && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                   {loginError}
@@ -141,14 +145,14 @@ export default function Login() {
                 </div>
               )}
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-mint-dark-text mb-1.5">Username</label>
+                <label htmlFor="username" className="block text-base font-medium text-mint-dark-text mb-2">Username</label>
                 <input
                   type="text"
                   id="username"
                   name="username"
                   value={formData.username}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue/50 ${
+                  className={`w-full px-4 py-3 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue/50 ${
                     errors.username ? 'border-red-500' : 'border-mint-medium-gray'
                   }`}
                   placeholder="Enter your username"
@@ -156,7 +160,7 @@ export default function Login() {
                 {errors.username && <p className="mt-1 text-xs text-red-500">{errors.username}</p>}
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-mint-dark-text mb-1.5">Password</label>
+                <label htmlFor="password" className="block text-base font-medium text-mint-dark-text mb-2">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -164,7 +168,7 @@ export default function Login() {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2.5 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue/50 ${
+                    className={`w-full px-4 py-3 pr-12 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue/50 ${
                       errors.password ? 'border-red-500' : 'border-mint-medium-gray'
                     }`}
                     placeholder="Enter your password"
@@ -172,7 +176,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,7 +204,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting || isLoading}
-                className="w-full bg-mint-primary-blue hover:bg-mint-secondary-blue text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-mint-primary-blue hover:bg-mint-secondary-blue text-white font-semibold py-3.5 text-base rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -216,33 +220,21 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-mint-medium-gray flex flex-wrap items-center justify-between gap-2 text-xs text-mint-dark-text/70">
+            <div className="mt-10 pt-8 border-t border-mint-medium-gray flex flex-wrap items-center justify-between gap-2 text-sm text-mint-dark-text/70">
               <span>© 2025 Ministry of Innovation and Technology</span>
               <Link href="#" className="text-mint-primary-blue hover:underline">Privacy Policy</Link>
             </div>
             </div>
           </div>
 
-          {/* Right panel (50%): relevant appealing bg image + green overlay, concept-style text (like example) */}
-          <div className="hidden lg:flex lg:w-1/2 flex-col py-10 px-8 xl:py-12 xl:px-12 relative overflow-hidden min-w-0 items-center justify-center rounded-l-[4rem] xl:rounded-l-[5rem] shadow-[-8px_0_24px_rgba(0,0,0,0.08)]">
-            {/* Relevant appealing image – people/collaboration (like example) */}
-            <div className="absolute inset-0 z-0 rounded-l-[4rem] xl:rounded-l-[5rem] bg-cover bg-center" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800)' }} />
-            {/* Green/teal overlay so text stays readable */}
-            <div className="absolute inset-0 z-[1] rounded-l-[4rem] xl:rounded-l-[5rem] bg-gradient-to-br from-[#0a4f57]/90 via-[#0d6670]/85 to-[#0a4f57]/90" />
-            {/* Subtle soft shapes */}
-            <div className="absolute inset-0 z-[2] rounded-l-[4rem] xl:rounded-l-[5rem] overflow-hidden">
+          {/* Right panel: same image + green overlay on all screen sizes; visible on mobile (top) and lg (right) */}
+          <div className="w-full lg:w-1/2 flex-shrink-0 flex flex-col relative overflow-hidden min-w-0 min-h-[36vh] sm:min-h-[40vh] lg:min-h-screen rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-none lg:rounded-l-[4rem] xl:rounded-l-[5rem] shadow-[0_8px_24px_rgba(0,0,0,0.08)] lg:shadow-[-8px_0_24px_rgba(0,0,0,0.08)] order-1 lg:order-2">
+            <div className="absolute inset-0 z-0 rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/login.png)' }} />
+            <div className="absolute inset-0 z-[1] rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] bg-gradient-to-br from-[#0a4f57]/90 via-[#0d6670]/85 to-[#0a4f57]/90" />
+            <div className="absolute inset-0 z-[2] rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] overflow-hidden pointer-events-none">
               <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-white/10 blur-3xl" />
               <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-mint-primary-blue/40 blur-3xl" />
               <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
-            </div>
-            <div className="relative z-10 w-full max-w-xl flex flex-col items-start text-left px-2">
-              <h2 className="text-2xl xl:text-4xl font-bold text-white uppercase leading-tight tracking-tight">
-                <span className="block">Calculating and tracking the national</span>
-                <span className="block mt-4">e-Government index</span>
-              </h2>
-              <p className="mt-6 text-sm xl:text-base text-white/70 font-normal max-w-lg">
-                A platform for the Ministry of Innovation and Technology to run the scoring engine, manage dimensions, and view unit scorecards across Ethiopia.
-              </p>
             </div>
           </div>
         </div>

@@ -9,9 +9,11 @@ import {
   getSubmissionsPendingChairmanScoringApproval,
   getSubmissionById,
   getSubjectiveResponsesForSubmission,
+  getScoringSubmissionsToChairman,
   SUBMISSION_STATUS
 } from '../../../data/submissions';
 import { getUnitById, getAllUnits } from '../../../data/administrativeUnits';
+import { getUsersByRole } from '../../../data/users';
 import { filterSubmissionsByAccess } from '../../../utils/permissions';
 import { getAssessmentYearById } from '../../../data/assessmentFramework';
 
@@ -45,7 +47,6 @@ export default function ChairmanFinalApprovalQueue() {
         const unit = getUnitById(s.unitId);
         if (!unit) return false;
         const map = {
-          federal: 'Federal Institute',
           region: 'Region',
           city: 'City Administration',
           zone: 'Zone',
@@ -167,7 +168,6 @@ export default function ChairmanFinalApprovalQueue() {
                       className="w-full px-4 py-2 border border-mint-medium-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue bg-white text-mint-dark-text"
                     >
                       <option value="all">All</option>
-                      <option value="federal">Federal Institute</option>
                       <option value="region">Region</option>
                       <option value="city">City Administration</option>
                       <option value="zone">Zone</option>
@@ -215,11 +215,14 @@ export default function ChairmanFinalApprovalQueue() {
                         <tbody className="bg-white divide-y divide-mint-medium-gray">
                           {paginatedSubmissions.map((sub) => {
                             const subjectiveCount = getSubjectiveResponsesForSubmission(sub.submissionId).length;
+                            const committeeMembers = getUsersByRole('Central Committee Member') || [];
+                            const submittedCount = getScoringSubmissionsToChairman(sub.submissionId).length;
                             return (
                               <tr key={sub.submissionId} className="hover:bg-mint-light-gray/50">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className="text-sm font-medium text-mint-dark-text">#{sub.submissionId}</span>
                                   <p className="text-xs text-mint-dark-text/60 truncate max-w-[180px]">{sub.submissionName || '—'}</p>
+                                  <p className="text-xs text-mint-primary-blue mt-0.5">{submittedCount} of {committeeMembers.length} members have submitted</p>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">{getUnitName(sub.unitId)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-mint-dark-text">

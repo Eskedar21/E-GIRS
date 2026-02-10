@@ -12,10 +12,12 @@ import {
   getSubjectiveScoresByResponse,
   getFinalSubQuestionScore,
   assignSubjectiveScore,
-  submitScoringToChairman,
+  submitMyScoringToChairman,
+  getScoringSubmissionsToChairman,
   SUBMISSION_STATUS
 } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
+import { getUsersByRole } from '../../../data/users';
 import { getDimensionsByYear, getIndicatorsByDimension, getAssessmentYearById } from '../../../data/assessmentFramework';
 
 const SCORE_OPTIONS = [
@@ -93,18 +95,26 @@ export default function ScoreSubjectiveSubmission() {
     return unit ? unit.officialUnitName : 'Unknown';
   };
 
+  const committeeMembers = useMemo(() => getUsersByRole('Central Committee Member') || [], []);
+
   // Current user must have scored every response (in state or already saved)
   const allScoredByMe = subjectiveResponses.length > 0 && subjectiveResponses.every(r =>
     (scores[r.responseId] !== undefined && scores[r.responseId] !== null) ||
     getSubjectiveScoresByResponse(r.responseId).some(s => s.committeeMemberId === user?.userId)
   );
+
+  // How many members have submitted their scoring to the Chairman (list grows as they submit)
+  const submittedToChairmanCount = useMemo(() => {
+    if (!submissionId) return 0;
+    return getScoringSubmissionsToChairman(parseInt(submissionId, 10)).length;
+  }, [submissionId, submission, scores]);
+
   const canSubmitToChairman = !isReadOnly && submission?.submissionStatus === SUBMISSION_STATUS.VALIDATED && allScoredByMe;
 
   const handleOpenSubmitToChairmanModal = () => {
     if (!user || !submissionId) return;
     setSaving(true);
     try {
-      // Persist all current scores so we can submit without separate "Save as draft"
       subjectiveResponses.forEach(r => {
         const val = scores[r.responseId];
         if (val !== undefined && val !== null) assignSubjectiveScore(r.responseId, user.userId, val);
@@ -113,10 +123,10 @@ export default function ScoreSubjectiveSubmission() {
       setSubmission(getSubmissionById(id));
       const updatedList = getSubjectiveResponsesForSubmission(id);
       setSubjectiveResponses(updatedList);
-      const nowAllScored = updatedList.every(r =>
+      const nowAllScoredByMe = updatedList.every(r =>
         getSubjectiveScoresByResponse(r.responseId).some(s => s.committeeMemberId === user.userId)
       );
-      if (!nowAllScored) {
+      if (!nowAllScoredByMe) {
         alert('Please score all answers before submitting. Go through each dimension and assign a score to every question.');
         return;
       }
@@ -129,11 +139,11 @@ export default function ScoreSubjectiveSubmission() {
   };
 
   const handleConfirmSubmitToChairman = () => {
-    if (!submissionId) return;
+    if (!submissionId || !user) return;
     setSubmittingToChairman(true);
     setShowSubmitToChairmanModal(false);
     try {
-      submitScoringToChairman(parseInt(submissionId, 10));
+      submitMyScoringToChairman(parseInt(submissionId, 10), user.userId);
       setSubmission(getSubmissionById(parseInt(submissionId, 10)));
       setShowSubmitToChairmanSuccessModal(true);
     } catch (err) {
@@ -223,6 +233,9 @@ export default function ScoreSubjectiveSubmission() {
                 </div>
                 {!isReadOnly && !isPendingChairman && submission?.submissionStatus === SUBMISSION_STATUS.VALIDATED && (
                   <div className="mt-6 pt-4 border-t border-mint-medium-gray">
+                    <p className="text-xs text-mint-dark-text/70 mb-2">
+                      {submittedToChairmanCount} of {committeeMembers.length} member{committeeMembers.length !== 1 ? 's' : ''} have submitted to the Chairman. You can submit your scores as soon as you finish.
+                    </p>
                     <button
                       type="button"
                       onClick={handleOpenSubmitToChairmanModal}
@@ -392,8 +405,8 @@ export default function ScoreSubjectiveSubmission() {
                 </div>
               </div>
               <div className="px-6 py-5">
-                <p className="text-base text-gray-700 mb-4">Send this submission to the Chairman for final approval of scores? You will not be able to change scores after submitting.</p>
-                <p className="text-sm text-gray-600"><strong>Next step:</strong> The Chairman will see all three committee members’ scores and their average, and can approve or alter the final score before submitting to the system.</p>
+                <p className="text-base text-gray-700 mb-4">Submit your scores to the Chairman? The Chairman's list will show this unit and how many members have submitted; they will finalize approval when ready.</p>
+                <p className="text-sm text-gray-600"><strong>Note:</strong> Other members can still submit their scores. The Chairman sees each member's scores and the average, and submits to the system when ready.</p>
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
                 <button onClick={() => setShowSubmitToChairmanModal(false)} className="px-5 py-2.5 bg-[#E0F2F7] hover:bg-[#B8E6F0] text-mint-primary-blue font-semibold rounded-lg">Cancel</button>
@@ -417,7 +430,7 @@ export default function ScoreSubjectiveSubmission() {
                 </div>
               </div>
               <div className="px-6 py-5">
-                <p className="text-base text-gray-700">The submission has been sent to the Chairman. The Chairman will review the committee scores and submit to the system for index calculation.</p>
+                <p className="text-base text-gray-700">Your scores have been submitted to the Chairman. The Chairman's list will update with the new count and they will finalize approval when ready.</p>
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
                 <button onClick={() => setShowSubmitToChairmanSuccessModal(false)} className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg">OK</button>

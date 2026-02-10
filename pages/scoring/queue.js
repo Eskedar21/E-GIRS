@@ -41,7 +41,6 @@ export default function PendingSubjectiveScoringQueue() {
     let filtered = [...submissions];
     if (scopeFilter !== 'all') {
       const map = {
-        federal: 'Federal Institute',
         region: 'Region',
         city: 'City Administration',
         zone: 'Zone',
@@ -159,7 +158,6 @@ export default function PendingSubjectiveScoringQueue() {
                       className="w-full px-4 py-2 border border-mint-medium-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue bg-white text-mint-dark-text"
                     >
                       <option value="all">All</option>
-                      <option value="federal">Federal Institute</option>
                       <option value="region">Region</option>
                       <option value="city">City Administration</option>
                       <option value="zone">Zone</option>
