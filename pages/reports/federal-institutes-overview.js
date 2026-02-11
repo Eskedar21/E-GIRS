@@ -19,23 +19,25 @@ export default function FederalInstitutesOverview() {
   const [sortColumn, setSortColumn] = useState('submissionDate');
   const [sortDirection, setSortDirection] = useState('desc');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const assessmentYears = getAllAssessmentYears();
   const allUnits = getAllUnits();
   const allUsers = getAllUsers();
 
-  // Initialize with active year
+  // Initialize with active year, or first available year so the list is not empty
   useEffect(() => {
     const activeYear = assessmentYears.find(y => y.status === 'Active');
     if (activeYear) {
       setSelectedYearId(activeYear.assessmentYearId);
+    } else if (assessmentYears.length > 0) {
+      setSelectedYearId(assessmentYears[0].assessmentYearId);
     }
   }, []);
 
   // Get Federal Institute submissions
   const federalInstituteSubmissions = useMemo(() => {
-    if (!selectedYearId) return [];
-
     const allSubmissions = getAllSubmissions();
     
     // Filter for Federal Institutes
@@ -43,8 +45,8 @@ export default function FederalInstitutesOverview() {
     const federalUnitIds = federalUnits.map(u => u.unitId);
     
     let filtered = allSubmissions.filter(s => 
-      s.assessmentYearId === selectedYearId &&
-      federalUnitIds.includes(s.unitId)
+      federalUnitIds.includes(s.unitId) &&
+      (selectedYearId == null || s.assessmentYearId === selectedYearId)
     );
 
     // Filter by status if selected
@@ -55,27 +57,8 @@ export default function FederalInstitutesOverview() {
     // Apply access control
     filtered = filterSubmissionsByAccess(filtered, user, allUnits);
 
-    // Group by unitId and get only the latest submission for each institution
-    const submissionsByUnit = {};
-    filtered.forEach(submission => {
-      const unitId = submission.unitId;
-      if (!submissionsByUnit[unitId]) {
-        submissionsByUnit[unitId] = [];
-      }
-      submissionsByUnit[unitId].push(submission);
-    });
-
-    // Get latest submission for each unit (most recent by updatedAt or submittedDate)
-    const latestSubmissions = Object.values(submissionsByUnit).map(unitSubmissions => {
-      return unitSubmissions.sort((a, b) => {
-        const aDate = new Date(b.updatedAt || b.submittedDate || b.createdAt);
-        const bDate = new Date(a.updatedAt || a.submittedDate || a.createdAt);
-        return aDate - bDate;
-      })[0];
-    });
-
-    // Sort
-    latestSubmissions.sort((a, b) => {
+    // Show all submissions (sample submissions per institute), not just latest
+    const allSubmissionsSorted = [...filtered].sort((a, b) => {
       let aVal, bVal;
       switch (sortColumn) {
         case 'unitName':
@@ -109,7 +92,7 @@ export default function FederalInstitutesOverview() {
       return 0;
     });
 
-    return latestSubmissions.map(submission => {
+    return allSubmissionsSorted.map(submission => {
       const unit = getUnitById(submission.unitId);
       const approver = submission.approverUserId 
         ? allUsers.find(u => u.userId === submission.approverUserId)
@@ -118,10 +101,21 @@ export default function FederalInstitutesOverview() {
       return {
         ...submission,
         unitName: unit?.officialUnitName || 'Unknown',
-        approverName: approver ? `${approver.firstName} ${approver.lastName}` : 'N/A'
+        approverName: approver ? `${approver.firstName} ${approver.lastName}` : 'N/A',
+        rejectionReason: submission.rejectionReason || null
       };
     });
   }, [selectedYearId, selectedStatuses, sortColumn, sortDirection, user, allUnits, allUsers]);
+
+  const totalPages = Math.max(1, Math.ceil(federalInstituteSubmissions.length / PAGE_SIZE));
+  const paginatedSubmissions = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return federalInstituteSubmissions.slice(start, start + PAGE_SIZE);
+  }, [federalInstituteSubmissions, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedYearId, selectedStatuses]);
 
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -133,7 +127,6 @@ export default function FederalInstitutesOverview() {
   };
 
   const handleReview = (submission) => {
-    // Use submissionId directly for more reliable navigation
     router.push(`/reports/federal-institute-detail?submissionId=${submission.submissionId}&year=${submission.assessmentYearId}&unit=${submission.unitId}`);
   };
 
@@ -193,55 +186,29 @@ export default function FederalInstitutesOverview() {
     return statusConfig[status] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
-  // Calculate summary statistics
+  // Summary stats derived from the same filtered list as the table (concurrent with listed submissions)
   const summaryStats = useMemo(() => {
-    const allSubmissions = getAllSubmissions();
-    const federalUnits = allUnits.filter(u => u.unitType === 'Federal Institute');
-    const federalUnitIds = federalUnits.map(u => u.unitId);
-    
-    const allFederalSubmissions = allSubmissions.filter(s => 
-      (!selectedYearId || s.assessmentYearId === selectedYearId) &&
-      federalUnitIds.includes(s.unitId)
-    );
-
-    // Get latest submission per unit for stats
-    const submissionsByUnit = {};
-    allFederalSubmissions.forEach(submission => {
-      const unitId = submission.unitId;
-      if (!submissionsByUnit[unitId]) {
-        submissionsByUnit[unitId] = [];
-      }
-      submissionsByUnit[unitId].push(submission);
-    });
-
-    const latestSubmissions = Object.values(submissionsByUnit).map(unitSubmissions => {
-      return unitSubmissions.sort((a, b) => {
-        const aDate = new Date(b.updatedAt || b.submittedDate || b.createdAt);
-        const bDate = new Date(a.updatedAt || a.submittedDate || a.createdAt);
-        return aDate - bDate;
-      })[0];
-    });
-
+    const list = federalInstituteSubmissions;
     return {
-      total: latestSubmissions.length,
-      draft: latestSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.DRAFT).length,
-      pendingApproval: latestSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL).length,
-      pendingValidation: latestSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).length,
-      rejected: latestSubmissions.filter(s => 
+      total: list.length,
+      draft: list.filter(s => s.submissionStatus === SUBMISSION_STATUS.DRAFT).length,
+      pendingApproval: list.filter(s => s.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL).length,
+      pendingValidation: list.filter(s => s.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).length,
+      rejected: list.filter(s =>
         s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
         s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE
       ).length,
-      validated: latestSubmissions.filter(s => s.submissionStatus === SUBMISSION_STATUS.VALIDATED).length,
+      validated: list.filter(s => s.submissionStatus === SUBMISSION_STATUS.VALIDATED).length,
     };
-  }, [selectedYearId, allUnits]);
+  }, [federalInstituteSubmissions]);
 
   return (
-    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
+    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor', 'Federal Approver']}>
       <Layout title="Federal Institute Submissions Overview">
         <div className="flex">
           <Sidebar />
-          <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-            <div className="w-full">
+          <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
+            <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-[1600px]">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                   Federal Institute Submissions Overview
@@ -465,7 +432,7 @@ export default function FederalInstitutesOverview() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-mint-medium-gray">
-                      {federalInstituteSubmissions.length === 0 ? (
+                      {paginatedSubmissions.length === 0 ? (
                         <tr>
                           <td colSpan="7" className="px-6 py-12 text-center">
                             <div className="flex flex-col items-center">
@@ -476,20 +443,17 @@ export default function FederalInstitutesOverview() {
                           </td>
                         </tr>
                       ) : (
-                        federalInstituteSubmissions.map((submission) => {
+                        paginatedSubmissions.map((submission) => {
                           const assessmentYear = assessmentYears.find(y => y.assessmentYearId === submission.assessmentYearId);
                           return (
                             <tr key={submission.submissionId} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <Link
-                                  href={`/reports/federal-institute-detail?year=${submission.assessmentYearId}&unit=${submission.unitId}`}
-                                  className="text-sm font-semibold text-mint-primary-blue hover:text-mint-secondary-blue hover:underline transition-colors"
-                                >
+                                <span className="text-sm font-semibold text-mint-dark-text">
                                   {submission.unitName}
-                                </Link>
+                                </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusColor(submission.submissionStatus)}`}>
+                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${getStatusColor(submission.submissionStatus)}`}>
                                   {submission.submissionStatus}
                                 </span>
                               </td>
@@ -520,6 +484,33 @@ export default function FederalInstitutesOverview() {
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination */}
+                {federalInstituteSubmissions.length > 0 && (
+                  <div className="px-6 py-4 border-t border-mint-medium-gray bg-mint-light-gray flex flex-wrap items-center justify-between gap-4">
+                    <p className="text-sm font-medium text-mint-dark-text">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1} to {Math.min(currentPage * PAGE_SIZE, federalInstituteSubmissions.length)} of {federalInstituteSubmissions.length} submissions
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-mint-medium-gray bg-white text-mint-dark-text disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-mint-dark-text px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-mint-medium-gray bg-white text-mint-dark-text disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </main>

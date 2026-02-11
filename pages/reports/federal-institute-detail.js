@@ -5,6 +5,7 @@ import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { 
   getSubmissionById, 
   getResponsesBySubmission,
@@ -25,12 +26,19 @@ import {
 export default function FederalInstituteDetail() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isCollapsed, setCollapsed } = useSidebar();
   const { year, unit, submissionId } = router.query;
 
   const [submission, setSubmission] = useState(null);
   const [submissionDetails, setSubmissionDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sampleSubmissions, setSampleSubmissions] = useState([]);
+  const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
+  const [activeSection, setActiveSection] = useState(null);
+
+  useEffect(() => {
+    setCollapsed(true);
+  }, [setCollapsed]);
 
   // Find submission - prefer submissionId if provided, otherwise find by year and unit
   useEffect(() => {
@@ -42,9 +50,13 @@ export default function FederalInstituteDetail() {
 
     // If submissionId is provided, use it directly
     if (submissionId) {
-      const submissionIdNum = parseInt(submissionId);
+      const submissionIdNum = parseInt(submissionId, 10);
       if (!isNaN(submissionIdNum)) {
         foundSubmission = getSubmissionById(submissionIdNum);
+        if (!foundSubmission) {
+          const allSubs = getAllSubmissions();
+          foundSubmission = allSubs.find(s => s.submissionId === submissionIdNum);
+        }
         if (foundSubmission) {
           assessmentYearId = foundSubmission.assessmentYearId;
         }
@@ -115,9 +127,19 @@ export default function FederalInstituteDetail() {
   };
 
   const loadSubmissionDetails = (submissionId, assessmentYearId) => {
-    const submission = getSubmissionById(submissionId);
+    const id = Number(submissionId);
+    if (Number.isNaN(id)) {
+      setIsLoading(false);
+      return;
+    }
+    let submission = getSubmissionById(id);
+    if (!submission) {
+      const allSubs = getAllSubmissions();
+      submission = allSubs.find(s => s.submissionId === id);
+    }
     if (submission) {
-      const responses = getResponsesBySubmission(submissionId);
+      const yearId = Number(assessmentYearId ?? submission.assessmentYearId);
+      const responses = getResponsesBySubmission(id);
       
       // Get the unit to determine its type
       const unit = getUnitById(submission.unitId);
@@ -133,9 +155,9 @@ export default function FederalInstituteDetail() {
       };
       const applicableUnitTypes = getApplicableUnitTypes(unitType);
       
-      // Get assessment framework data - use the provided assessmentYearId to ensure consistency
-      const assessmentYear = getAssessmentYearById(assessmentYearId || submission.assessmentYearId);
-      const dimensions = assessmentYear ? getDimensionsByYear(assessmentYearId || submission.assessmentYearId) : [];
+      // Get assessment framework data - use numeric yearId for consistent lookup
+      const assessmentYear = getAssessmentYearById(yearId);
+      const dimensions = assessmentYear ? getDimensionsByYear(yearId) : [];
       
       // Determine if we should show all questions or only answered ones
       const isDraft = submission.submissionStatus === SUBMISSION_STATUS.DRAFT;
@@ -221,16 +243,54 @@ export default function FederalInstituteDetail() {
     window.print();
   };
 
-  if (isLoading) {
+  const questionNumberMap = useMemo(() => {
+    if (!submissionDetails || !submissionDetails.groupedData) return {};
+    const map = {};
+    let counter = 1;
+    submissionDetails.groupedData.forEach(({ indicators: dimIndicators }) => {
+      dimIndicators.forEach(({ subQuestions }) => {
+        subQuestions.forEach(({ subQuestion }) => {
+          map[subQuestion.subQuestionId] = counter++;
+        });
+      });
+    });
+    return map;
+  }, [submissionDetails]);
+
+  const goToDimension = (index) => {
+    setCurrentDimensionIndex(index);
+  };
+
+  useEffect(() => {
+    if (submissionDetails?.groupedData?.length > 0 &&
+        currentDimensionIndex >= 0 && currentDimensionIndex < submissionDetails.groupedData.length) {
+      const dimension = submissionDetails.groupedData[currentDimensionIndex].dimension;
+      setActiveSection(dimension.dimensionId);
+    }
+  }, [currentDimensionIndex, submissionDetails]);
+
+  useEffect(() => {
+    if (submissionDetails?.groupedData?.length > 0) {
+      setCurrentDimensionIndex(0);
+    }
+  }, [submissionId]);
+
+  const allowedDetailRoles = ['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor', 'Federal Approver'];
+  const showNotFound = router.isReady && !isLoading && !submission;
+  const showLoading = !router.isReady || (isLoading && !submission);
+
+  const mainMarginClass = `transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`;
+
+  if (showLoading) {
     return (
-      <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
+      <ProtectedRoute allowedRoles={allowedDetailRoles}>
         <Layout title="Federal Institute Detailed Submission">
-          <div className="flex">
+          <div className="flex bg-gray-50 min-h-screen">
             <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-              <div className="w-full">
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto ${mainMarginClass}`}>
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-white rounded-xl shadow-lg p-8 border border-mint-medium-gray text-center">
-                  <p className="text-mint-dark-text/70">Loading submission details...</p>
+                  <p className="text-sm text-mint-dark-text/70">Loading submission details...</p>
                 </div>
               </div>
             </main>
@@ -240,19 +300,19 @@ export default function FederalInstituteDetail() {
     );
   }
 
-  if (!submission) {
+  if (showNotFound) {
     return (
-      <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
+      <ProtectedRoute allowedRoles={allowedDetailRoles}>
         <Layout title="Federal Institute Detailed Submission">
-          <div className="flex">
+          <div className="flex bg-gray-50 min-h-screen">
             <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-              <div className="w-full">
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto ${mainMarginClass}`}>
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-white rounded-xl shadow-lg p-8 border border-mint-medium-gray text-center">
-                  <p className="text-mint-dark-text/70 mb-4">Submission not found.</p>
+                  <p className="text-sm text-mint-dark-text/70 mb-4">Submission not found.</p>
                   <Link
                     href="/reports/federal-institutes-overview"
-                    className="text-mint-primary-blue hover:text-mint-secondary-blue hover:underline"
+                    className="text-mint-primary-blue hover:text-mint-secondary-blue hover:underline text-sm font-medium"
                   >
                     ← Back to Federal Institutes Overview
                   </Link>
@@ -267,17 +327,17 @@ export default function FederalInstituteDetail() {
 
   if (!submissionDetails) {
     return (
-      <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
+      <ProtectedRoute allowedRoles={allowedDetailRoles}>
         <Layout title="Federal Institute Detailed Submission">
-          <div className="flex">
+          <div className="flex bg-gray-50 min-h-screen">
             <Sidebar />
-            <main className="flex-grow ml-64 p-8 bg-white text-mint-dark-text min-h-screen">
-              <div className="w-full">
+            <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto ${mainMarginClass}`}>
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-white rounded-xl shadow-lg p-8 border border-mint-medium-gray text-center">
-                  <p className="text-mint-dark-text/70 mb-4">Unable to load submission details.</p>
+                  <p className="text-sm text-mint-dark-text/70 mb-4">Unable to load submission details.</p>
                   <Link
                     href="/reports/federal-institutes-overview"
-                    className="text-mint-primary-blue hover:text-mint-secondary-blue hover:underline"
+                    className="text-mint-primary-blue hover:text-mint-secondary-blue hover:underline text-sm font-medium"
                   >
                     ← Back to Federal Institutes Overview
                   </Link>
@@ -303,120 +363,241 @@ export default function FederalInstituteDetail() {
     return statusConfig[status] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
+  const hasDimensions = submissionDetails?.groupedData && submissionDetails.groupedData.length > 0;
+
+  const renderSubQuestions = (indicatorSubQuestions) =>
+    indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
+      const globalQuestionNumber = questionNumberMap[subQuestion.subQuestionId] || 0;
+      const answerText = response?.responseValue || '';
+      const depth = subQuestion.depth ?? (subQuestion.parentSubQuestionId != null ? 2 : 1);
+      const indentClass = depth === 2 ? 'ml-6 border-l-4 border-mint-primary-blue/40' : depth === 3 ? 'ml-10 border-l-4 border-mint-primary-blue/30' : '';
+      return (
+        <div
+          key={subQuestion.subQuestionId}
+          className={`p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6 ${indentClass}`}
+        >
+          {/* Question Header with Answer */}
+          <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0d6670] text-white flex items-center justify-center font-bold text-lg">
+                {globalQuestionNumber}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-3">
+                  <p className="text-lg font-bold text-mint-dark-text">
+                    Question {globalQuestionNumber}: {subQuestion.subQuestionText}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-mint-dark-text/60">
+                  <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
+                    Type: {subQuestion.responseType}
+                  </span>
+                  <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
+                    Weight: {subQuestion.subWeightPercentage}%
+                  </span>
+                </div>
+                <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Answer:</p>
+                  <p className={`text-sm text-gray-900 whitespace-pre-wrap break-words leading-relaxed ${!answerText ? 'text-gray-400 italic' : ''}`}>
+                    {answerText || 'No response provided'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Details Section */}
+          {response && (
+            <div className="space-y-3">
+              {response.evidenceLink && (
+                <div className="bg-white p-4 rounded-lg border border-gray-300">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Evidence Link</label>
+                  <a
+                    href={response.evidenceLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-mint-primary-blue hover:underline break-all inline-flex items-center space-x-2"
+                  >
+                    <span>{response.evidenceLink}</span>
+                    <span className="text-xs">↗</span>
+                  </a>
+                </div>
+              )}
+
+              {(response.regionalNote || response.generalNote || response.centralRejectionReason || response.regionalRejectionReason) && (
+                <div className="mt-3 bg-gray-50 rounded-lg border border-gray-300 p-4">
+                  <div className="mb-3">
+                    <h4 className="text-sm font-bold text-gray-900">Comments</h4>
+                  </div>
+                  {response.regionalNote && (
+                    <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
+                      <div className="flex items-start space-x-2 mb-2">
+                        <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="text-xs font-semibold text-gray-900">Regional Approver</span>
+                            {response.updatedAt && <span className="text-xs text-gray-500 ml-2">{formatDate(response.updatedAt)}</span>}
+                          </div>
+                          <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">{response.regionalNote}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {response.regionalRejectionReason && (
+                    <div className="mb-4 bg-red-50 rounded-lg border-2 border-red-200 p-3">
+                      <div className="flex items-start space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="text-xs font-semibold text-red-900">Regional Approver - Rejection Reason</span>
+                            {response.updatedAt && <span className="text-xs text-red-600 ml-2">{formatDate(response.updatedAt)}</span>}
+                          </div>
+                          <p className="text-xs text-red-800 whitespace-pre-wrap break-words leading-relaxed">{response.regionalRejectionReason}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {response.generalNote && (
+                    <div className="mb-4 bg-green-50 rounded-lg border-2 border-green-200 p-3">
+                      <div className="flex items-start space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="text-xs font-semibold text-green-900">Central Committee - Note</span>
+                            {response.updatedAt && <span className="text-xs text-green-600 ml-2">{formatDate(response.updatedAt)}</span>}
+                          </div>
+                          <p className="text-xs text-green-800 whitespace-pre-wrap break-words leading-relaxed">{response.generalNote}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {response.centralRejectionReason && (
+                    <div className="mb-4 bg-red-50 rounded-lg border-2 border-red-200 p-3">
+                      <div className="flex items-start space-x-2 mb-2">
+                        <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <span className="text-xs font-semibold text-red-900">Central Committee - Rejection Reason</span>
+                            {response.updatedAt && <span className="text-xs text-red-600 ml-2">{formatDate(response.updatedAt)}</span>}
+                          </div>
+                          <p className="text-xs text-red-800 whitespace-pre-wrap break-words leading-relaxed">{response.centralRejectionReason}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    });
+
   return (
-    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor']}>
+    <ProtectedRoute allowedRoles={allowedDetailRoles}>
       <Layout title={`Federal Institute Submission - ${getUnitName(submission.unitId)}`}>
         <div className="flex bg-gray-50 min-h-screen">
           <Sidebar />
-          {/* Sample Submissions Sidebar - Matching Approver Interface Style */}
-          {sampleSubmissions.length > 0 && (
-            <aside className="w-80 bg-white border-r border-gray-200 p-6 h-screen sticky top-0 overflow-y-auto">
-              <div className="mb-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Institute Submissions</h2>
-                <p className="text-xs text-gray-600 mb-4">
-                  View different submission statuses for this institute. Click to view details. Read-only view for admins.
-                </p>
-                <div className="space-y-2">
-                  {sampleSubmissions.map((sampleSub) => {
-                    const isActive = sampleSub.submissionId === submission.submissionId;
-                    return (
+          {/* Assessment Dimensions Navigation - same as approval view */}
+          {hasDimensions && (
+            <aside className={`w-80 bg-transparent fixed top-16 bottom-0 overflow-y-auto z-40 pl-8 transition-all duration-300 ${isCollapsed ? 'left-16' : 'left-64'}`}>
+              <div className="p-4 pt-8">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Assessment Dimensions</h2>
+                <div className="space-y-1">
+                  {submissionDetails.groupedData.map(({ dimension }, index) => (
+                    <div key={dimension.dimensionId}>
                       <button
-                        key={sampleSub.submissionId}
-                        onClick={() => handleSelectSubmission(sampleSub.submissionId)}
-                        className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                          isActive
-                            ? 'bg-[#0d6670]/10 border-[#0d6670] shadow-md'
-                            : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                        type="button"
+                        onClick={() => goToDimension(index)}
+                        className={`w-full flex items-center text-left p-2 rounded-lg transition-all ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670]/10 text-[#0d6670] border-l-4 border-[#0d6670]'
+                            : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <p className={`text-sm font-semibold mb-1 ${
-                              isActive ? 'text-[#0d6670]' : 'text-gray-900'
-                            }`}>
-                              {sampleSub.submissionName || `Submission ${sampleSub.submissionId}`}
-                            </p>
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${getStatusColor(sampleSub.submissionStatus)}`}>
-                              {sampleSub.submissionStatus}
-                            </span>
-                          </div>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 ${
+                          activeSection === dimension.dimensionId
+                            ? 'bg-[#0d6670] text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {index + 1}
                         </div>
-                        <div className="text-xs text-gray-500 mt-2">
-                          {sampleSub.submittedDate 
-                            ? formatDate(sampleSub.submittedDate)
-                            : 'Not submitted'}
-                        </div>
-                        {sampleSub.rejectionReason && (
-                          <div className="mt-2 text-xs text-red-600 line-clamp-2">
-                            {sampleSub.rejectionReason.substring(0, 80)}...
-                          </div>
-                        )}
+                        <span className="text-sm font-medium flex-1">{dimension.dimensionName}</span>
                       </button>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
             </aside>
           )}
-          <div className={`flex flex-grow transition-all duration-300 ${sampleSubmissions.length > 0 ? 'ml-80' : ''}`}>
+          <div
+            className={`flex flex-grow ${mainMarginClass}`}
+            style={hasDimensions ? { marginLeft: isCollapsed ? 'calc(64px + 320px)' : 'calc(256px + 320px)' } : {}}
+          >
             <main className="flex-1 p-8 bg-white text-mint-dark-text min-h-screen overflow-y-auto">
-            <div className="w-full">
-              {/* Header Section */}
-              <div className="mb-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <Link
-                    href="/reports/federal-institutes-overview"
-                    className="flex items-center text-mint-primary-blue hover:text-mint-secondary-blue transition-colors"
-                  >
-                    <span className="text-xl mr-2">←</span>
-                    <span className="text-sm font-medium">Back to Federal Institutes Overview</span>
-                  </Link>
-                </div>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <h1 className="text-3xl font-bold text-mint-primary-blue">
-                        Federal Institute Detailed Submission
+              <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header - same structure as approval view */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
+                        {submission.submissionName || getUnitName(submission.unitId)}
                       </h1>
-                      <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
+                      {submission.submissionName && (
+                        <p className="text-sm text-mint-dark-text/60">
+                          {getUnitName(submission.unitId)}
+                        </p>
+                      )}
+                      {!submission.submissionName && (
+                        <p className="text-sm text-mint-dark-text/60 mt-1">
+                          Read-only view. Review submission details, status, and comments.
+                        </p>
+                      )}
+                      <span className="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
                         Read-Only View
                       </span>
                     </div>
-                    <p className="text-mint-dark-text/70">
-                      {getUnitName(submission.unitId)}
-                    </p>
-                    <p className="text-sm text-mint-dark-text/60 mt-1">
-                      Review submission details, status, and comments. This is a read-only view.
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={printToPDF}
+                        className="px-4 py-2 bg-[#0d6670] hover:bg-[#0a4f57] text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Print to PDF
+                      </button>
+                      <Link
+                        href="/reports/federal-institutes-overview"
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        ← Back to Overview
+                      </Link>
+                    </div>
                   </div>
-                  <button
-                    onClick={printToPDF}
-                    className="px-4 py-2 bg-[#0d6670] hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Print to PDF
-                  </button>
-                </div>
 
                 {/* Submission Info */}
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm font-semibold text-mint-dark-text/70 mb-1">Institute Name</p>
-                      <p className="text-lg font-bold text-mint-primary-blue">{getUnitName(submission.unitId)}</p>
+                      <p className="text-base font-normal text-mint-dark-text">{getUnitName(submission.unitId)}</p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-mint-dark-text/70 mb-1">Assessment Year</p>
-                      <p className="text-lg text-mint-dark-text">
+                      <p className="text-base font-normal text-mint-dark-text">
                         {getAssessmentYearById(submission.assessmentYearId)?.yearName || `Year ${submission.assessmentYearId}`}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-mint-dark-text/70 mb-1">Submission Status</p>
-                      <span className={`inline-block px-3 py-1.5 rounded-full text-sm font-semibold ${
+                      <span className={`inline-block px-3 py-1.5 rounded-full text-base font-normal text-mint-dark-text ${
                         submission.submissionStatus === 'Validated' ? 'bg-green-100 text-green-800' :
                         submission.submissionStatus === 'Scoring Complete' ? 'bg-blue-100 text-blue-800' :
                         submission.submissionStatus === 'Pending Central Validation' ? 'bg-orange-100 text-orange-800' :
@@ -429,7 +610,7 @@ export default function FederalInstituteDetail() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-mint-dark-text/70 mb-1">Submitted Date</p>
-                      <p className="text-lg text-mint-dark-text">{formatDate(submission.submittedDate || submission.createdAt)}</p>
+                      <p className="text-base font-normal text-mint-dark-text">{formatDate(submission.submittedDate || submission.createdAt)}</p>
                     </div>
                   </div>
                   
@@ -501,17 +682,11 @@ export default function FederalInstituteDetail() {
                 </div>
               </div>
 
-              {/* Question & Answer Section - Matching Approver Interface Style */}
-              {submissionDetails.groupedData.length > 0 ? (
+              {/* Question & Answer Section - one dimension at a time, same as approval view */}
+              {submissionDetails.groupedData.length > 0 && (
                 <div className="space-y-6">
-                  {submissionDetails.groupedData.map(({ dimension, indicators: dimIndicators }, dimIdx) => {
-                    // Calculate question numbers
-                    let questionNumber = 1;
-                    submissionDetails.groupedData.slice(0, dimIdx).forEach(({ indicators: prevIndicators }) => {
-                      prevIndicators.forEach(({ subQuestions }) => {
-                        questionNumber += subQuestions.length;
-                      });
-                    });
+                  {(submissionDetails.groupedData.map(({ dimension, indicators: dimIndicators }, dimIdx) => {
+                    if (dimIdx !== currentDimensionIndex) return null;
 
                     return (
                       <div key={dimension.dimensionId} className="bg-white rounded-xl p-6 border-2 border-mint-medium-gray shadow-sm">
@@ -545,199 +720,22 @@ export default function FederalInstituteDetail() {
                             </div>
 
                             <div className="space-y-4">
-                              {indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
-                                const globalQuestionNumber = questionNumber + sqIdx;
-                                const answerText = response?.responseValue || '';
-                                const depth = subQuestion.depth ?? (subQuestion.parentSubQuestionId != null ? 2 : 1);
-                                const indentClass = depth === 2 ? 'ml-6 border-l-4 border-mint-primary-blue/40' : depth === 3 ? 'ml-10 border-l-4 border-mint-primary-blue/30' : '';
-                                return (
-                                  <div
-                                    key={subQuestion.subQuestionId}
-                                    className={`p-6 rounded-lg border-2 border-gray-200 bg-white transition-all shadow-md mb-6 ${indentClass}`}
-                                  >
-                                    {/* Question Header with Answer */}
-                                    <div className="mb-5 pb-4 border-b-2 border-mint-medium-gray">
-                                      <div className="flex items-start space-x-3">
-                                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0d6670] text-white flex items-center justify-center font-bold text-lg">
-                                          {globalQuestionNumber}
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="flex items-center space-x-2 mb-3">
-                                            <p className="text-lg font-bold text-mint-dark-text">
-                                              Question {globalQuestionNumber}: {subQuestion.subQuestionText}
-                                            </p>
-                                          </div>
-                                          <div className="flex flex-wrap items-center gap-3 text-xs text-mint-dark-text/60">
-                                            <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
-                                              Type: {subQuestion.responseType}
-                                            </span>
-                                            <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
-                                              Weight: {subQuestion.subWeightPercentage}%
-                                            </span>
-                                          </div>
-                                          {/* Answer inline with question */}
-                                          <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
-                                            <p className="text-xs font-semibold text-gray-600 mb-1">Answer:</p>
-                                            <p className={`text-sm text-gray-900 whitespace-pre-wrap break-words leading-relaxed ${!answerText ? 'text-gray-400 italic' : ''}`}>
-                                              {answerText || 'No response provided'}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Additional Details Section */}
-                                    {response && (
-                                      <div className="space-y-3">
-                                        {/* Evidence Link */}
-                                        {response.evidenceLink && (
-                                          <div className="bg-white p-4 rounded-lg border border-gray-300">
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                              Evidence Link
-                                            </label>
-                                            <a
-                                              href={response.evidenceLink}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-sm text-mint-primary-blue hover:underline break-all inline-flex items-center space-x-2"
-                                            >
-                                              <span>{response.evidenceLink}</span>
-                                              <span className="text-xs">↗</span>
-                                            </a>
-                                          </div>
-                                        )}
-
-                                        {/* Comments Section - Read-only view like approver interface */}
-                                        {(response.regionalNote || response.generalNote || response.centralRejectionReason || response.regionalRejectionReason) && (
-                                          <div className="mt-3 bg-gray-50 rounded-lg border border-gray-300 p-4">
-                                            <div className="mb-3">
-                                              <h4 className="text-sm font-bold text-gray-900">Comments</h4>
-                                            </div>
-                                    
-                                            {/* Regional Approver Note */}
-                                            {response.regionalNote && (
-                                              <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
-                                                <div className="flex items-start space-x-2 mb-2">
-                                                  <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                                  </svg>
-                                                  <div className="flex-1">
-                                                    <div className="flex items-start justify-between mb-1">
-                                                      <span className="text-xs font-semibold text-gray-900">
-                                                        Regional Approver
-                                                      </span>
-                                                      {response.updatedAt && (
-                                                        <span className="text-xs text-gray-500 ml-2">
-                                                          {formatDate(response.updatedAt)}
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                    <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
-                                                      {response.regionalNote}
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            )}
-
-                                            {/* Regional Rejection Reason */}
-                                            {response.regionalRejectionReason && (
-                                      <div className="mb-4 bg-red-50 rounded-lg border-2 border-red-200 p-3">
-                                        <div className="flex items-start space-x-2 mb-2">
-                                          <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          <div className="flex-1">
-                                            <div className="flex items-start justify-between mb-1">
-                                              <span className="text-xs font-semibold text-red-900">
-                                                Regional Approver - Rejection Reason
-                                              </span>
-                                              {response.updatedAt && (
-                                                <span className="text-xs text-red-600 ml-2">
-                                                  {formatDate(response.updatedAt)}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <p className="text-xs text-red-800 whitespace-pre-wrap break-words leading-relaxed">
-                                              {response.regionalRejectionReason}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                            )}
-
-                                            {/* Central Committee General Note */}
-                                            {response.generalNote && (
-                                      <div className="mb-4 bg-green-50 rounded-lg border-2 border-green-200 p-3">
-                                        <div className="flex items-start space-x-2 mb-2">
-                                          <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          <div className="flex-1">
-                                            <div className="flex items-start justify-between mb-1">
-                                              <span className="text-xs font-semibold text-green-900">
-                                                Central Committee - Note
-                                              </span>
-                                              {response.updatedAt && (
-                                                <span className="text-xs text-green-600 ml-2">
-                                                  {formatDate(response.updatedAt)}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <p className="text-xs text-green-800 whitespace-pre-wrap break-words leading-relaxed">
-                                              {response.generalNote}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                            )}
-
-                                            {/* Central Committee Rejection Reason */}
-                                            {response.centralRejectionReason && (
-                                      <div className="mb-4 bg-red-50 rounded-lg border-2 border-red-200 p-3">
-                                        <div className="flex items-start space-x-2 mb-2">
-                                          <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          <div className="flex-1">
-                                            <div className="flex items-start justify-between mb-1">
-                                              <span className="text-xs font-semibold text-red-900">
-                                                Central Committee - Rejection Reason
-                                              </span>
-                                              {response.updatedAt && (
-                                                <span className="text-xs text-red-600 ml-2">
-                                                  {formatDate(response.updatedAt)}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <p className="text-xs text-red-800 whitespace-pre-wrap break-words leading-relaxed">
-                                              {response.centralRejectionReason}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                              {renderSubQuestions(indicatorSubQuestions)}
                             </div>
                           </div>
                         ))}
                       </div>
                     );
-                  })}
+                  }) )}
                 </div>
-              ) : (
+              )}
+              {submissionDetails.groupedData.length === 0 && (
                 <div className="bg-white rounded-xl shadow-lg p-8 border border-mint-medium-gray text-center">
                   <p className="text-mint-dark-text/70">No responses found for this submission.</p>
                 </div>
               )}
-            </div>
-          </main>
+              </div>
+            </main>
           </div>
         </div>
       </Layout>

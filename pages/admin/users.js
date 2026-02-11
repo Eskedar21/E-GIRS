@@ -18,10 +18,19 @@ export default function UserManagement() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [listKey, setListKey] = useState(0);
+  const [refreshedAt, setRefreshedAt] = useState(null);
 
   const loadUsersData = () => {
-    setUsers(getAllUsers());
-    setUnits(getAllUnits());
+    setUsers(() => getAllUsers());
+    setUnits(() => getAllUnits());
+  };
+
+  const handleRefresh = () => {
+    loadUsersData();
+    setListKey((k) => k + 1);
+    setRefreshedAt(Date.now());
+    setTimeout(() => setRefreshedAt(null), 2000);
   };
 
   useEffect(() => {
@@ -72,6 +81,13 @@ export default function UserManagement() {
       loadUsersData();
     }
   }, [router.isReady, router.pathname]);
+
+  // Refetch when navigating back to this page (e.g. after edit) so table shows latest data
+  useEffect(() => {
+    if (router.isReady && router.asPath === '/admin/users') {
+      loadUsersData();
+    }
+  }, [router.isReady, router.asPath]);
 
   const handleDeleteClick = (user) => {
     setUserToDelete(user);
@@ -126,7 +142,8 @@ export default function UserManagement() {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    onClick={loadUsersData}
+                    type="button"
+                    onClick={handleRefresh}
                     variant="outline"
                     className="border-mint-primary-blue text-mint-primary-blue hover:bg-mint-light-gray"
                   >
@@ -146,9 +163,14 @@ export default function UserManagement() {
             {/* Users List */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-mint-medium-gray">
               <div className="p-6">
-                <h2 className="text-xl font-semibold text-mint-dark-text mb-4">
-                  All Users ({users.length})
-                </h2>
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-xl font-semibold text-mint-dark-text">
+                    All Users ({users.length})
+                  </h2>
+                  {refreshedAt && (
+                    <span className="text-sm text-green-600 font-medium">Refreshed</span>
+                  )}
+                </div>
                 {users.length === 0 ? (
                   <p className="text-mint-dark-text">No users registered yet.</p>
                 ) : (
@@ -179,7 +201,7 @@ export default function UserManagement() {
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-mint-medium-gray">
+                      <tbody key={listKey} className="bg-white divide-y divide-mint-medium-gray">
                         {users.map((user) => (
                           <tr key={user.userId} className="hover:bg-mint-light-gray">
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">

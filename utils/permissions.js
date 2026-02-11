@@ -32,6 +32,11 @@ export const canAccessUnit = (user, targetUnitId, allUnits) => {
 
   // For approvers, check if target unit is within their hierarchy
   if (['Regional Approver', 'Federal Approver'].includes(user.role)) {
+    // Federal Approvers can access all Federal Institute units (institutes have no parent in hierarchy)
+    if (user.role === 'Federal Approver' && allUnits && allUnits.length > 0) {
+      const targetUnit = allUnits.find(u => u.unitId === targetUnitId);
+      if (targetUnit && targetUnit.unitType === 'Federal Institute') return true;
+    }
     return isUnitInHierarchy(user.officialUnitId, targetUnitId, allUnits);
   }
 
@@ -154,6 +159,10 @@ export const canPerformAction = (user, action, resource = null) => {
     
     case 'view_all_submissions':
       return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(role);
+    
+    case 'view_submission':
+      // Same roles that can access Federal Institute report / submission details (read-only)
+      return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor', 'Federal Approver', 'Regional Approver'].includes(role);
     
     default:
       return false;

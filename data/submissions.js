@@ -32027,14 +32027,16 @@ export const submitForApproval = (submissionId) => {
       const allUnits = getAllUnits();
       
       // Find approvers who can access this unit
-      const approvers = allUsers.filter(user => {
-        if (!['Regional Approver', 'Federal Approver'].includes(user.role)) {
+      const isFederalInstituteSubmission = unit && unit.unitType === 'Federal Institute';
+      const approvers = allUsers.filter(u => {
+        if (!['Regional Approver', 'Federal Approver'].includes(u.role)) {
           return false;
         }
-        if (!user.officialUnitId) return false;
-        
+        if (!u.officialUnitId) return false;
+        // Federal Institute submissions go to all Federal Approvers
+        if (isFederalInstituteSubmission && u.role === 'Federal Approver') return true;
         // Check if submission unit is in approver's hierarchy
-        return isUnitInHierarchy(user.officialUnitId, submission.unitId, allUnits);
+        return isUnitInHierarchy(u.officialUnitId, submission.unitId, allUnits);
       });
       
       // Notify all relevant approvers
@@ -32047,7 +32049,9 @@ export const submitForApproval = (submissionId) => {
         const pendingCount = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL)
           .filter(s => {
             const sUnit = getUnitById(s.unitId);
-            return sUnit && isUnitInHierarchy(approver.officialUnitId, s.unitId, allUnits);
+            if (!sUnit) return false;
+            if (approver.role === 'Federal Approver' && sUnit.unitType === 'Federal Institute') return true;
+            return isUnitInHierarchy(approver.officialUnitId, s.unitId, allUnits);
           }).length;
         if (pendingCount > 0) {
           notifyNewSubmissionsInQueue(approver.userId, pendingCount);

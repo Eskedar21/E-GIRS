@@ -305,13 +305,11 @@ export default function DataSubmission() {
     }
   }, [selectedYear?.assessmentYearId, groupedQuestions]);
 
-  // Clear incomplete dimension flags when all questions are answered (so flags update in real time)
+  // Clear incomplete dimension flags when all questions are answered (evidence link is optional)
   const totalAnsweredQuestionsForEffect = subQuestions.filter(sq => {
     const response = responses[sq.subQuestionId];
-    const evidence = evidenceLinks[sq.subQuestionId];
     const hasAnswer = response && response !== '' && response.trim() !== '';
-    const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
-    return hasAnswer && hasEvidence;
+    return hasAnswer;
   }).length;
   useEffect(() => {
     if (subQuestions.length > 0 && totalAnsweredQuestionsForEffect === subQuestions.length) {
@@ -563,16 +561,11 @@ export default function DataSubmission() {
     setErrorMessage('');
     setSuccessMessage('');
     
-    // Validate that all required questions are answered - STRICT: no submission without all answers and evidence
+    // Validate that all required questions are answered (evidence link is optional)
     const unanswered = subQuestions.filter(sq => {
       const response = responses[sq.subQuestionId];
-      const evidence = evidenceLinks[sq.subQuestionId];
-      // Check if answer is provided
       const hasAnswer = response && response !== '' && response.trim() !== '';
-      // Check if evidence link is provided
-      const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
-      // Both answer and evidence must be provided
-      return !hasAnswer || !hasEvidence;
+      return !hasAnswer;
     });
     
     if (unanswered.length > 0) {
@@ -589,7 +582,7 @@ export default function DataSubmission() {
       // Show clear error message - do not allow submission
       setErrorMessage(
         `⚠️ Cannot submit: You have ${unanswered.length} incomplete question(s) out of ${subQuestions.length} total. ` +
-        `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting. ` +
+        `Please ensure ALL questions have an answer selected before submitting. ` +
         `Dimensions with missing answers are flagged in the list on the left.`
       );
       // Scroll to first unanswered question
@@ -648,22 +641,17 @@ export default function DataSubmission() {
         }
       }
       
-      // Final validation - ensure ALL required questions are answered (both answer and evidence link)
+      // Final validation - ensure ALL required questions are answered (evidence link is optional)
       const unanswered = subQuestions.filter(sq => {
         const response = responses[sq.subQuestionId];
-        const evidence = evidenceLinks[sq.subQuestionId];
-        // Check if answer is provided
         const hasAnswer = response && response !== '' && response.trim() !== '';
-        // Check if evidence link is provided
-        const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
-        // Both answer and evidence must be provided
-        return !hasAnswer || !hasEvidence;
+        return !hasAnswer;
       });
       
       if (unanswered.length > 0) {
         setErrorMessage(
           `⚠️ Cannot submit: You have ${unanswered.length} incomplete question(s). ` +
-          `Please ensure ALL questions have both an answer selected AND an evidence link provided before submitting.`
+          `Please ensure ALL questions have an answer selected before submitting.`
         );
         setIsSaving(false);
         return;
@@ -847,7 +835,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-red-500 font-normal ml-1">*</span>
+                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
                   </label>
                   <input
                     type="url"
@@ -946,7 +934,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-red-500 font-normal ml-1">*</span>
+                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
                   </label>
                   <input
                     type="url"
@@ -1037,7 +1025,7 @@ export default function DataSubmission() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Evidence Link
-                    <span className="text-red-500 font-normal ml-1">*</span>
+                    <span className="text-gray-500 font-normal ml-1">(Optional)</span>
                   </label>
                   <input
                     type="url"
@@ -1068,13 +1056,11 @@ export default function DataSubmission() {
     }
   };
 
-  // Calculate progress - count questions with both answer AND evidence link
+  // Calculate progress - count questions with answer (evidence link is optional)
   const totalAnsweredQuestions = subQuestions.filter(sq => {
     const response = responses[sq.subQuestionId];
-    const evidence = evidenceLinks[sq.subQuestionId];
     const hasAnswer = response && response !== '' && response.trim() !== '';
-    const hasEvidence = evidence && evidence !== '' && evidence.trim() !== '';
-    return hasAnswer && hasEvidence;
+    return hasAnswer;
   }).length;
   const totalQuestions = subQuestions.length;
   const progressPercentage = totalQuestions > 0 ? (totalAnsweredQuestions / totalQuestions) * 100 : 0;

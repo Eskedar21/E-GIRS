@@ -414,9 +414,9 @@ export default function ReportsIndex() {
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
-                      <div className="h-64">
+                      <div className="h-64 min-h-[256px] w-full min-w-0">
                         {maturityDistribution.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minHeight={256} minWidth={0}>
                             <PieChart>
                               <Pie
                                 data={maturityDistribution}
@@ -452,9 +452,9 @@ export default function ReportsIndex() {
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
-                      <div className="h-64">
+                      <div className="h-64 min-h-[256px] w-full min-w-0">
                         {trendData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minHeight={256} minWidth={0}>
                             <LineChart data={trendData}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="year" />
@@ -483,9 +483,9 @@ export default function ReportsIndex() {
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
-                      <div className="h-64">
+                      <div className="h-64 min-h-[256px] w-full min-w-0">
                         {topUnits.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minHeight={256} minWidth={0}>
                             <BarChart data={topUnits} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis type="number" domain={[0, 100]} />
@@ -511,9 +511,9 @@ export default function ReportsIndex() {
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
-                      <div className="h-64">
+                      <div className="h-64 min-h-[256px] w-full min-w-0">
                         {nationalDimensions.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minHeight={256} minWidth={0}>
                             <RadarChart data={nationalDimensions}>
                               <PolarGrid />
                               <PolarAngleAxis dataKey="dimension" />
