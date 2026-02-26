@@ -14,6 +14,7 @@ import {
   getEmailVerificationLink,
   USER_ROLES
 } from '../../../data/users';
+import { getAccessibleUnitIds } from '../../../utils/permissions';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -40,7 +41,10 @@ export default function CreateUser() {
   const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
-    setUnits(getAllUnits());
+    const allUnits = getAllUnits();
+    const accessibleIds = user ? getAccessibleUnitIds(user, allUnits) : null;
+    const unitsToShow = accessibleIds ? allUnits.filter(u => accessibleIds.includes(u.unitId)) : allUnits;
+    setUnits(unitsToShow);
     // Reset form to fresh state on mount
     setFormData({
       username: '',
@@ -87,17 +91,19 @@ export default function CreateUser() {
   };
 
   const getAvailableRoles = () => {
-    // If current user is Chairman (CC), they can only create Central Committee Member and Secretary
+    // Chairman (CC) can only create Central Committee Member and Secretary
     if (user && user.role === 'Chairman (CC)') {
       return [USER_ROLES.CENTRAL_COMMITTEE_MEMBER, USER_ROLES.SECRETARY];
     }
-    
-    // If current user is Super Admin or MInT Admin, they can create any role
+    // Regional Admin and Federal Admin can only create roles for their scope (no central roles)
     const selectedUnit = getSelectedUnit();
     if (selectedUnit) {
       return getRolesForUnitType(selectedUnit.unitType);
     }
-    // If no unit selected, show central roles
+    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin')) {
+      return [];
+    }
+    // Super Admin / MInT Admin: if no unit selected, show central roles
     return getRolesForUnitType(null);
   };
 
@@ -138,8 +144,6 @@ export default function CreateUser() {
     // Unit validation (required for non-central roles)
     const selectedUnit = getSelectedUnit();
     const isCentralRole = [USER_ROLES.CENTRAL_COMMITTEE_MEMBER, USER_ROLES.CHAIRMAN, USER_ROLES.SECRETARY].includes(formData.role);
-    
-    // Chairman can create Central Committee Members and Secretary without unit assignment
     if (user?.role === 'Chairman (CC)') {
       // No unit required for roles created by Chairman
     } else if (!isCentralRole && !formData.officialUnitId) {
@@ -208,7 +212,7 @@ export default function CreateUser() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
       <Layout title="Create New User">
         <div className="flex">
           <Sidebar />
@@ -244,7 +248,7 @@ export default function CreateUser() {
                     Create New User
                   </CardTitle>
                   <CardDescription>
-                    {user?.role === 'Chairman (CC)' 
+                    {user?.role === 'Chairman (CC)'
                       ? 'Create accounts for Central Committee Members and Secretary'
                       : 'Fill in the required information to create a new user account'}
                   </CardDescription>
@@ -385,8 +389,8 @@ export default function CreateUser() {
                           Administrative Unit
                           {user?.role === 'Chairman (CC)' ? (
                             <span className="text-mint-dark-text/60"> (Not required for Central Committee roles)</span>
-                          ) : getSelectedUnit() && getSelectedUnit().unitType !== 'Federal Institute' && 
-                            getSelectedUnit().unitType !== 'Region' && 
+                          ) : getSelectedUnit() && getSelectedUnit().unitType !== 'Federal Institute' &&
+                            getSelectedUnit().unitType !== 'Region' &&
                             getSelectedUnit().unitType !== 'City Administration' ? (
                             <span className="text-red-500">*</span>
                           ) : (

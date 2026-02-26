@@ -5,7 +5,7 @@ import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
-import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, resubmitToCentralCommittee, rejectToContributor, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
+import { getSubmissionById, approveResponseByRegionalApprover, rejectResponseByRegionalApprover, submitRegionalApproval, resubmitToCentralCommittee, rejectToContributor, saveRegionalNote, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
 import { getResponsesBySubmission } from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
@@ -42,9 +42,11 @@ export default function EvaluateSubmission() {
   }, [submissionId]);
 
   const loadSubmissionDetails = (submissionId) => {
-    const submission = getSubmissionById(submissionId);
+    const sid = submissionId != null ? parseInt(submissionId, 10) : NaN;
+    if (Number.isNaN(sid)) return;
+    const submission = getSubmissionById(sid);
     if (submission) {
-      const responses = getResponsesBySubmission(submissionId);
+      const responses = getResponsesBySubmission(sid);
       
       // Get the unit to determine its type
       const unit = getUnitById(submission.unitId);
@@ -114,45 +116,44 @@ export default function EvaluateSubmission() {
   };
 
   const handleApproveSubmission = () => {
-    if (!user || !submissionDetails || !submissionDetails.submission) {
+    if (!user || !submissionDetails?.submission) {
       alert('Submission details are not loaded. Please refresh the page.');
       return;
     }
-    
     if (!canPerformAction(user, 'approve_submission')) {
       alert('You do not have permission to approve submissions.');
       return;
     }
-    
+    const sid = submissionId != null ? parseInt(submissionId, 10) : NaN;
+    if (Number.isNaN(sid)) {
+      alert('Invalid submission. Please go back to the queue and try again.');
+      return;
+    }
     try {
-      // Approve all answered questions
-      const responses = submissionDetails?.responses || [];
-      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
-      answeredResponses.forEach(response => {
-        if (response && response.responseId && (!response.regionalApprovalStatus || response.regionalApprovalStatus === VALIDATION_STATUS.PENDING)) {
-          approveResponseByRegionalApprover(response.responseId, user.userId, null);
+      // Use the same source of truth as submitRegionalApproval so every "answered" response gets approved
+      const allResponses = getResponsesBySubmission(sid);
+      const answeredResponses = allResponses.filter(r =>
+        r && r.responseValue != null && String(r.responseValue).trim() !== ''
+      );
+      answeredResponses.forEach((r) => {
+        const needsApproval = !r.regionalApprovalStatus || r.regionalApprovalStatus === VALIDATION_STATUS.PENDING;
+        if (needsApproval && r.responseId != null) {
+          approveResponseByRegionalApprover(r.responseId, user.userId, null);
         }
       });
-      
-      // Submit approval
-      const result = submitRegionalApproval(submissionDetails.submission.submissionId, user.userId);
-      
+      const result = submitRegionalApproval(sid, user.userId);
       if (result) {
         setShowApproveModal(false);
-        loadSubmissionDetails(parseInt(submissionId));
+        loadSubmissionDetails(sid);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('submissionUpdated', { detail: { submissionId: result.submissionId } }));
         }
         if (result.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
           setSuccessMessage('✅ Approval submitted successfully! The submission has been sent to the Central Committee for final validation. You will be redirected to the approval queue.');
-          setTimeout(() => {
-            router.push('/approval/queue');
-          }, 3000);
+          setTimeout(() => router.push('/approval/queue'), 3000);
         } else {
           setSuccessMessage('⚠️ Approval submitted. The submission has been sent back to the Data Contributor with rejection reasons. You will be redirected to the approval queue.');
-          setTimeout(() => {
-            router.push('/approval/queue');
-          }, 3000);
+          setTimeout(() => router.push('/approval/queue'), 3000);
         }
         setTimeout(() => setSuccessMessage(''), 8000);
       }
@@ -160,6 +161,7 @@ export default function EvaluateSubmission() {
       console.error('Approve submission error:', error);
       setShowApproveModal(false);
       alert(error.message || 'Error submitting approval. Please try again.');
+      loadSubmissionDetails(sid);
     }
   };
 
@@ -169,29 +171,30 @@ export default function EvaluateSubmission() {
       alert('Please provide a rejection reason.');
       return;
     }
-    
-    if (!user || !submissionDetails || !submissionDetails.submission) {
+    if (!user || !submissionDetails?.submission) {
       alert('Submission details are not loaded. Please refresh the page.');
       return;
     }
-    
     if (!canPerformAction(user, 'approve_submission')) {
       alert('You do not have permission to reject submissions.');
       return;
     }
-    
+    const sid = submissionId != null ? parseInt(submissionId, 10) : NaN;
+    if (Number.isNaN(sid)) {
+      alert('Invalid submission. Please go back to the queue and try again.');
+      return;
+    }
     try {
-      // Reject all answered questions
-      const responses = submissionDetails?.responses || [];
-      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
-      answeredResponses.forEach(response => {
-        if (response && response.responseId) {
-          rejectResponseByRegionalApprover(response.responseId, user.userId, reason);
+      const allResponses = getResponsesBySubmission(sid);
+      const answeredResponses = allResponses.filter(r =>
+        r && r.responseValue != null && String(r.responseValue).trim() !== ''
+      );
+      answeredResponses.forEach((r) => {
+        if (r.responseId != null) {
+          rejectResponseByRegionalApprover(r.responseId, user.userId, reason);
         }
       });
-      
-      // Submit rejection
-      const result = submitRegionalApproval(submissionDetails.submission.submissionId, user.userId);
+      const result = submitRegionalApproval(sid, user.userId);
       
       if (result) {
         loadSubmissionDetails(parseInt(submissionId));
@@ -212,23 +215,21 @@ export default function EvaluateSubmission() {
     }
   };
 
-  const handleSaveComment = (responseId) => {
+  const handleSaveComment = (responseId, subQuestionId = null) => {
     if (!user) return;
-    
-    const note = regionalNotes[responseId] || '';
-    if (!note.trim()) {
-      return;
-    }
-    
-    const response = submissionDetails?.responses.find(r => r.responseId === responseId);
-    if (response) {
-      response.regionalNote = note;
-      response.updatedAt = new Date().toISOString();
-      
-      setRegionalNotes(prev => ({ ...prev, [responseId]: '' }));
-      loadSubmissionDetails(parseInt(submissionId));
+    const sid = submissionId != null ? parseInt(submissionId, 10) : NaN;
+    const rid = responseId != null ? Number(responseId) : NaN;
+    const noteKey = !Number.isNaN(rid) ? rid : subQuestionId;
+    const note = (regionalNotes[rid] || regionalNotes[responseId] || regionalNotes[subQuestionId] || regionalNotes[noteKey] || '').trim();
+    if (!note) return;
+    const updated = saveRegionalNote(Number.isNaN(rid) ? undefined : rid, note, Number.isNaN(sid) ? undefined : sid, subQuestionId != null ? Number(subQuestionId) : undefined);
+    if (updated) {
+      setRegionalNotes(prev => ({ ...prev, [rid]: '', [responseId]: '', [subQuestionId]: '', [noteKey]: '' }));
+      loadSubmissionDetails(sid);
       setSuccessMessage('💬 Comment saved successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      alert('Could not save comment. The question may not be linked yet. Please refresh and try again.');
     }
   };
 
@@ -268,9 +269,11 @@ export default function EvaluateSubmission() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '';
+    if (dateString == null || dateString === '' || Number.isNaN(dateString)) return '';
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      const d = new Date(dateString);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -278,6 +281,12 @@ export default function EvaluateSubmission() {
     } catch {
       return '';
     }
+  };
+
+  const safeComment = (value) => {
+    if (value == null || value === '') return '';
+    const s = String(value).trim();
+    return s === 'NaN' || s === 'undefined' ? '' : s;
   };
 
   const getUnitName = (unitId) => {
@@ -363,6 +372,9 @@ export default function EvaluateSubmission() {
                       submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
   
   const isRejectedByCentralCommittee = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
+  const isWithCentralCommittee = submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION ||
+    submissionDetails.submission.submissionStatus === SUBMISSION_STATUS.VALIDATED;
+  const canInitialApproverAct = isSubmitted && !isWithCentralCommittee;
 
   return (
     <ProtectedRoute allowedRoles={['Regional Approver', 'Federal Approver']}>
@@ -516,6 +528,7 @@ export default function EvaluateSubmission() {
                                 const actualResponse = response || submissionDetails?.responses?.find(r => r && r.subQuestionId === subQuestion.subQuestionId) || null;
                                 const answerText = actualResponse?.responseValue || '';
                                 const hasAnswer = answerText && answerText.trim() !== '';
+                                const commentKey = actualResponse?.responseId ?? subQuestion.subQuestionId;
                                 
                                 return (
                                   <div 
@@ -539,7 +552,7 @@ export default function EvaluateSubmission() {
                                               Type: {subQuestion.responseType}
                                             </span>
                                             <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
-                                              Weight: {subQuestion.subWeightPercentage}%
+                                              Weight: {typeof subQuestion.subWeightPercentage === 'number' && !Number.isNaN(subQuestion.subWeightPercentage) ? subQuestion.subWeightPercentage : '—'}%
                                             </span>
                                           </div>
                                           {/* Always show Answer inline with question - all submitted submissions must have answers */}
@@ -601,10 +614,10 @@ export default function EvaluateSubmission() {
                                                 <h4 className="text-sm font-bold text-gray-900">Comments</h4>
                                                 <button
                                                   onClick={() => {
-                                                    if (actualResponse && actualResponse.responseId) {
+                                                    if (actualResponse && commentKey != null) {
                                                       setOpenCommentSections(prev => ({ 
                                                         ...prev, 
-                                                        [actualResponse.responseId]: !prev[actualResponse.responseId] 
+                                                        [commentKey]: !prev[commentKey] 
                                                       }));
                                                     }
                                                   }}
@@ -614,8 +627,8 @@ export default function EvaluateSubmission() {
                                                 </button>
                                               </div>
                                               
-                                              {/* Existing Comments - Always visible */}
-                                              {actualResponse.regionalNote && (
+                                              {/* Existing Comments - Always visible (guard against NaN/invalid) */}
+                                              {safeComment(actualResponse.regionalNote) && (
                                                 <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
                                                   <div className="flex items-start space-x-2 mb-2">
                                                     <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -629,11 +642,11 @@ export default function EvaluateSubmission() {
                                                             if (approverId) {
                                                               const approver = getUserById(approverId);
                                                               if (approver) {
-                                                                return `${approver.fullName} (${approver.role})`;
+                                                                return `${approver.fullName || approver.username || ''} (${approver.role || ''})`;
                                                               }
                                                             }
                                                             if (user) {
-                                                              return `${user.fullName || user.username} (${user.role})`;
+                                                              return `${user.fullName || user.username || ''} (${user.role || ''})`;
                                                             }
                                                             return 'Regional Approver';
                                                           })()}
@@ -643,21 +656,21 @@ export default function EvaluateSubmission() {
                                                         </span>
                                                       </div>
                                                       <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
-                                                        {actualResponse.regionalNote}
+                                                        {safeComment(actualResponse.regionalNote)}
                                                       </p>
                                                     </div>
                                                   </div>
                                                 </div>
                                               )}
                                               
-                                              {/* Comment Input - Toggleable */}
-                                              {actualResponse && actualResponse.responseId && openCommentSections[actualResponse.responseId] && (
+                                              {/* Comment Input - Toggleable (commentKey = responseId or subQuestionId for new users/edge cases) */}
+                                              {actualResponse && commentKey != null && openCommentSections[commentKey] && (
                                                 <div className="space-y-2">
                                                   <textarea
-                                                    value={regionalNotes[actualResponse.responseId] || ''}
+                                                    value={regionalNotes[commentKey] || regionalNotes[actualResponse.responseId] || ''}
                                                     onChange={(e) => {
-                                                      if (actualResponse && actualResponse.responseId) {
-                                                        setRegionalNotes(prev => ({ ...prev, [actualResponse.responseId]: e.target.value }));
+                                                      if (actualResponse && commentKey != null) {
+                                                        setRegionalNotes(prev => ({ ...prev, [commentKey]: e.target.value }));
                                                       }
                                                     }}
                                                     rows="3"
@@ -666,9 +679,10 @@ export default function EvaluateSubmission() {
                                                   />
                                                   <div className="flex justify-end space-x-2">
                                                     <button
+                                                      type="button"
                                                       onClick={() => {
-                                                        if (actualResponse && actualResponse.responseId) {
-                                                          setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
+                                                        if (commentKey != null) {
+                                                          setOpenCommentSections(prev => ({ ...prev, [commentKey]: false }));
                                                         }
                                                       }}
                                                       className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-xs"
@@ -676,13 +690,14 @@ export default function EvaluateSubmission() {
                                                       Cancel
                                                     </button>
                                                     <button
+                                                      type="button"
                                                       onClick={() => {
-                                                        if (actualResponse && actualResponse.responseId) {
-                                                          handleSaveComment(actualResponse.responseId);
-                                                          setOpenCommentSections(prev => ({ ...prev, [actualResponse.responseId]: false }));
+                                                        if (actualResponse && commentKey != null) {
+                                                          handleSaveComment(actualResponse.responseId, subQuestion.subQuestionId);
+                                                          setOpenCommentSections(prev => ({ ...prev, [commentKey]: false }));
                                                         }
                                                       }}
-                                                      disabled={!actualResponse || !actualResponse.responseId || !regionalNotes[actualResponse.responseId]?.trim()}
+                                                      disabled={!actualResponse || !(regionalNotes[commentKey] || regionalNotes[actualResponse.responseId] || '')?.trim()}
                                                       className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                       Add Comment
@@ -790,15 +805,17 @@ export default function EvaluateSubmission() {
                         })()}</p>
                       )}
                     </div>
-                    {isRejectedByCentralCommittee ? (
+                    {isWithCentralCommittee ? (
+                      <p className="mt-4 text-sm text-blue-700 font-medium">This submission is with the Central Committee (or already validated). You cannot take action here. Use the Central Validation Queue if you are a committee member or Chairman.</p>
+                    ) : isRejectedByCentralCommittee ? (
                       <p className="mt-4 text-sm text-red-700 font-medium">This submission was rejected by the Central Committee. Choose an action below.</p>
                     ) : (
                       <p className="mt-4 text-sm text-gray-700 font-medium">Review and take necessary action.</p>
                     )}
                   </div>
                   
-                  {/* Action Buttons */}
-                  {isRejectedByCentralCommittee ? (
+                  {/* Action Buttons — only when submission needs initial approval action */}
+                  {canInitialApproverAct && isRejectedByCentralCommittee ? (
                     <div className="space-y-3">
                       <button
                         onClick={handleEditAndResubmit}
@@ -813,7 +830,7 @@ export default function EvaluateSubmission() {
                         Reject to Contributor
                       </button>
                     </div>
-                  ) : (
+                  ) : canInitialApproverAct ? (
                     <div className="space-y-3">
                       <button
                         onClick={() => setShowApproveModal(true)}
@@ -828,7 +845,7 @@ export default function EvaluateSubmission() {
                         Reject
                       </button>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </aside>
             )}
@@ -855,10 +872,10 @@ export default function EvaluateSubmission() {
               </div>
               <div className="px-6 py-5">
                 <p className="text-base leading-relaxed text-gray-700 mb-4">
-                  Are you sure you want to approve this submission? Once approved, it will be sent to the Central Committee for final validation.
+                  Are you sure you want to approve this submission? Once approved, it will be sent to the Central Committee.
                 </p>
                 <p className="text-sm text-gray-600 mb-4">
-                  <strong>Next Step:</strong> The submission will be forwarded to the Central Committee for review and validation.
+                  <strong>Next step:</strong> Central Committee members will review each question and submit their approvals. When all have completed, the Chairman will see the list of actions per question and provide final approval or rejection.
                 </p>
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">

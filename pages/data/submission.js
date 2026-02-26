@@ -28,7 +28,6 @@ import {
   SUBMISSION_STATUS
 } from '../../data/submissions';
 import { getSubQuestionById } from '../../data/assessmentFramework';
-
 export default function DataSubmission() {
   const { user } = useAuth();
   const { isCollapsed, setCollapsed } = useSidebar();
@@ -688,8 +687,8 @@ export default function DataSubmission() {
         setIncompleteDimensionIds(new Set());
         setSuccessMessage(
           '✅ Submission sent for approval successfully!\n\n' +
-          'Your submission has been sent to the Regional Approver for review.\n\n' +
-          'After regional approval, it will proceed to the Central Committee for final validation.\n\n' +
+          'Your submission has been sent to the Initial Approver (Regional or Federal) for your unit\'s scope.\n\n' +
+          'After initial approval, it will go to the Central Committee for per-question review, then to the Chairman for final approval.\n\n' +
           'You will be notified of any changes or rejections.'
         );
         setTimeout(() => setSuccessMessage(''), 10000);

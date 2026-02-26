@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { verifyOTP, sendOTP, getUserById } from '../data/users';
+import { verifyOTP, sendOTP, getUserById, recordLastLogin } from '../data/users';
 import { getUnitById } from '../data/administrativeUnits';
 import { InputOTP } from '../components/ui/input-otp';
 import { Label } from '../components/ui/label';
@@ -173,6 +173,9 @@ export default function Verify2FA() {
           unitInfo = getUnitById(user.officialUnitId);
         }
 
+        recordLastLogin(user.userId);
+
+        const now = Date.now();
         const userSession = {
           userId: user.userId,
           username: user.username,
@@ -180,9 +183,11 @@ export default function Verify2FA() {
           role: user.role,
           officialUnitId: user.officialUnitId,
           unitInfo: unitInfo,
-          unitType: unitInfo ? unitInfo.unitType : null
+          unitType: unitInfo ? unitInfo.unitType : null,
+          sessionStoredAt: now,
+          lastActivityAt: now
         };
-        
+
         localStorage.setItem('egirs_user', JSON.stringify(userSession));
         localStorage.removeItem('egirs_pending_2fa');
         

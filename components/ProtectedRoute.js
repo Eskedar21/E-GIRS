@@ -3,22 +3,25 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProtectedRoute({ children, allowedRoles = ['all'] }) {
-  const { user, isLoading, hasRole } = useAuth();
+  const { user, isLoading, hasRole, logoutIfExpired } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading) {
+      if (logoutIfExpired()) {
+        router.push('/login');
+        return;
+      }
       if (!user) {
         router.push('/login');
         return;
       }
-
       if (!hasRole(allowedRoles)) {
         router.push('/dashboard');
         return;
       }
     }
-  }, [user, isLoading, allowedRoles, router]); // Removed hasRole from deps as it's memoized
+  }, [user, isLoading, allowedRoles, router, logoutIfExpired]);
 
   if (isLoading) {
     return (

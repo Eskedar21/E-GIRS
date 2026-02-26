@@ -154,15 +154,20 @@ export default function ReportsIndex() {
       .map(([name, value]) => ({ name, value }));
   }, [rankedUnits]);
 
-  // Top units by score
+  // Top units by score (with rank)
   const topUnits = useMemo(() => {
     return rankedUnits
       .slice(0, 5)
-      .map(unit => ({
-        name: unit.name.length > 20 ? unit.name.substring(0, 20) + '...' : unit.name,
-        score: (unit.score || 0) * 100, // Convert to percentage
-        fullName: unit.name
-      }));
+      .map((unit, index) => {
+        const rank = index + 1;
+        const shortName = unit.name.length > 20 ? unit.name.substring(0, 20) + '...' : unit.name;
+        return {
+          rank,
+          name: `${rank}. ${shortName}`,
+          score: (unit.score || 0) * 100, // Convert to percentage
+          fullName: unit.name
+        };
+      });
   }, [rankedUnits]);
 
   // National dimension scores for radar chart
@@ -193,7 +198,7 @@ export default function ReportsIndex() {
     const yearId = selectedYearId === '2024' ? 1 : 2;
     
     // Apply role-based scoping
-    if (['Federal Approver', 'Institute Admin', 'Institute Data Contributor'].includes(userRole)) {
+    if (['Federal Approver', 'Federal Admin', 'Institute Data Contributor'].includes(userRole)) {
       if (!user?.officialUnitId) return [];
       institutes = institutes.filter(inst => {
         if (userRole === 'Federal Approver') {
@@ -258,7 +263,7 @@ export default function ReportsIndex() {
   };
 
   // Check if user can view federal submissions
-  const canViewFederal = ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Approver', 'Institute Admin', 'Institute Data Contributor'].includes(userRole);
+  const canViewFederal = ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Approver', 'Federal Admin', 'Institute Data Contributor'].includes(userRole);
 
   return (
     <ProtectedRoute allowedRoles={['all']}>

@@ -31683,20 +31683,71 @@ let responses = [
     regionalNote: null,
     createdAt: '2024-12-21T10:20:00.000Z',
     updatedAt: '2024-12-23T16:00:00.000Z'
+  },
+  // Submission 102 (Ministry of Education - Pending Central Validation) — for testing committee inline approval
+  {
+    responseId: 9001,
+    submissionId: 102,
+    subQuestionId: 1,
+    responseValue: 'Yes, we have an e-government policy document approved in 2024.',
+    evidenceLink: 'https://moe.gov.et/policy',
+    evidenceFilePath: null,
+    validationStatus: VALIDATION_STATUS.PENDING,
+    centralRejectionReason: null,
+    generalNote: null,
+    regionalApprovalStatus: VALIDATION_STATUS.APPROVED,
+    regionalRejectionReason: null,
+    regionalNote: null,
+    createdAt: '2024-12-19T10:00:00.000Z',
+    updatedAt: '2024-12-19T10:00:00.000Z'
+  },
+  {
+    responseId: 9002,
+    submissionId: 102,
+    subQuestionId: 2,
+    responseValue: 'Targets include digital services, citizen engagement, and infrastructure.',
+    evidenceLink: null,
+    evidenceFilePath: null,
+    validationStatus: VALIDATION_STATUS.PENDING,
+    centralRejectionReason: null,
+    generalNote: null,
+    regionalApprovalStatus: VALIDATION_STATUS.APPROVED,
+    regionalRejectionReason: null,
+    regionalNote: null,
+    createdAt: '2024-12-19T10:05:00.000Z',
+    updatedAt: '2024-12-19T10:05:00.000Z'
+  },
+  {
+    responseId: 9003,
+    submissionId: 102,
+    subQuestionId: 3,
+    responseValue: 'Yes, we have a dedicated e-government unit with 10 staff.',
+    evidenceLink: 'https://moe.gov.et/structure',
+    evidenceFilePath: null,
+    validationStatus: VALIDATION_STATUS.PENDING,
+    centralRejectionReason: null,
+    generalNote: null,
+    regionalApprovalStatus: VALIDATION_STATUS.APPROVED,
+    regionalRejectionReason: null,
+    regionalNote: null,
+    createdAt: '2024-12-19T10:10:00.000Z',
+    updatedAt: '2024-12-19T10:10:00.000Z'
   }
   // NOTE: The above responses are sample data. In production, ALL applicable questions for each unit type
   // must be answered before submission. The system validation ensures this. For demonstration purposes,
   // we show a subset. To see complete data, all questions from indicators applicable to each unit type
   // should have responses. For Region/City: questions 1-14, 26-28, 33-34, 42-44, 48-49, 53-54, 62-63, 64-67, 68-69, 79-80.
   // For Sub-city/Woreda: questions 15-25, 29-32, 35-37, 38-41, 45-47, 50-52, 70-75.
-];
+  ];
 
 // Get all submissions
 export const getAllSubmissions = () => [...submissions];
 
 // Get submission by ID
 export const getSubmissionById = (submissionId) => {
-  return submissions.find(s => s.submissionId === submissionId);
+  const id = submissionId != null ? Number(submissionId) : NaN;
+  if (Number.isNaN(id)) return undefined;
+  return submissions.find(s => s && Number(s.submissionId) === id);
 };
 
 // Get submissions by unit
@@ -31752,7 +31803,9 @@ export const updateSubmission = (submissionId, submissionData) => {
 
 // Get responses for a submission
 export const getResponsesBySubmission = (submissionId) => {
-  return responses.filter(r => r.submissionId === submissionId);
+  const sid = submissionId != null ? Number(submissionId) : NaN;
+  if (Number.isNaN(sid)) return [];
+  return responses.filter(r => r && Number(r.submissionId) === sid);
 };
 
 // Get response by sub-question
@@ -32006,7 +32059,7 @@ export const saveResponse = (responseData) => {
   }
 };
 
-// Submit for approval
+// Submit for approval — Flow: Contributor submits → PENDING_INITIAL_APPROVAL → Initial Approver (scope-based) → PENDING_CENTRAL_VALIDATION → Central Committee (inline per question) → Chairman (final approve/reject)
 export const submitForApproval = (submissionId) => {
   const submission = getSubmissionById(submissionId);
   if (submission) {
@@ -32014,7 +32067,7 @@ export const submitForApproval = (submissionId) => {
     submission.submittedDate = new Date().toISOString();
     submission.updatedAt = new Date().toISOString();
     
-    // Send notification to approvers
+    // Notify initial approvers whose scope includes this submission's unit
     try {
       const { notifySubmissionReceived, notifyNewSubmissionsInQueue } = require('./notifications');
       const { getUnitById, getAllUnits } = require('./administrativeUnits');
@@ -32066,19 +32119,40 @@ export const submitForApproval = (submissionId) => {
   return null;
 };
 
+// Save regional approver note only (no approval/rejection change). Used when initial approver adds a comment per question.
+// Optional submissionId + subQuestionId allow finding the response when responseId is missing (e.g. newly created user / API data).
+export const saveRegionalNote = (responseId, note, submissionId = null, subQuestionId = null) => {
+  if (!responses || !Array.isArray(responses)) return null;
+  const noteStr = note != null ? String(note) : null;
+  let response = null;
+  const rid = responseId != null ? Number(responseId) : NaN;
+  if (!Number.isNaN(rid) && rid >= 0) {
+    response = responses.find(r => r && r.responseId === rid);
+  }
+  if (!response && submissionId != null && subQuestionId != null) {
+    const sid = Number(submissionId);
+    const sqid = Number(subQuestionId);
+    if (!Number.isNaN(sid) && !Number.isNaN(sqid)) {
+      response = responses.find(r => r && r.submissionId === sid && r.subQuestionId === sqid);
+    }
+  }
+  if (response) {
+    response.regionalNote = noteStr;
+    response.updatedAt = new Date().toISOString();
+    return response;
+  }
+  return null;
+};
+
 // Regional Approver per-question approval actions (does NOT auto-submit)
 export const approveResponseByRegionalApprover = (responseId, approverUserId, note = null) => {
-  if (!responseId) {
-    console.error('approveResponseByRegionalApprover called with undefined or null responseId');
+  const rid = responseId != null ? Number(responseId) : NaN;
+  if (Number.isNaN(rid)) {
+    console.error('approveResponseByRegionalApprover called with invalid responseId');
     return null;
   }
-  
-  if (!responses || !Array.isArray(responses)) {
-    console.error('responses array is not initialized');
-    return null;
-  }
-  
-  const response = responses.find(r => r && r.responseId === responseId);
+  if (!responses || !Array.isArray(responses)) return null;
+  const response = responses.find(r => r && Number(r.responseId) === rid);
   if (response) {
     response.regionalApprovalStatus = VALIDATION_STATUS.APPROVED;
     response.regionalRejectionReason = null;
@@ -32092,17 +32166,13 @@ export const approveResponseByRegionalApprover = (responseId, approverUserId, no
 
 // Regional Approver per-question rejection (does NOT auto-submit)
 export const rejectResponseByRegionalApprover = (responseId, approverUserId, rejectionReason) => {
-  if (!responseId) {
-    console.error('rejectResponseByRegionalApprover called with undefined or null responseId');
+  const rid = responseId != null ? Number(responseId) : NaN;
+  if (Number.isNaN(rid)) {
+    console.error('rejectResponseByRegionalApprover called with invalid responseId');
     return null;
   }
-  
-  if (!responses || !Array.isArray(responses)) {
-    console.error('responses array is not initialized');
-    return null;
-  }
-  
-  const response = responses.find(r => r && r.responseId === responseId);
+  if (!responses || !Array.isArray(responses)) return null;
+  const response = responses.find(r => r && Number(r.responseId) === rid);
   if (response) {
     response.regionalApprovalStatus = VALIDATION_STATUS.REJECTED;
     response.regionalRejectionReason = rejectionReason;
@@ -32115,14 +32185,17 @@ export const rejectResponseByRegionalApprover = (responseId, approverUserId, rej
 
 // Submit regional approval - sends to central or back to contributor
 export const submitRegionalApproval = (submissionId, approverUserId) => {
-  const submission = getSubmissionById(submissionId);
+  const sid = submissionId != null ? Number(submissionId) : NaN;
+  if (Number.isNaN(sid)) return null;
+  const submission = getSubmissionById(sid);
   if (!submission) return null;
-  
-  const submissionResponses = getResponsesBySubmission(submissionId);
-  const allResponses = submissionResponses.filter(r => r.responseValue !== null && r.responseValue !== undefined);
-  const reviewedResponses = allResponses.filter(r => r.regionalApprovalStatus !== null);
-  
-  // Check if all questions have been reviewed
+  const submissionResponses = getResponsesBySubmission(sid);
+  const allResponses = submissionResponses.filter(r =>
+    r.responseValue != null && String(r.responseValue).trim() !== ''
+  );
+  const reviewedResponses = allResponses.filter(r =>
+    r.regionalApprovalStatus === VALIDATION_STATUS.APPROVED || r.regionalApprovalStatus === VALIDATION_STATUS.REJECTED
+  );
   if (reviewedResponses.length !== allResponses.length) {
     throw new Error('Please review all questions before submitting approval.');
   }
@@ -32164,19 +32237,22 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
       console.error('Error sending notification:', error);
     }
   } else {
-    // All responses approved - send to Central Committee
+    // All responses approved - send to Central Committee (flow: contributor → initial approver → central committee → chairman)
     submission.submissionStatus = SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION;
     submission.approverUserId = approverUserId;
     submission.approvalDate = new Date().toISOString();
     submission.rejectionReason = null;
     submission.updatedAt = new Date().toISOString();
     
-    // Reset central validation status for fresh review
+    // Reset central validation status for fresh review by Central Committee
     submissionResponses.forEach(r => {
       r.validationStatus = VALIDATION_STATUS.PENDING;
       r.centralRejectionReason = null;
       r.generalNote = null;
     });
+    // Clear any prior committee inline validations so Central Committee members start fresh per question
+    committeeMemberValidations = committeeMemberValidations.filter(v => v.submissionId !== Number(submissionId));
+    committeeValidationSubmissions = committeeValidationSubmissions.filter(e => e.submissionId !== Number(submissionId));
     
     // Send notification to contributor
     try {
@@ -32247,13 +32323,168 @@ export const validateResponse = (responseId, validationStatus, rejectionReason =
   return null;
 };
 
-// Submit central validation - sends to calculation or back to regional approver
+// --- Inline committee member validations (per-question approval + comment, then forward to chairman) ---
+// Store: { submissionId, responseId, committeeMemberId, status: 'Approved'|'Rejected', comment, updatedAt }
+let committeeMemberValidations = [];
+// Store: { submissionId, committeeMemberId, submittedAt } — who has submitted their validations
+let committeeValidationSubmissions = [];
+
+export const getCommitteeMemberValidationsForSubmission = (submissionId) => {
+  return committeeMemberValidations.filter(v => v.submissionId === Number(submissionId));
+};
+
+/** Returns validations grouped by responseId: { [responseId]: [{ committeeMemberId, status, comment, updatedAt }] } */
+export const getCommitteeMemberValidationsByResponse = (submissionId) => {
+  const list = getCommitteeMemberValidationsForSubmission(submissionId);
+  const byResponse = {};
+  list.forEach(v => {
+    if (!byResponse[v.responseId]) byResponse[v.responseId] = [];
+    byResponse[v.responseId].push({
+      committeeMemberId: v.committeeMemberId,
+      status: v.status,
+      comment: v.comment || '',
+      updatedAt: v.updatedAt
+    });
+  });
+  return byResponse;
+};
+
+export const getCommitteeMemberValidation = (submissionId, responseId, committeeMemberId) => {
+  return committeeMemberValidations.find(
+    v => v.submissionId === Number(submissionId) && v.responseId === Number(responseId) && v.committeeMemberId === Number(committeeMemberId)
+  );
+};
+
+export const saveCommitteeMemberValidation = (submissionId, responseId, committeeMemberId, status, comment) => {
+  const sid = Number(submissionId);
+  const rid = Number(responseId);
+  const mid = Number(committeeMemberId);
+  const existing = committeeMemberValidations.find(
+    v => v.submissionId === sid && v.responseId === rid && v.committeeMemberId === mid
+  );
+  const record = { submissionId: sid, responseId: rid, committeeMemberId: mid, status, comment: comment || null, updatedAt: new Date().toISOString() };
+  if (existing) {
+    Object.assign(existing, record);
+    return existing;
+  }
+  committeeMemberValidations.push(record);
+  return record;
+};
+
+/** Submit current member's validations; requires all answered responses to have a validation from this member. */
+export const submitCommitteeValidation = (submissionId, committeeMemberId) => {
+  const submission = getSubmissionById(submissionId);
+  if (!submission || submission.submissionStatus !== SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+    throw new Error('Submission not found or not pending central validation.');
+  }
+  const { getUsersByRole } = require('./users');
+  const responses = getResponsesBySubmission(submissionId);
+  const answered = responses.filter(r => r.responseValue != null && String(r.responseValue).trim() !== '');
+  const mid = Number(committeeMemberId);
+  for (const r of answered) {
+    const v = getCommitteeMemberValidation(submissionId, r.responseId, mid);
+    if (!v || !v.status) throw new Error('You must approve or reject every question before submitting.');
+  }
+  const existing = committeeValidationSubmissions.find(
+    e => e.submissionId === Number(submissionId) && e.committeeMemberId === mid
+  );
+  if (!existing) {
+    committeeValidationSubmissions.push({
+      submissionId: Number(submissionId),
+      committeeMemberId: mid,
+      submittedAt: new Date().toISOString()
+    });
+  }
+  return { submissionId: Number(submissionId), committeeMemberId: mid };
+};
+
+export const getCommitteeValidationSubmissions = (submissionId) => {
+  return committeeValidationSubmissions.filter(e => e.submissionId === Number(submissionId));
+};
+
+/** True if every Central Committee Member has submitted their validation for this submission. */
+export const haveAllCommitteeMembersSubmittedValidation = (submissionId) => {
+  const { getUsersByRole } = require('./users');
+  const members = getUsersByRole('Central Committee Member') || [];
+  if (members.length === 0) return false;
+  const submitted = getCommitteeValidationSubmissions(submissionId);
+  return submitted.length >= members.length;
+};
+
+/** Submissions in PENDING_CENTRAL_VALIDATION where all committee members have submitted (ready for chairman final decision). */
+export const getSubmissionsReadyForChairmanValidation = () => {
+  const list = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
+  return list.filter(sub => haveAllCommitteeMembersSubmittedValidation(sub.submissionId));
+};
+
+/** Chairman final validation: approve (VALIDATED) or reject (REJECTED_BY_CENTRAL_COMMITTEE). rejectionReasonsByResponse = { responseId: string }. */
+export const submitChairmanFinalValidation = (submissionId, chairmanUserId, approved, rejectionReasonsByResponse = null) => {
+  const submission = getSubmissionById(submissionId);
+  if (!submission) return null;
+  if (submission.submissionStatus !== SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+    throw new Error('Submission is not pending central validation.');
+  }
+  if (!haveAllCommitteeMembersSubmittedValidation(submissionId)) {
+    throw new Error('All committee members must submit their validations before the Chairman can finalize.');
+  }
+  const { getSubQuestionById } = require('./assessmentFramework');
+  const submissionResponses = getResponsesBySubmission(submissionId);
+  const answered = submissionResponses.filter(r => r.responseValue != null && String(r.responseValue).trim() !== '');
+
+  if (approved) {
+    answered.forEach(r => {
+      r.validationStatus = VALIDATION_STATUS.APPROVED;
+      r.centralRejectionReason = null;
+      r.updatedAt = new Date().toISOString();
+    });
+    submission.submissionStatus = SUBMISSION_STATUS.VALIDATED;
+    submission.updatedAt = new Date().toISOString();
+    try {
+      const { notifySubmissionValidated } = require('./notifications');
+      const { getUnitById } = require('./administrativeUnits');
+      const unit = getUnitById(submission.unitId);
+      const unitName = unit ? unit.officialUnitName : 'Unknown Unit';
+      if (submission.approverUserId) notifySubmissionValidated(submissionId, submission.approverUserId, unitName);
+    } catch (e) { console.error(e); }
+    return submission;
+  }
+
+  submission.submissionStatus = SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE;
+  submission.updatedAt = new Date().toISOString();
+  const reasons = rejectionReasonsByResponse || {};
+  let rejectionText = 'Central Committee Rejection Reasons (Chairman final decision):\n\n';
+  answered.forEach((r, idx) => {
+    const reason = reasons[r.responseId] || 'Rejected by Chairman.';
+    r.validationStatus = VALIDATION_STATUS.REJECTED;
+    r.centralRejectionReason = reason;
+    r.updatedAt = new Date().toISOString();
+    const subQ = getSubQuestionById(r.subQuestionId);
+    rejectionText += `${idx + 1}. ${subQ?.subQuestionText || `Question ${r.responseId}`}\n   Reason: ${reason}\n\n`;
+  });
+  submission.rejectionReason = rejectionText;
+  try {
+    const { notifySubmissionRejectedByCentralCommittee } = require('./notifications');
+    const { getUnitById } = require('./administrativeUnits');
+    const unit = getUnitById(submission.unitId);
+    const unitName = unit ? unit.officialUnitName : 'Unknown Unit';
+    if (submission.approverUserId) notifySubmissionRejectedByCentralCommittee(submissionId, submission.approverUserId, unitName, submission.rejectionReason);
+  } catch (e) { console.error(e); }
+  return submission;
+};
+
+// Submit central validation - sends to calculation or back to regional approver (legacy single-validator path)
 export const submitCentralValidation = (submissionId, validatorUserId) => {
   const submission = getSubmissionById(submissionId);
   if (!submission) return null;
   
   // Dynamically import to avoid circular dependency
   const { getSubQuestionById } = require('./assessmentFramework');
+  const { getUsersByRole } = require('./users');
+  const committeeMembers = getUsersByRole('Central Committee Member') || [];
+  // If we have committee members and this submission uses inline flow (at least one member has submitted), only chairman can finalize via submitChairmanFinalValidation
+  if (committeeMembers.length > 0 && getCommitteeValidationSubmissions(submissionId).length > 0) {
+    throw new Error('This submission uses committee inline approvals. Only the Chairman can provide final approval after all members have submitted.');
+  }
   
   const submissionResponses = getResponsesBySubmission(submissionId);
   const allResponses = submissionResponses.filter(r => r.responseValue !== null && r.responseValue !== undefined);
@@ -32337,6 +32568,9 @@ export const resubmitToCentralCommittee = (submissionId) => {
   if (submission) {
     submission.submissionStatus = SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION;
     submission.updatedAt = new Date().toISOString();
+    // Clear inline committee validations so members can vote again
+    committeeMemberValidations = committeeMemberValidations.filter(v => v.submissionId !== Number(submissionId));
+    committeeValidationSubmissions = committeeValidationSubmissions.filter(e => e.submissionId !== Number(submissionId));
     // Reset validation status for all responses
     const submissionResponses = getResponsesBySubmission(submissionId);
     if (submissionResponses && Array.isArray(submissionResponses)) {
@@ -32400,4 +32634,39 @@ export const rejectToContributor = (submissionId, additionalComment) => {
   }
   return null;
 };
+
+// Seed one submission (102) as "reviewed by all committee members" for testing Chairman "Ready for your decision"
+(function seedCommitteeValidationForTest() {
+  try {
+    const sub = getSubmissionById(102);
+    if (!sub || sub.submissionStatus !== SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) return;
+    const respList = getResponsesBySubmission(102);
+    const answered = respList.filter(r => r.responseValue != null && String(r.responseValue).trim() !== '');
+    if (answered.length === 0) return;
+    const { getUsersByRole } = require('./users');
+    const members = getUsersByRole('Central Committee Member') || [];
+    if (members.length === 0) return;
+    const sid = 102;
+    const now = new Date().toISOString();
+    members.forEach(m => {
+      if (!committeeValidationSubmissions.some(e => e.submissionId === sid && e.committeeMemberId === m.userId)) {
+        committeeValidationSubmissions.push({ submissionId: sid, committeeMemberId: m.userId, submittedAt: now });
+      }
+      answered.forEach(r => {
+        if (!committeeMemberValidations.some(v => v.submissionId === sid && v.responseId === r.responseId && v.committeeMemberId === m.userId)) {
+          committeeMemberValidations.push({
+            submissionId: sid,
+            responseId: r.responseId,
+            committeeMemberId: m.userId,
+            status: 'Approved',
+            comment: 'Seeded for test — committee review complete.',
+            updatedAt: now
+          });
+        }
+      });
+    });
+  } catch (e) {
+    console.error('seedCommitteeValidationForTest:', e);
+  }
+})();
 

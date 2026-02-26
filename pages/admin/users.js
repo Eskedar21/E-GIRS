@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
@@ -6,6 +6,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAllUnits } from '../../data/administrativeUnits';
 import { getAllUsers, deleteUser } from '../../data/users';
+import { filterUsersByScope, canPerformAction } from '../../utils/permissions';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
@@ -19,22 +20,33 @@ export default function UserManagement() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [listKey, setListKey] = useState(0);
-  const [refreshedAt, setRefreshedAt] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterAdminUnit, setFilterAdminUnit] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [listVersion, setListVersion] = useState(0);
 
   const loadUsersData = () => {
-    setUsers(() => getAllUsers());
-    setUnits(() => getAllUnits());
+    const allUnits = getAllUnits();
+    setUnits(() => allUnits);
+    const allUsers = getAllUsers();
+    const filtered = user ? filterUsersByScope(user, allUsers, allUnits) : allUsers;
+    setUsers(() => filtered);
+    setListVersion((v) => v + 1);
   };
 
-  const handleRefresh = () => {
-    loadUsersData();
-    setListKey((k) => k + 1);
-    setRefreshedAt(Date.now());
-    setTimeout(() => setRefreshedAt(null), 2000);
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
   };
 
   useEffect(() => {
-    // Initial load
+    if (!user) return;
     loadUsersData();
     
     // Refresh when route changes (e.g., coming back from create page)
@@ -73,14 +85,14 @@ export default function UserManagement() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [router]);
+  }, [router, user]);
 
   // Also refresh when router is ready and pathname matches
   useEffect(() => {
-    if (router.isReady && router.pathname === '/admin/users') {
+    if (user && router.isReady && router.pathname === '/admin/users') {
       loadUsersData();
     }
-  }, [router.isReady, router.pathname]);
+  }, [router.isReady, router.pathname, user]);
 
   // Refetch when navigating back to this page (e.g. after edit) so table shows latest data
   useEffect(() => {
@@ -99,7 +111,7 @@ export default function UserManagement() {
       try {
         const deleted = deleteUser(userToDelete.userId);
         if (deleted) {
-          setUsers(getAllUsers());
+          loadUsersData();
           setSuccessMessage(`User "${deleted.username}" has been deleted successfully.`);
           setDeleteDialogOpen(false);
           setUserToDelete(null);
@@ -125,8 +137,56 @@ export default function UserManagement() {
     return unit ? unit.officialUnitName : 'Unknown';
   };
 
+  const formatDateTime = (isoStr) => {
+    if (!isoStr) return 'Never';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    } catch {
+      return '—';
+    }
+  };
+
+  // Derive displayed list from fresh data (getAllUsers) so newly created users always appear
+  const { displayedUsers, totalScopeCount } = useMemo(() => {
+    const allUnits = getAllUnits();
+    const allUsers = getAllUsers();
+    const scopeFiltered = user ? filterUsersByScope(user, allUsers, allUnits) : allUsers;
+    const totalScopeCount = scopeFiltered.length;
+    let list = [...scopeFiltered];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((u) => {
+        const username = (u.username || '').toLowerCase();
+        const fullName = (u.fullName || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        return username.includes(q) || fullName.includes(q) || email.includes(q);
+      });
+    }
+    if (filterAdminUnit === 'central') {
+      list = list.filter((u) => u.officialUnitId == null);
+    } else if (filterAdminUnit) {
+      const unitId = parseInt(filterAdminUnit, 10);
+      if (!isNaN(unitId)) list = list.filter((u) => u.officialUnitId === unitId);
+    }
+    if (filterStatus === 'Verified') list = list.filter((u) => !!u.isEmailVerified);
+    if (filterStatus === 'Pending') list = list.filter((u) => !u.isEmailVerified);
+
+    if (sortBy === 'createdAt' || sortBy === 'lastLoginAt') {
+      list = [...list].sort((a, b) => {
+        const aVal = a[sortBy] ? new Date(a[sortBy]).getTime() : 0;
+        const bVal = b[sortBy] ? new Date(b[sortBy]).getTime() : 0;
+        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return { displayedUsers: list, totalScopeCount };
+  }, [user, searchQuery, filterAdminUnit, filterStatus, sortBy, sortOrder, listVersion]);
+
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
       <Layout title="User Management">
         <div className="flex">
           <Sidebar />
@@ -141,20 +201,14 @@ export default function UserManagement() {
                   <p className="text-mint-dark-text/70">Create and manage user accounts with role-based access</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleRefresh}
-                    variant="outline"
-                    className="border-mint-primary-blue text-mint-primary-blue hover:bg-mint-light-gray"
-                  >
-                    Refresh
-                  </Button>
-                  <Button
-                    onClick={() => router.push('/admin/users/create')}
-                    className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
-                  >
-                    + Create New User
-                  </Button>
+                  {canPerformAction(user, 'create_user') && (
+                    <Button
+                      onClick={() => router.push('/admin/users/create')}
+                      className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
+                    >
+                      + Create New User
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -163,16 +217,46 @@ export default function UserManagement() {
             {/* Users List */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-mint-medium-gray">
               <div className="p-6">
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-4 mb-4">
                   <h2 className="text-xl font-semibold text-mint-dark-text">
-                    All Users ({users.length})
+                    All Users ({displayedUsers.length}{totalScopeCount !== displayedUsers.length ? ` of ${totalScopeCount}` : ''})
                   </h2>
-                  {refreshedAt && (
-                    <span className="text-sm text-green-600 font-medium">Refreshed</span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-3 ml-auto">
+                    <input
+                      type="search"
+                      placeholder="Search by name or email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="px-3 py-2 border border-mint-medium-gray rounded-lg text-sm text-mint-dark-text placeholder:text-mint-dark-text/60 focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent min-w-[200px]"
+                    />
+                    <select
+                      value={filterAdminUnit}
+                      onChange={(e) => setFilterAdminUnit(e.target.value)}
+                      className="px-3 py-2 border border-mint-medium-gray rounded-lg text-sm text-mint-dark-text bg-white focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent"
+                    >
+                      <option value="">All admin units</option>
+                      <option value="central">N/A (Central Role)</option>
+                      {units.map((unit) => (
+                        <option key={unit.unitId} value={unit.unitId}>
+                          {unit.officialUnitName}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="px-3 py-2 border border-mint-medium-gray rounded-lg text-sm text-mint-dark-text bg-white focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent"
+                    >
+                      <option value="">All statuses</option>
+                      <option value="Verified">Verified</option>
+                      <option value="Pending">Pending</option>
+                    </select>
+                  </div>
                 </div>
-                {users.length === 0 ? (
+                {totalScopeCount === 0 ? (
                   <p className="text-mint-dark-text">No users registered yet.</p>
+                ) : displayedUsers.length === 0 ? (
+                  <p className="text-mint-dark-text">No users match your search or filters.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full divide-y divide-mint-medium-gray">
@@ -196,42 +280,60 @@ export default function UserManagement() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider" style={{ minWidth: '120px' }}>
                             Status
                           </th>
+                          <th
+                            className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer hover:bg-mint-secondary-blue select-none"
+                            onClick={() => handleSort('createdAt')}
+                          >
+                            Created {sortBy === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                          </th>
+                          <th
+                            className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer hover:bg-mint-secondary-blue select-none"
+                            onClick={() => handleSort('lastLoginAt')}
+                          >
+                            Last Login {sortBy === 'lastLoginAt' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                          </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
                       </thead>
                       <tbody key={listKey} className="bg-white divide-y divide-mint-medium-gray">
-                        {users.map((user) => (
-                          <tr key={user.userId} className="hover:bg-mint-light-gray">
+                        {displayedUsers.map((u) => (
+                          <tr key={u.userId} className="hover:bg-mint-light-gray">
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
-                              {user.userId}
+                              {u.userId}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-mint-dark-text">
-                              {user.username}
+                              {u.username}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
-                              {user.email}
+                              {u.email}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
-                              {getUnitName(user.officialUnitId)}
+                              {getUnitName(u.officialUnitId)}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
-                              {user.role}
+                              {u.role}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm" style={{ minWidth: '120px' }}>
                               <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${
-                                user.isEmailVerified
+                                u.isEmailVerified
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {user.isEmailVerified ? 'Verified' : 'Pending'}
+                                {u.isEmailVerified ? 'Verified' : 'Pending'}
                               </span>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                              {formatDateTime(u.createdAt)}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
+                              {formatDateTime(u.lastLoginAt)}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm">
                               <div className="flex items-center gap-2">
                                 <Button
-                                  onClick={() => handleEditClick(user)}
+                                  onClick={() => handleEditClick(u)}
                                   variant="outline"
                                   size="sm"
                                   className="text-mint-primary-blue border-mint-primary-blue hover:bg-mint-primary-blue hover:text-white"
@@ -239,7 +341,7 @@ export default function UserManagement() {
                                   Edit
                                 </Button>
                                 <Button
-                                  onClick={() => handleDeleteClick(user)}
+                                  onClick={() => handleDeleteClick(u)}
                                   variant="outline"
                                   size="sm"
                                   className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"

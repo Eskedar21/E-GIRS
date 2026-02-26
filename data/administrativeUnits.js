@@ -872,6 +872,9 @@ export const getUnitById = (unitId) => {
   return administrativeUnits.find(unit => unit.unitId === unitId);
 };
 
+// Unit status
+export const UNIT_STATUS = { ACTIVE: 'active', INACTIVE: 'inactive' };
+
 // Create a new unit
 export const createUnit = (unitData) => {
   administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
@@ -883,6 +886,7 @@ export const createUnit = (unitData) => {
     unitType: unitData.unitType,
     parentUnitId: unitData.parentUnitId || null,
     pCode: unitData.pCode || null,
+    status: unitData.status === UNIT_STATUS.INACTIVE ? UNIT_STATUS.INACTIVE : UNIT_STATUS.ACTIVE,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -897,9 +901,14 @@ export const updateUnit = (unitId, unitData) => {
   administrativeUnits = loadAdministrativeUnits(); // Reload to ensure latest data
   const index = administrativeUnits.findIndex(unit => unit.unitId === unitId);
   if (index !== -1) {
+    const current = administrativeUnits[index];
+    const status = unitData.hasOwnProperty('status')
+      ? (unitData.status === UNIT_STATUS.INACTIVE ? UNIT_STATUS.INACTIVE : UNIT_STATUS.ACTIVE)
+      : (current.status || UNIT_STATUS.ACTIVE);
     administrativeUnits[index] = {
-      ...administrativeUnits[index],
+      ...current,
       ...unitData,
+      status,
       updatedAt: new Date().toISOString()
     };
     saveAdministrativeUnits(administrativeUnits);

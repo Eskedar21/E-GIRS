@@ -58,7 +58,12 @@ export default function AssessmentFramework() {
   const [editingIndicatorId, setEditingIndicatorId] = useState(null);
   const [editingSubQuestionId, setEditingSubQuestionId] = useState(null);
   
-  const [yearForm, setYearForm] = useState({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+  const [yearForm, setYearForm] = useState({
+    yearName: '',
+    status: ASSESSMENT_STATUS.DRAFT,
+    startDate: '',
+    endDate: ''
+  });
   const [dimensionForm, setDimensionForm] = useState({ dimensionName: '', dimensionWeight: '' });
   const [indicatorForm, setIndicatorForm] = useState({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
   const [subQuestionForm, setSubQuestionForm] = useState({ 
@@ -127,6 +132,8 @@ export default function AssessmentFramework() {
   };
 
   // Assessment Year Management
+  const toDateIso = (dateStr) => (dateStr ? new Date(dateStr + 'T12:00:00').toISOString() : null);
+
   const handleYearSubmit = (e) => {
     e.preventDefault();
     const newErrors = {};
@@ -134,11 +141,24 @@ export default function AssessmentFramework() {
     if (!yearForm.yearName.trim()) {
       newErrors.yearName = 'Year Name is required';
     }
+    if (yearForm.status === ASSESSMENT_STATUS.ACTIVE && !yearForm.endDate) {
+      newErrors.endDate = 'End date is required when status is Active.';
+    }
+    if (yearForm.startDate && yearForm.endDate && yearForm.endDate <= yearForm.startDate) {
+      newErrors.endDate = newErrors.endDate || 'End date must be after start date.';
+    }
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
+
+    const payload = {
+      yearName: yearForm.yearName,
+      status: yearForm.status,
+      startDate: toDateIso(yearForm.startDate),
+      endDate: toDateIso(yearForm.endDate)
+    };
 
     if (editingYearId) {
       if (yearForm.status === ASSESSMENT_STATUS.ACTIVE) {
@@ -150,21 +170,21 @@ export default function AssessmentFramework() {
         setShowYearForm(false);
         setEditingYearId(null);
         setPendingActivation({ yearId: editingYearId, yearName: yearForm.yearName });
-        setActivationStartDate(new Date().toISOString().slice(0, 10));
-        setActivationEndDate('');
+        setActivationStartDate(yearForm.startDate || new Date().toISOString().slice(0, 10));
+        setActivationEndDate(yearForm.endDate || '');
         setActivationDateError('');
         return;
       }
-      updateAssessmentYear(editingYearId, yearForm);
+      updateAssessmentYear(editingYearId, payload);
       setSuccessMessage('Assessment Year updated successfully!');
       setEditingYearId(null);
     } else {
-      createAssessmentYear(yearForm);
+      createAssessmentYear(payload);
       setSuccessMessage('Assessment Year created successfully!');
     }
     refreshData();
     setShowYearForm(false);
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: '', endDate: '' });
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
@@ -174,7 +194,12 @@ export default function AssessmentFramework() {
 
   const handleEditYear = (year) => {
     setEditingYearId(year.assessmentYearId);
-    setYearForm({ yearName: year.yearName, status: year.status });
+    setYearForm({
+      yearName: year.yearName,
+      status: year.status,
+      startDate: year.startDate ? year.startDate.slice(0, 10) : '',
+      endDate: year.endDate ? year.endDate.slice(0, 10) : ''
+    });
     setShowYearForm(true);
     setShowDimensionForm(false);
     setShowIndicatorForm(false);
@@ -188,13 +213,14 @@ export default function AssessmentFramework() {
   const handleCancelYearEdit = () => {
     setEditingYearId(null);
     setShowYearForm(false);
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: '', endDate: '' });
     setErrors({});
   };
 
   const handleCreateYear = () => {
     setEditingYearId(null);
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT });
+    const today = typeof window !== 'undefined' ? new Date().toISOString().slice(0, 10) : '';
+    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: today, endDate: '' });
     setShowYearForm(true);
     setErrors({});
   };
@@ -209,8 +235,8 @@ export default function AssessmentFramework() {
       const year = years.find(y => y.assessmentYearId === yearId);
       setPendingActivation({ yearId, yearName: year?.yearName || 'This year' });
       const today = new Date().toISOString().slice(0, 10);
-      setActivationStartDate(today);
-      setActivationEndDate('');
+      setActivationStartDate(year?.startDate ? year.startDate.slice(0, 10) : today);
+      setActivationEndDate(year?.endDate ? year.endDate.slice(0, 10) : '');
       setActivationDateError('');
       return;
     }
@@ -791,6 +817,33 @@ export default function AssessmentFramework() {
                               <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
                               <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
                             </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="startDate" className="mb-2">
+                              Submission start date
+                            </Label>
+                            <Input
+                              type="date"
+                              id="startDate"
+                              value={yearForm.startDate}
+                              onChange={(e) => setYearForm({ ...yearForm, startDate: e.target.value })}
+                              className={errors.startDate ? 'border-red-500' : ''}
+                            />
+                            <p className="text-xs text-mint-dark-text/60 mt-1">When contributors can start submitting</p>
+                          </div>
+                          <div>
+                            <Label htmlFor="endDate" className="mb-2">
+                              Submission end date (deadline)
+                            </Label>
+                            <Input
+                              type="date"
+                              id="endDate"
+                              value={yearForm.endDate}
+                              onChange={(e) => setYearForm({ ...yearForm, endDate: e.target.value })}
+                              className={errors.endDate ? 'border-red-500' : ''}
+                            />
+                            {errors.endDate && <p className="mt-1 text-sm text-red-500">{errors.endDate}</p>}
+                            <p className="text-xs text-mint-dark-text/60 mt-1">Deadline for submissions; used for ribbon and auto-close</p>
                           </div>
                         </div>
                         <Button

@@ -45,6 +45,12 @@ export const canAccessUnit = (user, targetUnitId, allUnits) => {
     return user.officialUnitId === targetUnitId;
   }
 
+  // Regional Admin and Federal Admin: access within their scope
+  if (['Regional Admin', 'Federal Admin'].includes(user.role)) {
+    const accessible = getAccessibleUnitIds(user, allUnits);
+    return accessible.includes(targetUnitId);
+  }
+
   return false;
 };
 
@@ -125,7 +131,7 @@ export const canPerformAction = (user, action, resource = null) => {
 
   switch (action) {
     case 'create_user':
-      return ['Super Admin', 'MInT Admin', 'Regional Admin', 'Institute Admin', 'Chairman (CC)'].includes(role);
+      return ['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Chairman (CC)'].includes(role);
     
     case 'manage_framework':
       return ['Super Admin', 'MInT Admin'].includes(role);
@@ -162,7 +168,7 @@ export const canPerformAction = (user, action, resource = null) => {
     
     case 'view_submission':
       // Same roles that can access Federal Institute report / submission details (read-only)
-      return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Institute Admin', 'Institute Data Contributor', 'Federal Approver', 'Regional Approver'].includes(role);
+      return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institute Data Contributor', 'Federal Approver', 'Regional Approver'].includes(role);
     
     default:
       return false;
@@ -212,6 +218,73 @@ export const getAccessibleUnitIds = (user, allUnits) => {
     return [user.officialUnitId, ...getChildUnitIds(user.officialUnitId)];
   }
 
+  // Regional Admin: own unit (region/city) and all descendants
+  if (user.role === 'Regional Admin') {
+    const getChildUnitIds = (unitId) => {
+      const directChildren = (allUnits || []).filter(u => u.parentUnitId === unitId);
+      const childIds = directChildren.map(u => u.unitId);
+      directChildren.forEach(child => {
+        childIds.push(...getChildUnitIds(child.unitId));
+      });
+      return childIds;
+    };
+    return [user.officialUnitId, ...getChildUnitIds(user.officialUnitId)];
+  }
+
+  // Federal Admin: all federal institutions
+  if (user.role === 'Federal Admin') {
+    return (allUnits || []).filter(u => u.unitType === 'Federal Institute').map(u => u.unitId);
+  }
+
   return [];
+};
+
+/**
+ * Check if user can create a unit (optionally under a given parent)
+ * @param {Object} user - Current user
+ * @param {number|null} parentUnitId - Parent unit for the new unit (null for root-level Region/City/Federal Institute)
+ * @param {Array} allUnits - All administrative units
+ * @returns {boolean}
+ */
+export const canCreateUnit = (user, parentUnitId, allUnits) => {
+  if (!user || !allUnits) return false;
+  if (user.role === 'Super Admin' || user.role === 'MInT Admin') return true;
+  if (user.role === 'Regional Admin' && user.officialUnitId) {
+    const accessible = getAccessibleUnitIds(user, allUnits);
+    return parentUnitId === null || accessible.includes(parentUnitId);
+  }
+  // Federal Admin cannot create new federal institutes (only edit existing)
+  if (user.role === 'Federal Admin') return false;
+  return false;
+};
+
+/**
+ * Check if user can edit a specific unit
+ * @param {Object} user - Current user
+ * @param {number} unitId - Unit to edit
+ * @param {Array} allUnits - All administrative units
+ * @returns {boolean}
+ */
+export const canEditUnit = (user, unitId, allUnits) => {
+  if (!user || !allUnits) return false;
+  if (user.role === 'Super Admin' || user.role === 'MInT Admin') return true;
+  const accessible = getAccessibleUnitIds(user, allUnits);
+  return accessible.includes(unitId);
+};
+
+/**
+ * Filter users to those the given admin can manage (scoped by unit)
+ * @param {Object} adminUser - Current user (admin)
+ * @param {Array} users - All users
+ * @param {Array} allUnits - All administrative units
+ * @returns {Array} - Filtered users
+ */
+export const filterUsersByScope = (adminUser, users, allUnits) => {
+  if (!adminUser || !users || users.length === 0) return [];
+  if (adminUser.role === 'Super Admin' || adminUser.role === 'MInT Admin' || adminUser.role === 'Chairman (CC)') {
+    return users;
+  }
+  const accessibleUnitIds = getAccessibleUnitIds(adminUser, allUnits);
+  return users.filter(u => u.officialUnitId != null && accessibleUnitIds.includes(u.officialUnitId));
 };
 

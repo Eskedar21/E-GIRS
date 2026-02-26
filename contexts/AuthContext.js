@@ -1,20 +1,41 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getUserByUsername, checkPassword } from '../data/users';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { getUserByUsername, checkPassword, recordLastLogin } from '../data/users';
 import { getUnitById } from '../data/administrativeUnits';
 
 const AuthContext = createContext();
 
+/** Session timeout: 30 minutes of inactivity */
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const ACTIVITY_THROTTLE_MS = 60 * 1000;
+
+function isSessionExpired(session) {
+  if (!session) return true;
+  const lastActivity = session.lastActivityAt ?? session.sessionStoredAt;
+  if (!lastActivity) return true;
+  return Date.now() - lastActivity > SESSION_TIMEOUT_MS;
+}
+
+function withSessionTimestamps(session) {
+  const now = Date.now();
+  return { ...session, sessionStoredAt: now, lastActivityAt: now };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const lastActivityUpdate = useRef(0);
 
   useEffect(() => {
-    // Check for stored user session
     const storedUser = localStorage.getItem('egirs_user');
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
-        setUser(userData);
+        if (isSessionExpired(userData)) {
+          localStorage.removeItem('egirs_user');
+          setUser(null);
+        } else {
+          setUser(userData);
+        }
       } catch (e) {
         localStorage.removeItem('egirs_user');
       }
@@ -66,7 +87,9 @@ export function AuthProvider({ children }) {
       unitInfo = getUnitById(userData.officialUnitId);
     }
 
-    const userSession = {
+    recordLastLogin(userData.userId);
+
+    const userSession = withSessionTimestamps({
       userId: userData.userId,
       username: userData.username,
       email: userData.email,
@@ -74,7 +97,7 @@ export function AuthProvider({ children }) {
       officialUnitId: userData.officialUnitId,
       unitInfo: unitInfo,
       unitType: unitInfo ? unitInfo.unitType : null
-    };
+    });
 
     localStorage.setItem('egirs_user', JSON.stringify(userSession));
     localStorage.removeItem('egirs_pending_2fa');
@@ -85,8 +108,55 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem('egirs_user');
     setUser(null);
-    // Router navigation will be handled by the component calling logout
   }, []);
+
+  const logoutIfExpired = useCallback(() => {
+    const stored = localStorage.getItem('egirs_user');
+    if (!stored) return false;
+    try {
+      const data = JSON.parse(stored);
+      if (isSessionExpired(data)) {
+        localStorage.removeItem('egirs_user');
+        setUser(null);
+        return true;
+      }
+    } catch {
+      localStorage.removeItem('egirs_user');
+      setUser(null);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const updateLastActivity = useCallback(() => {
+    const now = Date.now();
+    if (now - lastActivityUpdate.current < ACTIVITY_THROTTLE_MS) return;
+    lastActivityUpdate.current = now;
+    const stored = localStorage.getItem('egirs_user');
+    if (!stored) return;
+    try {
+      const data = JSON.parse(stored);
+      if (isSessionExpired(data)) {
+        localStorage.removeItem('egirs_user');
+        setUser(null);
+        return;
+      }
+      const updated = { ...data, lastActivityAt: now };
+      localStorage.setItem('egirs_user', JSON.stringify(updated));
+      setUser(updated);
+    } catch {
+      localStorage.removeItem('egirs_user');
+      setUser(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const handleActivity = () => updateLastActivity();
+    const events = ['click', 'keydown', 'scroll', 'mousemove'];
+    events.forEach((e) => window.addEventListener(e, handleActivity));
+    return () => events.forEach((e) => window.removeEventListener(e, handleActivity));
+  }, [user, updateLastActivity]);
 
   const hasRole = useCallback((allowedRoles) => {
     if (!user) return false;
@@ -95,11 +165,15 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const refreshUser = useCallback(() => {
-    // Refresh user from localStorage
     const storedUser = localStorage.getItem('egirs_user');
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
+        if (isSessionExpired(userData)) {
+          localStorage.removeItem('egirs_user');
+          setUser(null);
+          return null;
+        }
         setUser(userData);
         return userData;
       } catch (e) {
@@ -107,14 +181,13 @@ export function AuthProvider({ children }) {
         setUser(null);
         return null;
       }
-    } else {
-      setUser(null);
-      return null;
     }
+    setUser(null);
+    return null;
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hasRole, isLoading, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, logout, logoutIfExpired, hasRole, isLoading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

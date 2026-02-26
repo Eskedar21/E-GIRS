@@ -5,12 +5,26 @@ import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSidebar } from '../../../contexts/SidebarContext';
-import { getSubmissionById, getResponsesBySubmission, validateResponse, submitCentralValidation, SUBMISSION_STATUS, VALIDATION_STATUS } from '../../../data/submissions';
+import {
+  getSubmissionById,
+  getResponsesBySubmission,
+  validateResponse,
+  submitCentralValidation,
+  getCommitteeMemberValidationsByResponse,
+  getCommitteeMemberValidation,
+  getCommitteeValidationSubmissions,
+  haveAllCommitteeMembersSubmittedValidation,
+  submitCommitteeValidation,
+  submitChairmanFinalValidation,
+  saveCommitteeMemberValidation,
+  SUBMISSION_STATUS,
+  VALIDATION_STATUS
+} from '../../../data/submissions';
 import { getUnitById } from '../../../data/administrativeUnits';
 import { canPerformAction } from '../../../utils/permissions';
 import { getSubQuestionsByIndicator, getIndicatorsByDimension } from '../../../data/assessmentFramework';
 import { getDimensionsByYear, getAssessmentYearById } from '../../../data/assessmentFramework';
-import { getUserById } from '../../../data/users';
+import { getUserById, getUsersByRole } from '../../../data/users';
 
 export default function EvaluateCentralSubmission() {
   const router = useRouter();
@@ -33,6 +47,43 @@ export default function EvaluateCentralSubmission() {
   const [openCommentSections, setOpenCommentSections] = useState({});
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
+  const [chairmanRejectionReasons, setChairmanRejectionReasons] = useState({});
+  const [showChairmanRejectModal, setShowChairmanRejectModal] = useState(false);
+  const [submittingChairman, setSubmittingChairman] = useState(false);
+
+  const allCommitteeMembers = useMemo(() => getUsersByRole('Central Committee Member') || [], []);
+  const useInlineFlow = allCommitteeMembers.length > 0;
+  const isChairman = userRole === 'Chairman (CC)';
+  const isCommitteeMember = userRole === 'Central Committee Member';
+  const submissionIdNum = submissionId ? parseInt(submissionId, 10) : null;
+  const validationsByResponse = useMemo(
+    () => (submissionIdNum ? getCommitteeMemberValidationsByResponse(submissionIdNum) : {}),
+    [submissionIdNum, submissionDetails]
+  );
+  const committeeSubmissions = useMemo(
+    () => (submissionIdNum ? getCommitteeValidationSubmissions(submissionIdNum) : []),
+    [submissionIdNum, submissionDetails]
+  );
+  const mySubmitted = useMemo(
+    () => user && committeeSubmissions.some(e => Number(e.committeeMemberId) === Number(user.userId)),
+    [user, committeeSubmissions]
+  );
+  const allMembersSubmitted = useMemo(
+    () => submissionIdNum && haveAllCommitteeMembersSubmittedValidation(submissionIdNum),
+    [submissionIdNum, committeeSubmissions]
+  );
+  const answeredResponses = useMemo(
+    () => (submissionDetails?.responses || []).filter(r => r.responseValue != null && String(r.responseValue).trim() !== ''),
+    [submissionDetails]
+  );
+  const myValidationsComplete = useMemo(() => {
+    if (!user || !submissionIdNum) return false;
+    const mid = Number(user.userId);
+    return answeredResponses.every(r => {
+      const v = getCommitteeMemberValidation(submissionIdNum, r.responseId, mid);
+      return v && (v.status === 'Approved' || v.status === 'Rejected');
+    });
+  }, [user, submissionIdNum, answeredResponses]);
 
   useEffect(() => {
     if (submissionId) {
@@ -229,10 +280,82 @@ export default function EvaluateCentralSubmission() {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
+  const handleInlineApprove = (responseId) => {
+    if (!user || !submissionIdNum) return;
+    const comment = validationNotes[responseId] || '';
+    saveCommitteeMemberValidation(submissionIdNum, responseId, user.userId, 'Approved', comment);
+    setValidationNotes(prev => ({ ...prev, [responseId]: '' }));
+    loadSubmissionDetails(parseInt(submissionId));
+    setSuccessMessage('✓ Approved this question.');
+    setTimeout(() => setSuccessMessage(''), 2000);
+  };
+
+  const handleInlineReject = (responseId) => {
+    if (!user || !submissionIdNum) return;
+    const comment = validationNotes[responseId] || rejectionReasons[responseId] || '';
+    saveCommitteeMemberValidation(submissionIdNum, responseId, user.userId, 'Rejected', comment);
+    setValidationNotes(prev => ({ ...prev, [responseId]: '' }));
+    setRejectionReasons(prev => ({ ...prev, [responseId]: '' }));
+    loadSubmissionDetails(parseInt(submissionId));
+    setSuccessMessage('✓ Rejected this question.');
+    setTimeout(() => setSuccessMessage(''), 2000);
+  };
+
+  const handleSubmitMyValidations = () => {
+    if (!user || !submissionDetails?.submission) return;
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      submitCommitteeValidation(submissionDetails.submission.submissionId, user.userId);
+      loadSubmissionDetails(parseInt(submissionId));
+      setSuccessMessage('✅ Your validations have been submitted. The assessment will be forwarded to the Chairman once all committee members have completed their approvals.');
+      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 4000);
+    } catch (e) {
+      alert(e.message || 'Failed to submit.');
+    }
+  };
+
+  const handleChairmanFinalApprove = () => {
+    if (!user || !submissionDetails?.submission) return;
+    setSubmittingChairman(true);
+    try {
+      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, true);
+      loadSubmissionDetails(parseInt(submissionId));
+      setSuccessMessage('✅ Final approval submitted. The submission has been validated.');
+      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 3000);
+    } catch (e) {
+      alert(e.message || 'Failed to submit.');
+    } finally {
+      setSubmittingChairman(false);
+    }
+  };
+
+  const handleChairmanFinalReject = () => {
+    if (!user || !submissionDetails?.submission) return;
+    setSubmittingChairman(true);
+    try {
+      const reasons = {};
+      answeredResponses.forEach(r => {
+        const reason = chairmanRejectionReasons[r.responseId] || chairmanRejectionReasons['submission'] || 'Rejected by Chairman.';
+        reasons[r.responseId] = reason;
+      });
+      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, false, reasons);
+      loadSubmissionDetails(parseInt(submissionId));
+      setShowChairmanRejectModal(false);
+      setChairmanRejectionReasons({});
+      setSuccessMessage('⚠️ Final rejection submitted. The submission has been sent back.');
+      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 3000);
+    } catch (e) {
+      alert(e.message || 'Failed to submit.');
+    } finally {
+      setSubmittingChairman(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (dateString == null || dateString === '' || Number.isNaN(dateString)) return '';
+    try {
+      const d = new Date(dateString);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -240,6 +363,12 @@ export default function EvaluateCentralSubmission() {
     } catch {
       return '';
     }
+  };
+
+  const safeComment = (value) => {
+    if (value == null || value === '') return '';
+    const s = String(value).trim();
+    return s === 'NaN' || s === 'undefined' ? '' : s;
   };
 
   const getUnitName = (unitId) => {
@@ -472,7 +601,7 @@ export default function EvaluateCentralSubmission() {
                                               Type: {subQuestion.responseType}
                                             </span>
                                             <span className="px-2 py-1 bg-white rounded border border-mint-medium-gray">
-                                              Weight: {subQuestion.subWeightPercentage}%
+                                              Weight: {typeof subQuestion.subWeightPercentage === 'number' && !Number.isNaN(subQuestion.subWeightPercentage) ? subQuestion.subWeightPercentage : '—'}%
                                             </span>
                                             {hasAnswer && (
                                               <span className="px-2 py-1 bg-[#0d6670]/10 text-[#0d6670] rounded font-semibold">
@@ -537,9 +666,115 @@ export default function EvaluateCentralSubmission() {
                                             </a>
                                           </div>
                                         )}
+
+                                        {/* Inline committee approval per question */}
+                                        {isPending && hasAnswer && useInlineFlow && response.responseId && (
+                                          <div className="mt-4 p-4 rounded-lg border-2 border-mint-medium-gray bg-gray-50">
+                                            {isCommitteeMember && (
+                                              <>
+                                                {mySubmitted ? (
+                                                  <div className="space-y-2">
+                                                    <p className="text-sm font-semibold text-gray-700">Your decision (submitted)</p>
+                                                    {(() => {
+                                                      const v = getCommitteeMemberValidation(submissionIdNum, response.responseId, user?.userId);
+                                                      return v ? (
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                          <span className={`px-2 py-1 rounded text-xs font-semibold ${v.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                            {v.status === 'Approved' ? '✓ Approved' : '✗ Rejected'}
+                                                          </span>
+                                                          {v.comment && <span className="text-sm text-gray-600 italic">— {v.comment}</span>}
+                                                        </div>
+                                                      ) : null;
+                                                    })()}
+                                                  </div>
+                                                ) : (
+                                                  <div className="space-y-3">
+                                                    <p className="text-sm font-semibold text-gray-700">Approve or reject this question</p>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleInlineApprove(response.responseId)}
+                                                        className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 font-semibold rounded-lg text-sm"
+                                                      >
+                                                        Approve
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleInlineReject(response.responseId)}
+                                                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-semibold rounded-lg text-sm"
+                                                      >
+                                                        Reject
+                                                      </button>
+                                                    </div>
+                                                    {(() => {
+                                                      const v = getCommitteeMemberValidation(submissionIdNum, response.responseId, user?.userId);
+                                                      if (v) {
+                                                        return (
+                                                          <p className="text-xs text-gray-600">
+                                                            Current: <span className={v.status === 'Approved' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>{v.status}</span>
+                                                            {v.comment && ` — ${v.comment}`}
+                                                          </p>
+                                                        );
+                                                      }
+                                                      return null;
+                                                    })()}
+                                                    <div>
+                                                      <label className="block text-xs font-medium text-gray-600 mb-1">Comment (optional)</label>
+                                                      <textarea
+                                                        value={validationNotes[response.responseId] || ''}
+                                                        onChange={(e) => setValidationNotes(prev => ({ ...prev, [response.responseId]: e.target.value }))}
+                                                        rows={2}
+                                                        className="w-full p-2 text-sm border border-gray-300 rounded-lg"
+                                                        placeholder="Add a comment for this question..."
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </>
+                                            )}
+                                            {(isChairman || isReadOnly) && allMembersSubmitted && (
+                                              <div className="space-y-2">
+                                                <p className="text-sm font-semibold text-gray-800">Committee approvals for this question</p>
+                                                <div className="overflow-x-auto">
+                                                  <table className="min-w-full text-sm border border-gray-300 rounded-lg overflow-hidden">
+                                                    <thead className="bg-mint-primary-blue/10">
+                                                      <tr>
+                                                        <th className="text-left py-2 px-3 font-semibold text-gray-800">Member</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-gray-800">Decision</th>
+                                                        <th className="text-left py-2 px-3 font-semibold text-gray-800">Comment</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white">
+                                                      {allCommitteeMembers.map((member) => {
+                                                        const list = validationsByResponse[response.responseId] || [];
+                                                        const entry = list.find(e => Number(e.committeeMemberId) === Number(member.userId));
+                                                        const name = member.fullName || member.username || `User ${member.userId}`;
+                                                        return (
+                                                          <tr key={member.userId} className="border-t border-gray-200">
+                                                            <td className="py-2 px-3 font-medium text-gray-800">{name}</td>
+                                                            <td className="py-2 px-3">
+                                                              {entry ? (
+                                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${entry.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                  {entry.status}
+                                                                </span>
+                                                              ) : (
+                                                                <span className="text-gray-400">—</span>
+                                                              )}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-gray-600 max-w-xs truncate" title={entry?.comment}>{entry?.comment || '—'}</td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                         
-                                        {/* Comments Section */}
-                                        {isPending && hasAnswer && (
+                                        {/* Comments Section (legacy / non-inline) */}
+                                        {isPending && hasAnswer && !(useInlineFlow && isCommitteeMember) && (
                                           <div className="mt-3 bg-gray-50 rounded-lg border border-gray-300 p-4">
                                             <div className="mb-3">
                                               <div className="flex items-center justify-between mb-3">
@@ -559,8 +794,8 @@ export default function EvaluateCentralSubmission() {
                                                 </button>
                                               </div>
                                               
-                                              {/* Existing Comments - Always visible */}
-                                              {response && response.generalNote && (
+                                              {/* Existing Comments - Always visible (guard against NaN/invalid) */}
+                                              {response && safeComment(response.generalNote) && (
                                                 <div className="mb-4 bg-white rounded-lg border border-gray-300 p-3">
                                                   <div className="flex items-start space-x-2 mb-2">
                                                     <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -569,19 +804,14 @@ export default function EvaluateCentralSubmission() {
                                                     <div className="flex-1">
                                                       <div className="flex items-start justify-between mb-1">
                                                         <span className="text-xs font-semibold text-gray-900">
-                                                          {(() => {
-                                                            if (user) {
-                                                              return `${user.fullName || user.username} (${user.role})`;
-                                                            }
-                                                            return 'Central Committee Member';
-                                                          })()}
+                                                          {user ? `${user.fullName || user.username || ''} (${user.role || ''})` : 'Central Committee Member'}
                                                         </span>
                                                         <span className="text-xs text-gray-500 ml-2">
                                                           {formatDate(response.updatedAt)}
                                                         </span>
                                                       </div>
                                                       <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
-                                                        {response.generalNote}
+                                                        {safeComment(response.generalNote)}
                                                       </p>
                                                     </div>
                                                   </div>
@@ -742,10 +972,64 @@ export default function EvaluateCentralSubmission() {
                     <p className="mt-4 text-sm text-gray-700 font-medium">
                       {isReadOnly ? 'Read-only view. No actions available.' : 'Review and take necessary action.'}
                     </p>
+                    {useInlineFlow && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-gray-700">
+                        {isCommitteeMember && (
+                          <>
+                            {mySubmitted ? (
+                              <p className="font-medium text-green-800">✓ You have submitted your validations.</p>
+                            ) : (
+                              <p>Complete approve/reject for each question, then click &quot;Submit my validations&quot; below.</p>
+                            )}
+                          </>
+                        )}
+                        {isChairman && (
+                          <>
+                            {allMembersSubmitted ? (
+                              <p className="font-medium text-green-800">All committee members have submitted. Provide final approval or rejection.</p>
+                            ) : (
+                              <p><span className="font-semibold">{committeeSubmissions.length}</span> of <span className="font-semibold">{allCommitteeMembers.length}</span> members have submitted their approvals.</p>
+                            )}
+                          </>
+                        )}
+                        {isReadOnly && allMembersSubmitted && (
+                          <p>Committee approvals are complete. Awaiting Chairman&apos;s final decision.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Action Buttons - Hidden for Chairman and Secretary */}
-                  {!isReadOnly && (
+                  {/* Action Buttons */}
+                  {!isReadOnly && useInlineFlow && isCommitteeMember && !mySubmitted && myValidationsComplete && (
+                    <div className="mt-3">
+                      <button
+                        onClick={handleSubmitMyValidations}
+                        className="w-full px-6 py-3 bg-mint-primary-blue hover:bg-mint-secondary-blue text-white font-semibold rounded-lg transition-colors"
+                      >
+                        Submit my validations
+                      </button>
+                    </div>
+                  )}
+                  {!isReadOnly && useInlineFlow && isChairman && allMembersSubmitted && (
+                    <div className="mt-3 space-y-3">
+                      <button
+                        onClick={handleChairmanFinalApprove}
+                        disabled={submittingChairman}
+                        className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Final Approve
+                      </button>
+                      <button
+                        onClick={() => setShowChairmanRejectModal(true)}
+                        disabled={submittingChairman}
+                        className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Final Reject
+                      </button>
+                    </div>
+                  )}
+                  {/* Legacy single-validator actions (when there are no committee members) */}
+                  {!isReadOnly && !useInlineFlow && (
                     <div className="space-y-3">
                       <button
                         onClick={() => setShowApproveModal(true)}
@@ -861,6 +1145,39 @@ export default function EvaluateCentralSubmission() {
                   className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chairman Final Reject Modal */}
+        {showChairmanRejectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowChairmanRejectModal(false)} />
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900">Final Reject — Chairman</h3>
+              </div>
+              <div className="px-6 py-4 overflow-y-auto flex-1">
+                <p className="text-sm text-gray-700 mb-3">Provide the rejection reason. This will be sent back to the Regional Approver and contributor.</p>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Rejection reason <span className="text-red-500">*</span></label>
+                <textarea
+                  value={chairmanRejectionReasons['submission'] || ''}
+                  onChange={(e) => setChairmanRejectionReasons(prev => ({ ...prev, ['submission']: e.target.value }))}
+                  rows={4}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  placeholder="Enter the reason for rejection..."
+                />
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button onClick={() => setShowChairmanRejectModal(false)} className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg">Cancel</button>
+                <button
+                  onClick={handleChairmanFinalReject}
+                  disabled={submittingChairman || !chairmanRejectionReasons['submission']?.trim()}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50"
+                >
+                  Confirm Final Reject
                 </button>
               </div>
             </div>

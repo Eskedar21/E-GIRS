@@ -22,7 +22,7 @@ export default function Sidebar() {
     {
       title: 'Administrative Units',
       path: '/admin/administrative-units',
-      roles: ['Super Admin', 'MInT Admin', 'Regional Admin', 'Institute Admin', 'Chairman (CC)', 'Central Committee Member', 'Secretary (CC)']
+      roles: ['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Chairman (CC)', 'Secretary (CC)']
     },
     {
       title: 'Assessment Framework',
@@ -32,7 +32,7 @@ export default function Sidebar() {
     {
       title: 'User Management',
       path: '/admin/users',
-      roles: ['Super Admin', 'MInT Admin']
+      roles: ['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']
     },
     {
       title: 'Data Submission',

@@ -219,6 +219,12 @@ export const getAssessmentYearTimeRemaining = (year) => {
   return { days, hours, isOverdue };
 };
 
+/** True if assessment year has an end date, is not overdue, and has <= withinDays left (default 7). */
+export const isDeadlineSoon = (year, withinDays = 7) => {
+  const remaining = getAssessmentYearTimeRemaining(year);
+  return remaining && !remaining.isOverdue && remaining.days <= withinDays;
+};
+
 // Dimensions
 export const getDimensionsByYear = (yearId) => {
   dimensions = loadDimensions(); // Reload to ensure latest data

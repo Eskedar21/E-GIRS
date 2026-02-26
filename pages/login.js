@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 const TEST_USERS = [
   { username: 'admin', password: 'Admin123!', role: 'MInT Admin', category: 'Admin' },
+  { username: 'regional_admin', password: 'RegionalAdmin123!', role: 'Regional Admin', category: 'Admin' },
+  { username: 'federal_admin', password: 'FederalAdmin123!', role: 'Federal Admin', category: 'Admin' },
   { username: 'contributor1', password: 'Contributor123!', role: 'Data Contributor', category: 'Regional' },
   { username: 'institute_contributor', password: 'Institute123!', role: 'Institute Data Contributor', category: 'Federal' },
   { username: 'approver1', password: 'Approver123!', role: 'Regional Approver (Addis Ababa)', category: 'Regional' },
@@ -82,11 +84,17 @@ export default function Login() {
       <Head>
         <title>Login | E-GIRS</title>
       </Head>
-      <div className="min-h-screen bg-white flex flex-col lg:flex-row">
-        <div className="w-full flex flex-col lg:flex-row min-h-screen">
-          {/* Left panel - Login form: full width on small, 50% on lg; larger padding at all sizes */}
-          <div className="w-full lg:w-1/2 flex-shrink-0 flex items-center justify-center min-h-0 flex-1 lg:min-h-screen bg-white p-6 sm:p-8 md:p-10 lg:p-16 order-2 lg:order-1">
-            <div className="w-full max-w-lg flex flex-col">
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+        {/* Appealing background: soft gradient + orbs */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#f0f9fa] via-white to-[#e8f4f5]" aria-hidden />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-[#0d6670]/10 blur-3xl" />
+          <div className="absolute top-1/2 -left-32 w-80 h-80 rounded-full bg-[#0a4f57]/8 blur-3xl" />
+          <div className="absolute -bottom-32 right-1/4 w-72 h-72 rounded-full bg-[#0d6670]/6 blur-3xl" />
+        </div>
+        <div className="relative w-full min-h-screen flex items-center justify-center p-6 sm:p-8 md:p-10">
+          {/* Login form – centered */}
+          <div className="w-full max-w-lg flex flex-col bg-white/80 sm:bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl shadow-[#0a4f57]/5 p-8 sm:p-10 border border-[#0d6670]/10">
             <div className="flex items-center gap-4 mb-10 sm:mb-14">
               <img src="/logo.png" alt="MInT" className="h-12 w-auto object-contain flex-shrink-0" />
               <div className="w-px self-stretch min-h-[2.5rem] bg-mint-primary-blue flex-shrink-0" aria-hidden />
@@ -223,18 +231,6 @@ export default function Login() {
             <div className="mt-10 pt-8 border-t border-mint-medium-gray flex flex-wrap items-center justify-between gap-2 text-sm text-mint-dark-text/70">
               <span>© 2025 Ministry of Innovation and Technology</span>
               <Link href="#" className="text-mint-primary-blue hover:underline">Privacy Policy</Link>
-            </div>
-            </div>
-          </div>
-
-          {/* Right panel: same image + green overlay on all screen sizes; visible on mobile (top) and lg (right) */}
-          <div className="w-full lg:w-1/2 flex-shrink-0 flex flex-col relative overflow-hidden min-w-0 min-h-[36vh] sm:min-h-[40vh] lg:min-h-screen rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-none lg:rounded-l-[4rem] xl:rounded-l-[5rem] shadow-[0_8px_24px_rgba(0,0,0,0.08)] lg:shadow-[-8px_0_24px_rgba(0,0,0,0.08)] order-1 lg:order-2">
-            <div className="absolute inset-0 z-0 rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/login.png)' }} />
-            <div className="absolute inset-0 z-[1] rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] bg-gradient-to-br from-[#0a4f57]/90 via-[#0d6670]/85 to-[#0a4f57]/90" />
-            <div className="absolute inset-0 z-[2] rounded-b-[2rem] sm:rounded-b-[3rem] lg:rounded-l-[4rem] xl:rounded-l-[5rem] overflow-hidden pointer-events-none">
-              <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-mint-primary-blue/40 blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
             </div>
           </div>
         </div>

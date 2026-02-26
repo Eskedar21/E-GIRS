@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAllSubmissions, getSubmissionsByStatus, getSubmissionById, SUBMISSION_STATUS } from '../../data/submissions';
+import { getAllSubmissions, getSubmissionsByStatus, getSubmissionById, getSubmissionsReadyForChairmanValidation, SUBMISSION_STATUS } from '../../data/submissions';
 import { getAllUnits, getUnitById, getChildUnits } from '../../data/administrativeUnits';
 import { filterSubmissionsByAccess } from '../../utils/permissions';
 import { getAssessmentYearById } from '../../data/assessmentFramework';
@@ -109,8 +109,6 @@ export default function ApprovalQueue() {
         { value: 'all', label: 'All Statuses' },
         { value: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL, label: 'Pending Initial Approval' },
         { value: SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE, label: 'Rejected by Central Committee' },
-        { value: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION, label: 'Pending Central Validation' },
-        { value: SUBMISSION_STATUS.VALIDATED, label: 'Validated' },
       ];
     }
     return [{ value: 'all', label: 'All Statuses' }];
@@ -130,52 +128,13 @@ export default function ApprovalQueue() {
         const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
         submissions = [...pending, ...validated];
       } else if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
-        // Regional Approvers see submissions in their scope
+        // Initial approvers only see submissions that need their action (scope-based):
+        // - Pending Initial Approval (contributor just submitted)
+        // - Rejected by Central Committee (resubmitted for initial review again)
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
         const rejected = getSubmissionsByStatus(SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE);
-        const approvedPendingCentral = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
-        const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-        const allBeforeFilter = [...pending, ...rejected, ...approvedPendingCentral, ...validated];
-        
-        // Filter by scope
+        const allBeforeFilter = [...pending, ...rejected];
         submissions = filterSubmissionsByAccess(allBeforeFilter, user, allUnits);
-        
-        // Debug logging
-        const userUnit = getUnitById(user.officialUnitId);
-        console.log('Regional Approver - Submission Loading Debug:', {
-          userRole,
-          userUnitId: user.officialUnitId,
-          userUnitType: userUnit?.unitType,
-          userUnitName: userUnit?.officialUnitName,
-          pendingCount: pending.length,
-          rejectedCount: rejected.length,
-          approvedPendingCentralCount: approvedPendingCentral.length,
-          totalBeforeFilter: allBeforeFilter.length,
-          totalAfterFilter: submissions.length,
-          sampleSubmissions: allBeforeFilter.slice(0, 5).map(s => {
-            const sUnit = getUnitById(s.unitId);
-            return {
-              id: s.submissionId,
-              name: s.submissionName,
-              unitId: s.unitId,
-              unitName: sUnit?.officialUnitName,
-              unitType: sUnit?.unitType,
-              status: s.submissionStatus,
-              canAccess: filterSubmissionsByAccess([s], user, allUnits).length > 0
-            };
-          }),
-          filteredSubmissions: submissions.map(s => {
-            const sUnit = getUnitById(s.unitId);
-            return {
-              id: s.submissionId,
-              name: s.submissionName,
-              unitId: s.unitId,
-              unitName: sUnit?.officialUnitName,
-              unitType: sUnit?.unitType,
-              status: s.submissionStatus
-            };
-          })
-        });
       }
 
       // Sort by submitted date descending (latest first)
@@ -309,7 +268,14 @@ export default function ApprovalQueue() {
     }
   }, [allSubmissions]);
 
-  // Calculate summary statistics
+  // Submissions where all committee members have submitted (ready for Chairman final decision)
+  const readyForChairmanSubmissionIds = useMemo(() => {
+    if (userRole !== 'Chairman (CC)' && userRole !== 'Secretary (CC)') return new Set();
+    const ready = getSubmissionsReadyForChairmanValidation();
+    return new Set(ready.map(s => s.submissionId));
+  }, [userRole, allSubmissions]);
+
+  // Calculate summary statistics (based on what each role sees)
   const summaryStats = useMemo(() => {
     const stats = {
       total: allSubmissions.length,
@@ -319,17 +285,23 @@ export default function ApprovalQueue() {
       approved: 0,
     };
 
+    const isInitialApprover = ['Regional Approver', 'Federal Approver'].includes(userRole);
     allSubmissions.forEach(sub => {
-      if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL || 
-          sub.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
-        stats.pending++;
-      } else if (sub.submissionStatus === SUBMISSION_STATUS.VALIDATED) {
-        stats.verified++;
-      } else if (sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ||
-                 sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER) {
-        stats.rejected++;
-      } else if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
-        stats.approved++;
+      if (isInitialApprover) {
+        if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL) stats.pending++;
+        else if (sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) stats.rejected++;
+      } else {
+        if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL ||
+            sub.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+          stats.pending++;
+        } else if (sub.submissionStatus === SUBMISSION_STATUS.VALIDATED) {
+          stats.verified++;
+        } else if (sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ||
+                   sub.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER) {
+          stats.rejected++;
+        } else if (sub.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
+          stats.approved++;
+        }
       }
     });
 
@@ -440,28 +412,35 @@ export default function ApprovalQueue() {
                   {['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole) 
                     ? 'Central Validation Queue' 
                     : userRole === 'Federal Approver'
-                    ? 'Federal Approval Queue'
-                    : 'Approval Queue'}
+                    ? 'Initial Approval Queue (Federal)'
+                    : 'Initial Approval Queue'}
                   </h1>
                 <p className="text-gray-600">
                   {['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)
-                    ? 'Monitor and manage all submissions pending central validation. Track total number of submissions that are pending, verified, and rejected.'
+                    ? 'Submissions sent here after initial approval. Each committee member approves or rejects per question; when all have submitted, the Chairman sees the list and gives final approval.'
                     : userRole === 'Federal Approver'
-                    ? 'Monitor and manage all Federal Institute submissions in your scope. Review and approve data submissions from Federal Institutes under your jurisdiction.'
-                    : 'Monitor and manage all submissions in your scope. Track total number of submissions that are pending, verified, and rejected.'}
-                    </p>
-                  {userRole === 'Federal Approver' && user?.officialUnitId && (
-                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        <strong>Your Scope:</strong> You have access to review and approve submissions from Federal Institutes assigned to your administrative unit.
-                        {(() => {
-                          const userUnit = getUnitById(user.officialUnitId);
-                          return userUnit ? ` (${userUnit.officialUnitName})` : '';
-                        })()}
-                      </p>
-                    </div>
+                    ? 'Submissions from contributors in your scope (Federal Institutes). Approve or reject; approved submissions go to the Central Committee.'
+                    : 'Submissions from contributors in your scope. Approve or reject; approved submissions go to the Central Committee.'}
+                </p>
+                <div className="mt-3 p-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                  {['Regional Approver', 'Federal Approver'].includes(userRole) ? (
+                    <><strong>Flow:</strong> Contributor submits → <strong>Initial Approver (you)</strong> → Central Committee (per-question) → Chairman (final).</>
+                  ) : (
+                    <><strong>Flow:</strong> Contributor → Initial Approver → <strong>Central Committee</strong> (per-question approval) → <strong>Chairman</strong> (final decision).</>
                   )}
+                </div>
+                {userRole === 'Federal Approver' && user?.officialUnitId && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Your Scope:</strong> Federal Institute submissions under your unit.
+                      {(() => {
+                        const userUnit = getUnitById(user.officialUnitId);
+                        return userUnit ? ` (${userUnit.officialUnitName})` : '';
+                      })()}
+                    </p>
                   </div>
+                )}
+              </div>
 
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -685,13 +664,20 @@ export default function ApprovalQueue() {
                         </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-3 py-1.5 text-xs font-medium rounded-lg shadow-sm ${getStatusBadgeClass(submission.submissionStatus)}`}>
-                                    {submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ? (
-                                      <span className="tracking-wide">{submission.submissionStatus}</span>
-                                    ) : (
-                                      submission.submissionStatus
+                                  <div className="flex flex-col gap-1">
+                                    <span className={`inline-flex px-3 py-1.5 text-xs font-medium rounded-lg shadow-sm ${getStatusBadgeClass(submission.submissionStatus)}`}>
+                                      {submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE ? (
+                                        <span className="tracking-wide">{submission.submissionStatus}</span>
+                                      ) : (
+                                        submission.submissionStatus
+                                      )}
+                                    </span>
+                                    {userRole === 'Chairman (CC)' && submission.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION && readyForChairmanSubmissionIds.has(submission.submissionId) && (
+                                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800 border border-green-300">
+                                        Ready for your decision
+                                      </span>
                                     )}
-                                  </span>
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900">

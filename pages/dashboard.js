@@ -12,8 +12,9 @@ import {
   getSubmissionsByUnit,
   SUBMISSION_STATUS 
 } from '../data/submissions';
-import { getAllAssessmentYears, getAssessmentYearById } from '../data/assessmentFramework';
+import { getAllAssessmentYears, getAssessmentYearById, getAssessmentYearTimeRemaining, isDeadlineSoon } from '../data/assessmentFramework';
 import { filterSubmissionsByAccess } from '../utils/permissions';
+import DeadlineRibbon from '../components/DeadlineRibbon';
 import { 
   BarChart, 
   Bar, 
@@ -160,6 +161,34 @@ export default function Dashboard() {
     };
   }, [submissions, units, user, userRole, selectedYear]);
 
+  // Ribbon for all Data/Institute Contributors: show on dashboard, persist until they complete submission (submit for approval or later)
+  const contributorRibbon = useMemo(() => {
+    if (!user || !['Data Contributor', 'Institute Data Contributor'].includes(user.role)) return null;
+    const years = getAllAssessmentYears();
+    const hasDeadline = (y) => y.endDate && (isDeadlineSoon(y) || getAssessmentYearTimeRemaining(y)?.isOverdue);
+    const yearToShow = selectedYear?.endDate && hasDeadline(selectedYear)
+      ? selectedYear
+      : years.find(y => y.status === 'Active' && hasDeadline(y)) || years.find(hasDeadline);
+    if (!yearToShow?.endDate) return null;
+    const remaining = getAssessmentYearTimeRemaining(yearToShow);
+    const showSoon = isDeadlineSoon(yearToShow);
+    const showClosed = remaining?.isOverdue;
+    if (!showSoon && !showClosed) return null;
+    const submissionForYear = user ? getSubmissionsByUser(user.userId).find(s => s.assessmentYearId === yearToShow.assessmentYearId) : null;
+    const completed = submissionForYear && [
+      SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
+      SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
+      SUBMISSION_STATUS.VALIDATED,
+      SUBMISSION_STATUS.SCORING_COMPLETE
+    ].includes(submissionForYear.submissionStatus);
+    if (completed) return null; // Hide ribbon once submission is completed (submitted for approval or beyond)
+    return {
+      year: yearToShow,
+      remaining: remaining ?? { days: 0, hours: 0, isOverdue: true },
+      needsCompletion: true
+    };
+  }, [user, selectedYear, submissions]);
+
   // Prepare chart data for admin dashboard
   const adminChartData = useMemo(() => {
     const statusData = [
@@ -172,6 +201,50 @@ export default function Dashboard() {
     ];
     return statusData;
   }, [stats]);
+
+  // Submission status by admin unit (percent per unit) for admin dashboard
+  const submissionStatusByAdminUnit = useMemo(() => {
+    const allSubs = submissions.length > 0 ? submissions : getAllSubmissions();
+    const byUnit = new Map();
+    allSubs.forEach(sub => {
+      if (!byUnit.has(sub.unitId)) byUnit.set(sub.unitId, []);
+      byUnit.get(sub.unitId).push(sub);
+    });
+    const statusKeys = [
+      { key: 'Draft', status: SUBMISSION_STATUS.DRAFT },
+      { key: 'Pending Approval', status: SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL },
+      { key: 'Pending Validation', status: SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION },
+      { key: 'Validated', status: SUBMISSION_STATUS.VALIDATED },
+      { key: 'Completed', status: SUBMISSION_STATUS.SCORING_COMPLETE },
+      { key: 'Rejected', status: null }
+    ];
+    const rows = [];
+    byUnit.forEach((unitSubs, unitId) => {
+      const unit = getUnitById(unitId);
+      const name = unit ? (unit.officialUnitName?.length > 24 ? unit.officialUnitName.substring(0, 24) + '…' : unit.officialUnitName) : `Unit ${unitId}`;
+      const n = unitSubs.length;
+      const row = { name, total: n };
+      statusKeys.forEach(({ key, status }) => {
+        const count = status === null
+          ? unitSubs.filter(s => s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER || s.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE).length
+          : unitSubs.filter(s => s.submissionStatus === status).length;
+        row[key] = n > 0 ? Math.round((count / n) * 100) : 0;
+      });
+      rows.push(row);
+    });
+    return rows
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 12);
+  }, [submissions]);
+
+  const STATUS_LABELS = {
+    Draft: 'Draft',
+    'Pending Approval': 'Pending approval',
+    'Pending Validation': 'Pending validation',
+    Validated: 'Validated',
+    Completed: 'Completed',
+    Rejected: 'Rejected'
+  };
 
   // Prepare chart data for contributor dashboard (must be at top level)
   const contributorChartData = useMemo(() => [
@@ -397,21 +470,62 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-                <h3 className="text-lg font-bold text-mint-primary-blue mb-4">Submission Status Overview</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={adminChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="name" stroke="#374151" style={{ fontSize: '12px' }} />
-                    <YAxis stroke="#374151" style={{ fontSize: '12px' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                      {adminChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray overflow-hidden">
+                <div className="mb-1">
+                  <h3 className="text-lg font-bold text-mint-primary-blue">Submission Status by Unit</h3>
+                  <p className="text-sm text-mint-dark-text/60 mt-0.5">Share of each status per administrative unit (%). Top 12 units by submission count.</p>
+                </div>
+                {submissionStatusByAdminUnit.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[320px] text-mint-dark-text/50 bg-mint-light-gray/30 rounded-lg border border-dashed border-mint-medium-gray">
+                    <svg className="w-12 h-12 mb-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p className="font-medium">No submission data yet</p>
+                    <p className="text-xs mt-1">Status by unit will appear here once submissions exist.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={340}>
+                    <BarChart data={submissionStatusByAdminUnit} layout="vertical" margin={{ top: 8, left: 4, right: 24, bottom: 8 }} barCategoryGap="12%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8ECF0" horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} stroke="#64748b" style={{ fontSize: '11px' }} tick={{ fill: '#64748b' }} />
+                      <YAxis type="category" dataKey="name" width={76} stroke="#64748b" style={{ fontSize: '11px' }} tick={{ fill: '#334155' }} tickLine={false} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const p = payload[0].payload;
+                          const total = p.total ?? 0;
+                          const parts = ['Draft', 'Pending Approval', 'Pending Validation', 'Validated', 'Completed', 'Rejected']
+                            .filter(k => p[k] > 0)
+                            .map(k => ({ label: STATUS_LABELS[k], pct: p[k], key: k }));
+                          return (
+                            <div className="bg-white rounded-lg shadow-lg border border-mint-medium-gray p-3 min-w-[180px]">
+                              <p className="font-semibold text-mint-primary-blue text-sm border-b border-mint-medium-gray pb-2 mb-2">{label}</p>
+                              <p className="text-xs text-mint-dark-text/60 mb-2">{total} submission{total !== 1 ? 's' : ''} total</p>
+                              <div className="space-y-1">
+                                {parts.map(({ label: l, pct, key }) => (
+                                  <div key={key} className="flex items-center justify-between gap-4 text-xs">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: { Draft: '#eab308', 'Pending Approval': '#0d6670', 'Pending Validation': '#f97316', Validated: '#10b981', Completed: '#059669', Rejected: '#ef4444' }[key] }} />
+                                      {l}
+                                    </span>
+                                    <span className="font-medium tabular-nums">{pct}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '8px' }} iconType="square" iconSize={10} formatter={(value) => <span className="text-xs text-mint-dark-text/80">{STATUS_LABELS[value] || value}</span>} />
+                      <Bar dataKey="Draft" stackId="a" fill="#eab308" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Pending Approval" stackId="a" fill="#0d6670" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Pending Validation" stackId="a" fill="#f97316" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Validated" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Completed" stackId="a" fill="#059669" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Rejected" stackId="a" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
@@ -1172,6 +1286,8 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Deadline ribbon is shown at top of dashboard for contributors */}
+
             {/* Current Submission Status - Prominent Display */}
             {currentSubmission && selectedYear ? (
               <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-mint-medium-gray">
@@ -1413,6 +1529,15 @@ export default function Dashboard() {
           <Sidebar />
         <main className={`flex-grow p-8 bg-white text-mint-dark-text min-h-screen transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'}`}>
           <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+            {contributorRibbon && (
+              <div className="mb-6">
+                <DeadlineRibbon
+                  year={contributorRibbon.year}
+                  remaining={contributorRibbon.remaining}
+                  needsCompletion={contributorRibbon.needsCompletion}
+                />
+              </div>
+            )}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                 Dashboard

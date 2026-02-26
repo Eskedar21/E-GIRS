@@ -14,6 +14,7 @@ import {
   getRolesForUnitType,
   USER_ROLES
 } from '../../../../data/users';
+import { getAccessibleUnitIds } from '../../../../utils/permissions';
 import { Button } from '../../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { Input } from '../../../../components/ui/input';
@@ -42,13 +43,24 @@ export default function EditUser() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
-    setUnits(getAllUnits());
-  }, []);
+    const allUnits = getAllUnits();
+    const accessibleIds = user ? getAccessibleUnitIds(user, allUnits) : null;
+    setUnits(accessibleIds ? allUnits.filter(u => accessibleIds.includes(u.unitId)) : allUnits);
+  }, [user]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && user) {
+      const allUnits = getAllUnits();
       const userData = getUserById(parseInt(userId));
       if (userData) {
+        // Scoped admins can only edit users in their scope (unit-scoped users)
+        if (user.role === 'Regional Admin' || user.role === 'Federal Admin') {
+          const accessibleIds = getAccessibleUnitIds(user, allUnits);
+          if (userData.officialUnitId == null || !accessibleIds.includes(userData.officialUnitId)) {
+            router.push('/admin/users');
+            return;
+          }
+        }
         setFormData({
           username: userData.username || '',
           email: userData.email || '',
@@ -63,7 +75,7 @@ export default function EditUser() {
         router.push('/admin/users');
       }
     }
-  }, [userId, router]);
+  }, [userId, user, router]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +111,9 @@ export default function EditUser() {
     if (selectedUnit) {
       return getRolesForUnitType(selectedUnit.unitType);
     }
-    // If no unit selected, show central roles
+    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin')) {
+      return [];
+    }
     return getRolesForUnitType(null);
   };
 
@@ -199,7 +213,7 @@ export default function EditUser() {
 
   if (loading) {
     return (
-      <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
+      <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
         <Layout title="Edit User">
           <div className="flex">
             <Sidebar />
@@ -215,7 +229,7 @@ export default function EditUser() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
       <Layout title="Edit User">
         <div className="flex">
           <Sidebar />

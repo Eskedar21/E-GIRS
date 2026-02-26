@@ -195,6 +195,40 @@ const defaultUsers = [
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z'
   },
+  {
+    userId: 14,
+    username: 'regional_admin',
+    email: 'regional.admin@amhara.gov.et',
+    password: 'RegionalAdmin123!',
+    officialUnitId: 21,
+    role: 'Regional Admin',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    userId: 15,
+    username: 'federal_admin',
+    email: 'federal.admin@mint.gov.et',
+    password: 'FederalAdmin123!',
+    officialUnitId: 2,
+    role: 'Federal Admin',
+    isEmailVerified: true,
+    isAccountLocked: false,
+    isTwoFactorEnabled: false,
+    phoneNumber: null,
+    emailVerificationToken: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  },
 ];
 
 // Load users from localStorage or use defaults
@@ -217,6 +251,8 @@ const loadUsers = () => {
         isEmailVerified: user.isEmailVerified !== undefined ? user.isEmailVerified : false,
         isAccountLocked: user.isAccountLocked !== undefined ? user.isAccountLocked : false,
         isTwoFactorEnabled: user.isTwoFactorEnabled !== undefined ? user.isTwoFactorEnabled : false,
+        createdAt: user.createdAt || null,
+        lastLoginAt: user.lastLoginAt || null,
       }));
       
       // Merge with default users - update existing users from defaults and add new ones
@@ -314,7 +350,7 @@ export const USER_ROLES = {
   SUPER_ADMIN: 'Super Admin',
   MINT_ADMIN: 'MInT Admin',
   REGIONAL_ADMIN: 'Regional Admin',
-  INSTITUTE_ADMIN: 'Institute Admin'
+  FEDERAL_ADMIN: 'Federal Admin'
 };
 
 // Get roles based on unit type
@@ -446,7 +482,8 @@ export const createUser = (userData) => {
     passwordResetToken: null,
     passwordResetExpires: null,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    lastLoginAt: null
   };
   
   users.push(newUser);
@@ -480,6 +517,11 @@ export const updateUser = (userId, userData) => {
     return users[index];
   }
   return null;
+};
+
+// Record last login timestamp
+export const recordLastLogin = (userId) => {
+  return updateUser(userId, { lastLoginAt: new Date().toISOString() });
 };
 
 // Delete a user
