@@ -5,7 +5,7 @@ import { getUnitById } from '../data/administrativeUnits';
 const AuthContext = createContext();
 
 /** Session timeout: 30 minutes of inactivity */
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 60 * 1000;
 
 function isSessionExpired(session) {
