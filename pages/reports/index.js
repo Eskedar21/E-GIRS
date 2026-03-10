@@ -198,7 +198,7 @@ export default function ReportsIndex() {
     const yearId = selectedYearId === '2024' ? 1 : 2;
     
     // Apply role-based scoping
-    if (['Federal Approver', 'Federal Admin', 'Institute Data Contributor'].includes(userRole)) {
+    if (['Federal Approver', 'Federal Admin', 'Institutional Admin', 'Institute Data Contributor'].includes(userRole)) {
       if (!user?.officialUnitId) return [];
       institutes = institutes.filter(inst => {
         if (userRole === 'Federal Approver') {
@@ -263,7 +263,7 @@ export default function ReportsIndex() {
   };
 
   // Check if user can view federal submissions
-  const canViewFederal = ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Approver', 'Federal Admin', 'Institute Data Contributor'].includes(userRole);
+  const canViewFederal = ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Approver', 'Federal Admin', 'Institutional Admin', 'Institute Data Contributor'].includes(userRole);
 
   return (
     <ProtectedRoute allowedRoles={['all']}>

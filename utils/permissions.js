@@ -45,8 +45,8 @@ export const canAccessUnit = (user, targetUnitId, allUnits) => {
     return user.officialUnitId === targetUnitId;
   }
 
-  // Regional Admin and Federal Admin: access within their scope
-  if (['Regional Admin', 'Federal Admin'].includes(user.role)) {
+  // Regional Admin, Federal Admin, Institutional Admin: access within their scope
+  if (['Regional Admin', 'Federal Admin', 'Institutional Admin'].includes(user.role)) {
     const accessible = getAccessibleUnitIds(user, allUnits);
     return accessible.includes(targetUnitId);
   }
@@ -131,7 +131,7 @@ export const canPerformAction = (user, action, resource = null) => {
 
   switch (action) {
     case 'create_user':
-      return ['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Chairman (CC)'].includes(role);
+      return ['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Institutional Admin', 'Chairman (CC)'].includes(role);
     
     case 'manage_framework':
       return ['Super Admin', 'MInT Admin'].includes(role);
@@ -168,7 +168,7 @@ export const canPerformAction = (user, action, resource = null) => {
     
     case 'view_submission':
       // Same roles that can access Federal Institute report / submission details (read-only)
-      return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institute Data Contributor', 'Federal Approver', 'Regional Approver'].includes(role);
+      return ['Super Admin', 'MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institutional Admin', 'Institute Data Contributor', 'Federal Approver', 'Regional Approver'].includes(role);
     
     default:
       return false;
@@ -231,8 +231,8 @@ export const getAccessibleUnitIds = (user, allUnits) => {
     return [user.officialUnitId, ...getChildUnitIds(user.officialUnitId)];
   }
 
-  // Federal Admin: all federal institutions
-  if (user.role === 'Federal Admin') {
+  // Federal Admin / Institutional Admin: all federal institutions
+  if (user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
     return (allUnits || []).filter(u => u.unitType === 'Federal Institute').map(u => u.unitId);
   }
 
@@ -249,12 +249,14 @@ export const getAccessibleUnitIds = (user, allUnits) => {
 export const canCreateUnit = (user, parentUnitId, allUnits) => {
   if (!user || !allUnits) return false;
   if (user.role === 'Super Admin' || user.role === 'MInT Admin') return true;
+  // Regional Admin can only create lower units under their region, not new regions at root
   if (user.role === 'Regional Admin' && user.officialUnitId) {
+    if (parentUnitId === null) return false;
     const accessible = getAccessibleUnitIds(user, allUnits);
-    return parentUnitId === null || accessible.includes(parentUnitId);
+    return accessible.includes(parentUnitId);
   }
-  // Federal Admin cannot create new federal institutes (only edit existing)
-  if (user.role === 'Federal Admin') return false;
+  // Federal Admin / Institutional Admin cannot create new federal institutes (only edit existing)
+  if (user.role === 'Federal Admin' || user.role === 'Institutional Admin') return false;
   return false;
 };
 

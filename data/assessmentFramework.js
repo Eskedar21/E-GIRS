@@ -144,6 +144,15 @@ export const getActiveAssessmentYears = () => {
   assessmentYears = loadAssessmentYears();
   return assessmentYears.filter(y => y.status === ASSESSMENT_STATUS.ACTIVE);
 };
+
+/** Returns assessment years whose submission deadline has passed (status Archived). Visible to admins, central committee, chairman, approvers; not to contributors. */
+export const getArchivedAssessmentYears = () => {
+  assessmentYears = loadAssessmentYears();
+  const now = new Date().toISOString();
+  return assessmentYears.filter(
+    y => y.status === ASSESSMENT_STATUS.ARCHIVED || (y.endDate && y.endDate < now)
+  );
+};
 export const getAssessmentYearById = (id) => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
   return assessmentYears.find(y => y.assessmentYearId === id);

@@ -275,7 +275,7 @@ export default function FederalInstituteDetail() {
     }
   }, [submissionId]);
 
-  const allowedDetailRoles = ['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institute Data Contributor', 'Federal Approver'];
+  const allowedDetailRoles = ['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institutional Admin', 'Institute Data Contributor', 'Federal Approver'];
   const showNotFound = router.isReady && !isLoading && !submission;
   const showLoading = !router.isReady || (isLoading && !submission);
 

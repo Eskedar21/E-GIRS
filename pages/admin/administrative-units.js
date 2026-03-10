@@ -155,6 +155,13 @@ export default function AdministrativeUnitsManagement() {
     const finalUnitType = selectedUnitType || formData.unitType;
     if (!validateForm(finalUnitType)) return;
 
+    // Regional Admin cannot create Region, City Administration, or Federal Institute (only lower units)
+    const rootLevelTypes = [UNIT_TYPES.REGION, UNIT_TYPES.CITY_ADMINISTRATION, UNIT_TYPES.FEDERAL_INSTITUTE];
+    if (user?.role === 'Regional Admin' && rootLevelTypes.includes(finalUnitType)) {
+      setErrors({ general: 'Regional Admins can only create lower-level units (Zone, Sub-city, Woreda) under their region, not regions or city administrations.' });
+      return;
+    }
+
     const isFederalInstitute = finalUnitType === UNIT_TYPES.FEDERAL_INSTITUTE;
     try {
       const newUnit = createUnit({
@@ -361,7 +368,7 @@ export default function AdministrativeUnitsManagement() {
   const showPCodeForType = (unitType) => unitType && unitType !== UNIT_TYPES.FEDERAL_INSTITUTE;
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Chairman (CC)', 'Secretary (CC)']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Institutional Admin', 'Chairman (CC)', 'Secretary (CC)']}>
       <Layout title="Administrative Unit Management">
         <div className="flex">
           <Sidebar />
@@ -484,7 +491,10 @@ export default function AdministrativeUnitsManagement() {
                       <div>
                         <label className="block text-sm font-semibold text-mint-dark-text mb-4">Select Unit Type <span className="text-red-500">*</span></label>
                         <div className="grid grid-cols-2 gap-3">
-                          {[UNIT_TYPES.FEDERAL_INSTITUTE, UNIT_TYPES.REGION, UNIT_TYPES.CITY_ADMINISTRATION, UNIT_TYPES.ZONE, UNIT_TYPES.SUB_CITY, UNIT_TYPES.WOREDA].map((type) => (
+                          {(user?.role === 'Regional Admin'
+                            ? [UNIT_TYPES.ZONE, UNIT_TYPES.SUB_CITY, UNIT_TYPES.WOREDA]
+                            : [UNIT_TYPES.FEDERAL_INSTITUTE, UNIT_TYPES.REGION, UNIT_TYPES.CITY_ADMINISTRATION, UNIT_TYPES.ZONE, UNIT_TYPES.SUB_CITY, UNIT_TYPES.WOREDA]
+                          ).map((type) => (
                             <button key={type} type="button" onClick={() => handleUnitTypeSelect(type)} className="p-4 border-2 border-mint-medium-gray rounded-lg hover:border-mint-primary-blue hover:bg-mint-primary-blue/5 transition-all text-left">
                               <div className="font-semibold text-mint-dark-text">{type}</div>
                               <div className="text-sm text-mint-dark-text/70 mt-1">

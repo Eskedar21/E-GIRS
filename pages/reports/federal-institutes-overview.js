@@ -203,7 +203,7 @@ export default function FederalInstitutesOverview() {
   }, [federalInstituteSubmissions]);
 
   return (
-    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institute Data Contributor', 'Federal Approver']}>
+    <ProtectedRoute allowedRoles={['MInT Admin', 'Central Committee Member', 'Chairman (CC)', 'Secretary (CC)', 'Federal Admin', 'Institutional Admin', 'Institute Data Contributor', 'Federal Approver']}>
       <Layout title="Federal Institute Submissions Overview">
         <div className="flex">
           <Sidebar />

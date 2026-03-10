@@ -54,7 +54,7 @@ export default function EditUser() {
       const userData = getUserById(parseInt(userId));
       if (userData) {
         // Scoped admins can only edit users in their scope (unit-scoped users)
-        if (user.role === 'Regional Admin' || user.role === 'Federal Admin') {
+        if (user.role === 'Regional Admin' || user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
           const accessibleIds = getAccessibleUnitIds(user, allUnits);
           if (userData.officialUnitId == null || !accessibleIds.includes(userData.officialUnitId)) {
             router.push('/admin/users');
@@ -111,7 +111,7 @@ export default function EditUser() {
     if (selectedUnit) {
       return getRolesForUnitType(selectedUnit.unitType);
     }
-    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin')) {
+    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin' || user.role === 'Institutional Admin')) {
       return [];
     }
     return getRolesForUnitType(null);
@@ -154,11 +154,16 @@ export default function EditUser() {
       }
     }
 
-    // Unit validation (required for non-central roles)
+    // Unit validation (required for non-central and non-federal-admin roles)
     const selectedUnit = getSelectedUnit();
-    const isCentralRole = [USER_ROLES.CENTRAL_COMMITTEE_MEMBER, USER_ROLES.CHAIRMAN, USER_ROLES.SECRETARY].includes(formData.role);
-    
-    if (!isCentralRole && !formData.officialUnitId) {
+    const noUnitRequired = [
+      USER_ROLES.CENTRAL_COMMITTEE_MEMBER,
+      USER_ROLES.CHAIRMAN,
+      USER_ROLES.SECRETARY,
+      USER_ROLES.FEDERAL_ADMIN
+    ].includes(formData.role);
+
+    if (!noUnitRequired && !formData.officialUnitId) {
       newErrors.officialUnitId = 'Administrative Unit is required for this role';
     }
 
@@ -213,7 +218,7 @@ export default function EditUser() {
 
   if (loading) {
     return (
-      <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
+      <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin', 'Institutional Admin']}>
         <Layout title="Edit User">
           <div className="flex">
             <Sidebar />
@@ -229,7 +234,7 @@ export default function EditUser() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin', 'Institutional Admin']}>
       <Layout title="Edit User">
         <div className="flex">
           <Sidebar />

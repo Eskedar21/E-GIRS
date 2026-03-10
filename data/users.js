@@ -350,20 +350,22 @@ export const USER_ROLES = {
   SUPER_ADMIN: 'Super Admin',
   MINT_ADMIN: 'MInT Admin',
   REGIONAL_ADMIN: 'Regional Admin',
-  FEDERAL_ADMIN: 'Federal Admin'
+  FEDERAL_ADMIN: 'Federal Admin',
+  INSTITUTIONAL_ADMIN: 'Institutional Admin'
 };
 
 // Get roles based on unit type
 export const getRolesForUnitType = (unitType) => {
   if (!unitType) {
-    // Central roles (no unit required)
+    // Central roles + Federal Admin (no unit required; Federal Admin has access to all federal institutions)
     return [
       USER_ROLES.CENTRAL_COMMITTEE_MEMBER,
       USER_ROLES.CHAIRMAN,
-      USER_ROLES.SECRETARY
+      USER_ROLES.SECRETARY,
+      USER_ROLES.FEDERAL_ADMIN
     ];
   }
-  
+
   switch (unitType) {
     case 'Federal Institute':
       return [
@@ -371,6 +373,12 @@ export const getRolesForUnitType = (unitType) => {
         USER_ROLES.FEDERAL_APPROVER
       ];
     case 'Region':
+      // Regional Admin only when a Region is selected (not zones, sub-cities, woredas)
+      return [
+        USER_ROLES.DATA_CONTRIBUTOR,
+        USER_ROLES.REGIONAL_APPROVER,
+        USER_ROLES.REGIONAL_ADMIN
+      ];
     case 'City Administration':
     case 'Zone':
     case 'Sub-city':

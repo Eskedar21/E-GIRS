@@ -100,7 +100,7 @@ export default function CreateUser() {
     if (selectedUnit) {
       return getRolesForUnitType(selectedUnit.unitType);
     }
-    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin')) {
+    if (user && (user.role === 'Regional Admin' || user.role === 'Federal Admin' || user.role === 'Institutional Admin')) {
       return [];
     }
     // Super Admin / MInT Admin: if no unit selected, show central roles
@@ -141,12 +141,17 @@ export default function CreateUser() {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    // Unit validation (required for non-central roles)
+    // Unit validation (required for non-central and non-federal-admin roles)
     const selectedUnit = getSelectedUnit();
-    const isCentralRole = [USER_ROLES.CENTRAL_COMMITTEE_MEMBER, USER_ROLES.CHAIRMAN, USER_ROLES.SECRETARY].includes(formData.role);
+    const noUnitRequired = [
+      USER_ROLES.CENTRAL_COMMITTEE_MEMBER,
+      USER_ROLES.CHAIRMAN,
+      USER_ROLES.SECRETARY,
+      USER_ROLES.FEDERAL_ADMIN
+    ].includes(formData.role);
     if (user?.role === 'Chairman (CC)') {
       // No unit required for roles created by Chairman
-    } else if (!isCentralRole && !formData.officialUnitId) {
+    } else if (!noUnitRequired && !formData.officialUnitId) {
       newErrors.officialUnitId = 'Administrative Unit is required for this role';
     }
 
@@ -212,7 +217,7 @@ export default function CreateUser() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin', 'Institutional Admin']}>
       <Layout title="Create New User">
         <div className="flex">
           <Sidebar />

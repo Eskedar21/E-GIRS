@@ -186,7 +186,7 @@ export default function UserManagement() {
   }, [user, searchQuery, filterAdminUnit, filterStatus, sortBy, sortOrder, listVersion]);
 
   return (
-    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin']}>
+    <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin', 'Institutional Admin']}>
       <Layout title="User Management">
         <div className="flex">
           <Sidebar />

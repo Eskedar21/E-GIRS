@@ -44,6 +44,7 @@ export default function AssessmentFramework() {
   const [selectedIndicator, setSelectedIndicator] = useState(null);
   
   const [years, setYears] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Draft' | 'Active' | 'Archived'
   const [dimensions, setDimensions] = useState([]);
   const [indicators, setIndicators] = useState([]);
   const [subQuestions, setSubQuestions] = useState([]);
@@ -855,83 +856,90 @@ export default function AssessmentFramework() {
                       </form>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {years.map((year) => (
-                        <Card
-                          key={year.assessmentYearId}
-                          className="hover:border-mint-primary-blue hover:shadow-md transition-all"
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div 
-                                className="flex-1 cursor-pointer"
-                                onClick={() => setSelectedYear(year)}
-                              >
-                                <h3 className="font-semibold text-mint-dark-text mb-1">{year.yearName}</h3>
-                                <p className="text-sm text-mint-dark-text/70">Status: {year.status}</p>
-                                {year.status === ASSESSMENT_STATUS.ACTIVE && year.endDate && (() => {
-                                  const remaining = getAssessmentYearTimeRemaining(year);
-                                  if (!remaining) return null;
-                                  return (
-                                    <p className="text-xs mt-1 text-mint-dark-text/70">
-                                      {remaining.isOverdue ? 'Deadline passed (will auto-close)' : `Ends in ${remaining.days}d ${remaining.hours}h`}
-                                    </p>
-                                  );
-                                })()}
-                              </div>
-                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                year.status === ASSESSMENT_STATUS.ACTIVE
-                                  ? 'bg-green-100 text-green-800'
-                                  : year.status === ASSESSMENT_STATUS.DRAFT
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {year.status}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              <Select
-                                value={year.status}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleStatusChange(year.assessmentYearId, e.target.value);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex-1 text-sm"
-                              >
-                                <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
-                                <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
-                                <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
-                              </Select>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (year.status !== ASSESSMENT_STATUS.ACTIVE) handleEditYear(year);
-                                }}
-                                variant="outline"
-                                className="text-xs px-3"
-                                title={year.status === ASSESSMENT_STATUS.ACTIVE ? 'Locked: set to Draft or Archived to edit' : 'Edit Year'}
-                                disabled={year.status === ASSESSMENT_STATUS.ACTIVE}
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </Button>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedYear(year);
-                                }}
-                                variant="outline"
-                                className="text-xs px-3"
-                              >
-                                Manage
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                    <div className="mb-4 flex flex-wrap items-center gap-4">
+                      <Label htmlFor="statusFilter" className="font-medium">Filter by status</Label>
+                      <Select
+                        id="statusFilter"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-40"
+                      >
+                        <option value="All">All</option>
+                        <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
+                        <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
+                        <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
+                      </Select>
                     </div>
+
+                    {(statusFilter === 'All' ? years : years.filter(y => y.status === statusFilter)).length === 0 ? (
+                      <p className="text-mint-dark-text/70 py-6">
+                        {years.length === 0 ? 'No assessment years yet. Create one above.' : `No frameworks with status "${statusFilter}".`}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {(statusFilter === 'All' ? years : years.filter(y => y.status === statusFilter)).map((year) => {
+                          const remaining = year.endDate ? getAssessmentYearTimeRemaining(year) : null;
+                          return (
+                            <Card
+                              key={year.assessmentYearId}
+                              className="hover:border-mint-primary-blue hover:shadow-md transition-all"
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div
+                                    className="flex-1 cursor-pointer"
+                                    onClick={() => setSelectedYear(year)}
+                                  >
+                                    <h3 className="font-semibold text-mint-dark-text mb-1">{year.yearName}</h3>
+                                    <p className="text-sm text-mint-dark-text/70">Status: {year.status}</p>
+                                    {year.status === ASSESSMENT_STATUS.ACTIVE && year.endDate && remaining && (
+                                      <p className="text-xs mt-1 text-mint-dark-text/70">
+                                        {remaining.isOverdue ? 'Deadline passed (will auto-close)' : `Ends in ${remaining.days}d ${remaining.hours}h`}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    year.status === ASSESSMENT_STATUS.ACTIVE
+                                      ? 'bg-green-100 text-green-800'
+                                      : year.status === ASSESSMENT_STATUS.DRAFT
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {year.status}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                  <Select
+                                    value={year.status}
+                                    onChange={(e) => handleStatusChange(year.assessmentYearId, e.target.value)}
+                                    className="flex-1 min-w-0 text-sm"
+                                  >
+                                    <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
+                                    <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
+                                    <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
+                                  </Select>
+                                  <Button
+                                    onClick={(e) => { e.preventDefault(); handleEditYear(year); }}
+                                    variant="outline"
+                                    className="text-xs px-3"
+                                    title="Edit year details and status"
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.preventDefault(); setSelectedYear(year); }}
+                                    variant="outline"
+                                    className="text-xs px-3"
+                                  >
+                                    Manage
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
