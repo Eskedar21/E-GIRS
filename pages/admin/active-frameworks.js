@@ -258,7 +258,7 @@ export default function ActiveFrameworks() {
                   {activeForMe.length === 0 ? (
                     <p className="text-mint-dark-text/70 py-4">
                       There is no Draft or Active assessment in your scope yet. When MInT creates one for your scope, it
-                      will appear here.
+                      will appear here
                     </p>
                   ) : (
                     <div className="overflow-x-auto border rounded-lg">
