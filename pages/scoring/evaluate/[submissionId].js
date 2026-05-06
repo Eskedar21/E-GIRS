@@ -405,8 +405,7 @@ export default function ScoreSubjectiveSubmission() {
                 </div>
               </div>
               <div className="px-6 py-5">
-                <p className="text-base text-gray-700 mb-4">Submit your scores to the Chairman? The Chairman's list will show this unit and how many members have submitted; they will finalize approval when ready.</p>
-                <p className="text-sm text-gray-600"><strong>Note:</strong> Other members can still submit their scores. The Chairman sees each member's scores and the average, and submits to the system when ready.</p>
+                <p className="text-base text-gray-700">Submit your scores to the Chairman?</p>
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
                 <button onClick={() => setShowSubmitToChairmanModal(false)} className="px-5 py-2.5 bg-[#E0F2F7] hover:bg-[#B8E6F0] text-mint-primary-blue font-semibold rounded-lg">Cancel</button>
@@ -430,7 +429,7 @@ export default function ScoreSubjectiveSubmission() {
                 </div>
               </div>
               <div className="px-6 py-5">
-                <p className="text-base text-gray-700">Your scores have been submitted to the Chairman. The Chairman's list will update with the new count and they will finalize approval when ready.</p>
+                <p className="text-base text-gray-700">Your scores have been submitted.</p>
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
                 <button onClick={() => setShowSubmitToChairmanSuccessModal(false)} className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg">OK</button>

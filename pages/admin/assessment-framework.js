@@ -779,10 +779,6 @@ export default function AssessmentFramework() {
               <Card className="mb-6 border-amber-200 bg-amber-50/40 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg text-mint-primary-blue">Feedback from regional / institute admins</CardTitle>
-                  <CardDescription>
-                    Use <strong>Revert to draft</strong> while the year is still Active so you can change the framework.
-                    After edits (and re-activation if needed), use <strong>Acknowledge update</strong> to close the loop with the admin who wrote in.
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {openFrameworkFeedback.map((fb) => {
@@ -1076,11 +1072,6 @@ export default function AssessmentFramework() {
                         <h3 className="text-lg font-semibold text-mint-primary-blue mb-2">
                           {editingYearId ? 'Edit Assessment Year' : 'Create New Assessment Year'}
                         </h3>
-                        <p className="text-sm text-mint-dark-text/70 mb-4">
-                          {editingYearId
-                            ? 'Update the display name and scope. Status and assessment dates are changed with Activate or Archive on the year card or dimensions screen.'
-                            : 'New years are saved as Draft. After dimensions, indicators, and question weights are complete (100% each level), use Activate to set the period and go live.'}
-                        </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="md:col-span-2">
                             <Label htmlFor="yearName" className="mb-2">
@@ -1119,9 +1110,6 @@ export default function AssessmentFramework() {
                                 Federal Institute (Federal / Institutional Admins assign Institute Data Contributors)
                               </option>
                             </Select>
-                            <p className="text-xs text-mint-dark-text/60 mt-1">
-                              When this framework is activated, only the matching contributor type and scoped admins are notified.
-                            </p>
                           </div>
                         </div>
                         <Button

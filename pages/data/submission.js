@@ -730,12 +730,7 @@ export default function DataSubmission() {
       if (updatedSubmission) {
         setSubmission(updatedSubmission);
         setIncompleteDimensionIds(new Set());
-        setSuccessMessage(
-          '✅ Submission sent for approval successfully!\n\n' +
-          'Your submission has been sent to the Initial Approver (Regional or Federal) for your unit\'s scope.\n\n' +
-          'After initial approval, it will go to the Central Committee for per-question review, then to the Chairman for final approval.\n\n' +
-          'You will be notified of any changes or rejections.'
-        );
+        setSuccessMessage('Submission sent for approval successfully.');
         setTimeout(() => setSuccessMessage(''), 10000);
       } else {
         throw new Error('Failed to update submission status');
@@ -1764,4 +1759,3 @@ export default function DataSubmission() {
     </ProtectedRoute>
   );
 }
-

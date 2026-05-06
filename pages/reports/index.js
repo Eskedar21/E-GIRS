@@ -306,9 +306,6 @@ export default function ReportsIndex() {
                   <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                     Reports & Analytics
                   </h1>
-                  <p className="text-mint-dark-text/70">
-                    Comprehensive insights into unit performance, national index, maturity levels, and federal submissions
-                  </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <select
@@ -723,9 +720,6 @@ export default function ReportsIndex() {
                   {/* Federal Submissions View */}
                   <div className="mb-6">
                     <h2 className="text-2xl font-bold text-mint-primary-blue mb-4">Federal Institute Informational Submissions</h2>
-                    <p className="text-mint-dark-text/70 mb-4">
-                      View detailed informational submissions from Federal Institutes for {selectedYearId}
-                    </p>
                   </div>
 
                   {federalSubmissions.length === 0 ? (

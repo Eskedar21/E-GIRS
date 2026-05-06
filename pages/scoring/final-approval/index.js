@@ -144,9 +144,6 @@ export default function ChairmanFinalApprovalQueue() {
                 <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">
                   Scores for Final Approval
                 </h1>
-                <p className="text-mint-dark-text/70">
-                  One aggregated scoring per unit/institution. Submissions sent by the committee for your review. View committee members’ scores and their average, override the final score if needed, and submit to the system so the index can be calculated.
-                </p>
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-mint-medium-gray p-6 mb-6">

@@ -248,25 +248,11 @@ export default function ActiveFrameworks() {
             <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-mint-primary-blue mb-2">Frameworks for your scope</h1>
-                <p className="text-mint-dark-text/70 max-w-4xl">
-                  MInT creates assessments by scope: <strong>Regional</strong> for Regional Admins;{' '}
-                  <strong>Federal Institute</strong> for Federal and Institutional Admins. Draft years appear here so
-                  you can review structure and assign contributors before activation. For each
-                  framework, select contributors in your scope below, or open{' '}
-                  <Link href="/admin/users" className="text-mint-primary-blue hover:underline font-medium">
-                    User Management
-                  </Link>{' '}
-                  to create accounts. Use feedback to reach MInT if something needs to change.
-                </p>
               </div>
 
               <Card className="shadow-lg mb-6">
                 <CardHeader>
                   <CardTitle className="text-xl text-mint-primary-blue">Your frameworks (Draft and Active)</CardTitle>
-                  <CardDescription>
-                    Select a year to view structure (read-only), assign contributors, or send feedback to MInT. Data
-                    contributors only see a year on the submission page after it is Active.
-                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {activeForMe.length === 0 ? (
@@ -458,10 +444,6 @@ export default function ActiveFrameworks() {
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                               <CardTitle className="text-lg text-mint-primary-blue">Assign contributors</CardTitle>
-                              <CardDescription className="mt-1.5">
-                                Choose which unlocked {contributorRoleLabel.toLowerCase()} in your scope are tied to this
-                                assessment. Search to narrow the list, then save.
-                              </CardDescription>
                             </div>
                             {contributorsInScope.length > 0 && (
                               <span className="inline-flex shrink-0 items-center rounded-full border border-mint-primary-blue/20 bg-white px-3 py-1 text-xs font-semibold text-mint-primary-blue shadow-sm">
@@ -579,9 +561,6 @@ export default function ActiveFrameworks() {
                   <Card className="shadow-lg border border-gray-200">
                     <CardHeader>
                       <CardTitle className="text-lg text-mint-primary-blue">Feedback to MInT</CardTitle>
-                      <CardDescription>
-                        If something in this framework does not work for your region or institute, describe it here. MInT Admin will see it on the Assessment Framework page.
-                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handleSendFeedback} className="space-y-3">

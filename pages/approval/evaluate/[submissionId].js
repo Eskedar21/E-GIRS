@@ -897,9 +897,6 @@ export default function EvaluateSubmission() {
                   placeholder="Add a general comment for the Central Committee..."
                   required
                 />
-                <p className="text-sm text-gray-600 mb-4">
-                  <strong>Next step:</strong> Central Committee members will review each question and submit their approvals. When all have completed, the Chairman will see the list of actions per question and provide final approval or rejection.
-                </p>
                 {approveError && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-700 font-semibold">{approveError}</p>
@@ -1046,4 +1043,3 @@ export default function EvaluateSubmission() {
     </ProtectedRoute>
   );
 }
-
