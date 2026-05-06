@@ -4,8 +4,8 @@ import { getUnitById } from '../data/administrativeUnits';
 
 const AuthContext = createContext();
 
-/** Session timeout: 30 minutes of inactivity */
-const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+/** Session timeout: 20 minutes of inactivity */
+const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 60 * 1000;
 
 function isSessionExpired(session) {
@@ -21,27 +21,24 @@ function withSessionTimestamps(session) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const lastActivityUpdate = useRef(0);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('egirs_user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        if (isSessionExpired(userData)) {
-          localStorage.removeItem('egirs_user');
-          setUser(null);
-        } else {
-          setUser(userData);
-        }
-      } catch (e) {
-        localStorage.removeItem('egirs_user');
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const storedUser = window.localStorage.getItem('egirs_user');
+    if (!storedUser) return null;
+    try {
+      const userData = JSON.parse(storedUser);
+      if (isSessionExpired(userData)) {
+        window.localStorage.removeItem('egirs_user');
+        return null;
       }
+      return userData;
+    } catch {
+      window.localStorage.removeItem('egirs_user');
+      return null;
     }
-    setIsLoading(false);
-  }, []);
+  });
+  const [isLoading] = useState(false);
+  const lastActivityUpdate = useRef(0);
 
   const login = async (username, password) => {
     const userData = getUserByUsername(username);
@@ -186,8 +183,28 @@ export function AuthProvider({ children }) {
     return null;
   }, []);
 
+  /** Merge fields into the active session (e.g. after the user changes their username). */
+  const updateSessionUser = useCallback((partial) => {
+    const stored = localStorage.getItem('egirs_user');
+    if (!stored) return null;
+    try {
+      const data = JSON.parse(stored);
+      if (isSessionExpired(data)) {
+        localStorage.removeItem('egirs_user');
+        setUser(null);
+        return null;
+      }
+      const updated = { ...data, ...partial };
+      localStorage.setItem('egirs_user', JSON.stringify(updated));
+      setUser(updated);
+      return updated;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, logoutIfExpired, hasRole, isLoading, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, logout, logoutIfExpired, hasRole, isLoading, refreshUser, updateSessionUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -200,4 +217,3 @@ export function useAuth() {
   }
   return context;
 }
-

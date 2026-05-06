@@ -25,6 +25,16 @@ import {
 } from '../../data/administrativeUnits';
 import { getAccessibleUnitIds, canCreateUnit, canEditUnit } from '../../utils/permissions';
 
+/** Display order for unit-type filter options */
+const UNIT_TYPE_FILTER_ORDER = [
+  UNIT_TYPES.FEDERAL_INSTITUTE,
+  UNIT_TYPES.REGION,
+  UNIT_TYPES.CITY_ADMINISTRATION,
+  UNIT_TYPES.ZONE,
+  UNIT_TYPES.SUB_CITY,
+  UNIT_TYPES.WOREDA
+];
+
 export default function AdministrativeUnitsManagement() {
   const { user } = useAuth();
   const { isCollapsed } = useSidebar();
@@ -51,6 +61,33 @@ export default function AdministrativeUnitsManagement() {
   useEffect(() => {
     setUnits(getAllUnits());
   }, [successMessage]);
+
+  const scopedUnitTypeFilterValues = useMemo(() => {
+    const allUnitsList = getAllUnits();
+    if (!user) return UNIT_TYPE_FILTER_ORDER;
+    if (['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Secretary (CC)'].includes(user.role)) {
+      return UNIT_TYPE_FILTER_ORDER;
+    }
+    if (user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
+      return [UNIT_TYPES.FEDERAL_INSTITUTE];
+    }
+    if (user.role === 'Regional Admin') {
+      const allowed = new Set(getAccessibleUnitIds(user, allUnitsList));
+      const typesPresent = new Set(
+        allUnitsList.filter((u) => allowed.has(u.unitId)).map((u) => u.unitType)
+      );
+      typesPresent.delete(UNIT_TYPES.FEDERAL_INSTITUTE);
+      return UNIT_TYPE_FILTER_ORDER.filter((t) => typesPresent.has(t));
+    }
+    return UNIT_TYPE_FILTER_ORDER;
+  }, [user, units]);
+
+  useEffect(() => {
+    if (!unitTypeFilter) return;
+    if (!scopedUnitTypeFilterValues.includes(unitTypeFilter)) {
+      setUnitTypeFilter('');
+    }
+  }, [unitTypeFilter, scopedUnitTypeFilterValues]);
 
   const treeStructure = useMemo(() => {
     const allUnits = units.length > 0 ? units : getAllUnits();
@@ -383,12 +420,11 @@ export default function AdministrativeUnitsManagement() {
                     className="w-[200px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-primary-blue"
                   >
                     <option value="">All unit types</option>
-                    <option value={UNIT_TYPES.FEDERAL_INSTITUTE}>{UNIT_TYPES.FEDERAL_INSTITUTE}</option>
-                    <option value={UNIT_TYPES.REGION}>{UNIT_TYPES.REGION}</option>
-                    <option value={UNIT_TYPES.CITY_ADMINISTRATION}>{UNIT_TYPES.CITY_ADMINISTRATION}</option>
-                    <option value={UNIT_TYPES.ZONE}>{UNIT_TYPES.ZONE}</option>
-                    <option value={UNIT_TYPES.SUB_CITY}>{UNIT_TYPES.SUB_CITY}</option>
-                    <option value={UNIT_TYPES.WOREDA}>{UNIT_TYPES.WOREDA}</option>
+                    {scopedUnitTypeFilterValues.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
                   </Select>
                   <div className="relative">
                     <input type="text" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent" />

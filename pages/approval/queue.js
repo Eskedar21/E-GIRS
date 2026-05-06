@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getAllSubmissions, getSubmissionsByStatus, getSubmissionById, getSubmissionsReadyForChairmanValidation, SUBMISSION_STATUS } from '../../data/submissions';
 import { getAllUnits, getUnitById, getChildUnits } from '../../data/administrativeUnits';
 import { filterSubmissionsByAccess } from '../../utils/permissions';
-import { getAssessmentYearById } from '../../data/assessmentFramework';
+import { getAssessmentYearById, isAssessmentYearArchived } from '../../data/assessmentFramework';
 import { getUserById, updateUser } from '../../data/users';
 
 export default function ApprovalQueue() {
@@ -123,10 +123,12 @@ export default function ApprovalQueue() {
       const allUnits = getAllUnits();
       
       if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
-        // Central Committee sees all submissions with Pending Approval and Verified statuses
+        // Central Committee sees all submissions with Pending Approval and Verified statuses (excluding archived/closed years)
         const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
         const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-        submissions = [...pending, ...validated];
+        submissions = [...pending, ...validated].filter(
+          (s) => !isAssessmentYearArchived(s.assessmentYearId)
+        );
       } else if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
         // Initial approvers only see submissions that need their action (scope-based):
         // - Pending Initial Approval (contributor just submitted)
@@ -271,7 +273,9 @@ export default function ApprovalQueue() {
   // Submissions where all committee members have submitted (ready for Chairman final decision)
   const readyForChairmanSubmissionIds = useMemo(() => {
     if (userRole !== 'Chairman (CC)' && userRole !== 'Secretary (CC)') return new Set();
-    const ready = getSubmissionsReadyForChairmanValidation();
+    const ready = getSubmissionsReadyForChairmanValidation().filter(
+      (s) => !isAssessmentYearArchived(s.assessmentYearId)
+    );
     return new Set(ready.map(s => s.submissionId));
   }, [userRole, allSubmissions]);
 
@@ -516,7 +520,11 @@ export default function ApprovalQueue() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by company name, TIN number, or contact person..."
+                      placeholder={
+                        userRole === 'Federal Approver'
+                          ? 'Search by institution name, submission name, or submission ID...'
+                          : 'Search by unit name, submission name, or submission ID...'
+                      }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                                           </div>

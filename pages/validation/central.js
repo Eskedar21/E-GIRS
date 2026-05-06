@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -15,13 +16,16 @@ import {
   VALIDATION_STATUS
 } from '../../data/submissions';
 import { getAllUnits, getUnitById } from '../../data/administrativeUnits';
+import { getUsersByRole } from '../../data/users';
 import { filterSubmissionsByAccess, canPerformAction } from '../../utils/permissions';
 import { getSubQuestionById, getSubQuestionsByIndicator, getIndicatorById } from '../../data/assessmentFramework';
-import { getDimensionsByYear, getDimensionById, getIndicatorsByDimension, getAssessmentYearById } from '../../data/assessmentFramework';
+import { getDimensionsByYear, getDimensionById, getIndicatorsByDimension, getAssessmentYearById, isAssessmentYearArchived } from '../../data/assessmentFramework';
 
 export default function CentralValidation() {
+  const router = useRouter();
   const { user } = useAuth();
   const userRole = user ? user.role : '';
+  const usesCommitteeApprovalFlow = (getUsersByRole('Central Committee Member') || []).length > 0;
   const [submissions, setSubmissions] = useState([]);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [submissionDetails, setSubmissionDetails] = useState(null);
@@ -29,40 +33,7 @@ export default function CentralValidation() {
   const [rejectionReasons, setRejectionReasons] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
 
-  useEffect(() => {
-    if (!user) return;
-    
-    const loadSubmissions = () => {
-      // Central Committee sees ALL submissions pending central validation (no scope restriction)
-      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
-      setSubmissions(pending);
-      
-      // Reload selected submission details if it exists
-      if (selectedSubmission) {
-        loadSubmissionDetails(selectedSubmission.submissionId);
-      }
-    };
-    
-    loadSubmissions();
-    
-    // Listen for real-time updates
-    const handleSubmissionUpdate = (event) => {
-      loadSubmissions();
-    };
-    
-    if (typeof window !== 'undefined') {
-      window.addEventListener('submissionUpdated', handleSubmissionUpdate);
-      // Also poll for updates every 2 seconds as backup
-      const interval = setInterval(loadSubmissions, 2000);
-      
-      return () => {
-        window.removeEventListener('submissionUpdated', handleSubmissionUpdate);
-        clearInterval(interval);
-      };
-    }
-  }, [successMessage, user, selectedSubmission]);
-
-  const loadSubmissionDetails = (submissionId) => {
+  function loadSubmissionDetails(submissionId) {
     const submission = getSubmissionById(submissionId);
     if (submission) {
       setSelectedSubmission(submission);
@@ -114,7 +85,9 @@ export default function CentralValidation() {
               subQuestions: subQuestions.map(sq => {
                 const response = responses.find(r => r.subQuestionId === sq.subQuestionId);
                 // Only show questions that have answers (all should be answered before submission)
-                if (response && response.responseValue && response.responseValue.trim() !== '') {
+                const value = response?.responseValue;
+                const hasAnswer = value != null && String(value).trim() !== '';
+                if (response && hasAnswer) {
                   return {
                     subQuestion: sq,
                     response: response
@@ -133,10 +106,50 @@ export default function CentralValidation() {
         groupedData
       });
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!user) return;
+
+    const loadSubmissions = () => {
+      // Central Committee sees ALL submissions pending central validation (no scope restriction), excluding closed/archived assessment years
+      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).filter(
+        (s) => !isAssessmentYearArchived(s.assessmentYearId)
+      );
+      setSubmissions(pending);
+
+      // Reload selected submission details if it exists
+      if (selectedSubmission) {
+        loadSubmissionDetails(selectedSubmission.submissionId);
+      }
+    };
+
+    loadSubmissions();
+
+    // Listen for real-time updates
+    const handleSubmissionUpdate = (event) => {
+      loadSubmissions();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('submissionUpdated', handleSubmissionUpdate);
+      // Also poll for updates every 2 seconds as backup
+      const interval = setInterval(loadSubmissions, 2000);
+
+      return () => {
+        window.removeEventListener('submissionUpdated', handleSubmissionUpdate);
+        clearInterval(interval);
+      };
+    }
+  }, [successMessage, user, selectedSubmission]);
 
   const handleApproveResponse = (responseId) => {
     if (!user) return;
+    if (usesCommitteeApprovalFlow) {
+      alert('Use the full committee review screen to approve or reject each question. The Chairman will make the final general decision after all members submit.');
+      if (selectedSubmission) router.push(`/validation/evaluate/${selectedSubmission.submissionId}`);
+      return;
+    }
     
     if (!canPerformAction(user, 'validate_submission')) {
       alert('You do not have permission to validate submissions.');
@@ -157,7 +170,9 @@ export default function CentralValidation() {
     // Refresh submission details
     if (selectedSubmission) {
       loadSubmissionDetails(selectedSubmission.submissionId);
-      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
+      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).filter(
+        (s) => !isAssessmentYearArchived(s.assessmentYearId)
+      );
       setSubmissions(pending);
     }
     
@@ -172,6 +187,11 @@ export default function CentralValidation() {
 
   const handleRejectResponse = (responseId) => {
     if (!user) return;
+    if (usesCommitteeApprovalFlow) {
+      alert('Use the full committee review screen to approve or reject each question. The Chairman will make the final general decision after all members submit.');
+      if (selectedSubmission) router.push(`/validation/evaluate/${selectedSubmission.submissionId}`);
+      return;
+    }
     
     if (!canPerformAction(user, 'validate_submission')) {
       alert('You do not have permission to validate submissions.');
@@ -190,7 +210,9 @@ export default function CentralValidation() {
     // Refresh submission details
     if (selectedSubmission) {
       loadSubmissionDetails(selectedSubmission.submissionId);
-      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
+      const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).filter(
+        (s) => !isAssessmentYearArchived(s.assessmentYearId)
+      );
       setSubmissions(pending);
     }
     
@@ -200,6 +222,11 @@ export default function CentralValidation() {
 
   const handleSubmitValidation = () => {
     if (!user || !selectedSubmission) return;
+    if (usesCommitteeApprovalFlow) {
+      alert('This submission is waiting for committee member actions and Chairman final decision. Please use the full review screen.');
+      router.push(`/validation/evaluate/${selectedSubmission.submissionId}`);
+      return;
+    }
     
     if (!canPerformAction(user, 'validate_submission')) {
       alert('You do not have permission to submit validations.');
@@ -212,7 +239,9 @@ export default function CentralValidation() {
       if (result) {
         // Refresh submission details
         loadSubmissionDetails(selectedSubmission.submissionId);
-        const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
+        const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION).filter(
+          (s) => !isAssessmentYearArchived(s.assessmentYearId)
+        );
         setSubmissions(pending);
         
         // Dispatch event for real-time update
@@ -780,4 +809,3 @@ export default function CentralValidation() {
     </ProtectedRoute>
   );
 }
-

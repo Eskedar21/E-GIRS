@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import Sidebar from '../components/Sidebar';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -10,9 +10,18 @@ import {
   getSubmissionsByStatus, 
   getSubmissionsByUser,
   getSubmissionsByUnit,
+  getContributorSubmissionForUnitAndYear,
   SUBMISSION_STATUS 
 } from '../data/submissions';
-import { getAllAssessmentYears, getAssessmentYearById, getAssessmentYearTimeRemaining, isDeadlineSoon } from '../data/assessmentFramework';
+import {
+  getAllAssessmentYears,
+  getActiveAssessmentYearsForContributor,
+  getAssessmentYearTimeRemaining,
+  isDeadlineSoon,
+  isAssessmentYearArchived,
+  ASSESSMENT_STATUS
+} from '../data/assessmentFramework';
+import { getAllContributorUserIdsAssignedForAssessmentYear } from '../data/frameworkContributorAssignments';
 import { filterSubmissionsByAccess } from '../utils/permissions';
 import DeadlineRibbon from '../components/DeadlineRibbon';
 import { 
@@ -36,27 +45,75 @@ export default function Dashboard() {
   const { isCollapsed } = useSidebar();
   const userRole = user ? user.role : '';
   const [units] = useState(getAllUnits());
-  const [submissions, setSubmissions] = useState([]);
+  const [submissions, setSubmissions] = useState(() => getAllSubmissions());
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [selectedYear, setSelectedYear] = useState(null);
   const [assessmentYears, setAssessmentYears] = useState([]);
 
-  // Load assessment years
+  const userRef = useRef(user);
   useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  // Align year list + default selection with user role (contributors use same active years as /data/submission).
+  // useRef + primitive deps: avoid re-running on every auth activity tick (new session object) which reset the UI.
+  const syncAssessmentYearSelection = useCallback(() => {
+    const u = userRef.current;
+    if (u && ['Data Contributor', 'Institute Data Contributor'].includes(u.role)) {
+      // Only show years where this contributor is explicitly assigned by a scoped admin.
+      const active = getActiveAssessmentYearsForContributor(u);
+      const uid = u.userId != null && u.userId !== '' ? Number(u.userId) : NaN;
+      const years =
+        Number.isNaN(uid)
+          ? []
+          : active.filter((y) =>
+              getAllContributorUserIdsAssignedForAssessmentYear(y.assessmentYearId).includes(uid)
+            );
+      setAssessmentYears(years);
+      const storageKey =
+        u.userId != null && u.userId !== '' ? `egirs_dashboard_contributor_year_${Number(u.userId)}` : null;
+      setSelectedYear((prev) => {
+        if (!years.length) return null;
+        const prevId = prev != null ? Number(prev.assessmentYearId) : NaN;
+        const stillThere = !Number.isNaN(prevId) && years.some((y) => Number(y.assessmentYearId) === prevId);
+        if (stillThere) return years.find((y) => Number(y.assessmentYearId) === prevId);
+        if (typeof window !== 'undefined' && storageKey) {
+          const stored = parseInt(sessionStorage.getItem(storageKey), 10);
+          if (!Number.isNaN(stored)) {
+            const fromStore = years.find((y) => Number(y.assessmentYearId) === stored);
+            if (fromStore) return fromStore;
+          }
+        }
+        return years[0];
+      });
+      return;
+    }
     const years = getAllAssessmentYears();
     setAssessmentYears(years);
-    
-    // Auto-select active year if available
-    if (!selectedYear && years.length > 0) {
-      const activeYear = years.find(y => y.status === 'Active');
-      if (activeYear) {
-        setSelectedYear(activeYear);
-      } else if (years.length > 0) {
-        // If no active year, select the most recent one
-        setSelectedYear(years[years.length - 1]);
-      }
-    }
-  }, []);
+    setSelectedYear((prev) => {
+      if (!years.length) return null;
+      const prevId = prev != null ? Number(prev.assessmentYearId) : NaN;
+      const match = !Number.isNaN(prevId) ? years.find((y) => Number(y.assessmentYearId) === prevId) : null;
+      if (match) return match;
+      const activeYear = years.find((y) => y.status === ASSESSMENT_STATUS.ACTIVE);
+      return activeYear || years[years.length - 1] || null;
+    });
+  }, [user?.userId, user?.role, user?.officialUnitId]);
+
+  useEffect(() => {
+    syncAssessmentYearSelection();
+  }, [syncAssessmentYearSelection]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onFramework = () => syncAssessmentYearSelection();
+    window.addEventListener('assessmentFrameworkUpdated', onFramework);
+    window.addEventListener('frameworkContributorAssignmentsUpdated', onFramework);
+    return () => {
+      window.removeEventListener('assessmentFrameworkUpdated', onFramework);
+      window.removeEventListener('frameworkContributorAssignmentsUpdated', onFramework);
+    };
+  }, [syncAssessmentYearSelection]);
 
   // Load real-time submission data
   useEffect(() => {
@@ -105,10 +162,12 @@ export default function Dashboard() {
 
     // Use the EXACT same logic as approval queue
     if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(userRole)) {
-      // Central Committee sees all submissions with Pending Approval and Verified statuses
+      // Central Committee sees all submissions with Pending Approval and Verified statuses (excluding archived/closed years)
       const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
       const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-      relevantSubmissions = [...pending, ...validated];
+      relevantSubmissions = [...pending, ...validated].filter(
+        (s) => !isAssessmentYearArchived(s.assessmentYearId)
+      );
     } else if (['Regional Approver', 'Federal Approver'].includes(userRole)) {
       // Regional Approvers see submissions in their scope
       const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL);
@@ -123,7 +182,8 @@ export default function Dashboard() {
       // Data Contributors see their own submissions, filtered by selected year
       const userSubmissions = getSubmissionsByUser(user?.userId || 0);
       if (selectedYear) {
-        relevantSubmissions = userSubmissions.filter(s => s.assessmentYearId === selectedYear.assessmentYearId);
+        const yid = Number(selectedYear.assessmentYearId);
+        relevantSubmissions = userSubmissions.filter((s) => Number(s.assessmentYearId) === yid);
       } else {
         relevantSubmissions = userSubmissions;
       }
@@ -161,20 +221,41 @@ export default function Dashboard() {
     };
   }, [submissions, units, user, userRole, selectedYear]);
 
+  /** Submission row for the contributor + selected year — read live store (not stale React copy); submissions dep retriggers after sync events. */
+  const contributorSubmissionForSelectedYear = useMemo(() => {
+    if (!user || !['Data Contributor', 'Institute Data Contributor'].includes(user.role)) {
+      return null;
+    }
+    if (!selectedYear) return null;
+    const yearId = Number(selectedYear.assessmentYearId);
+    const contributorId = Number(user.userId);
+    const unitId =
+      user.officialUnitId != null && user.officialUnitId !== ''
+        ? Number(user.officialUnitId)
+        : NaN;
+    if (Number.isNaN(contributorId) || Number.isNaN(yearId) || Number.isNaN(unitId)) return null;
+    return getContributorSubmissionForUnitAndYear(user.userId, user.officialUnitId, selectedYear.assessmentYearId) || null;
+  }, [user, selectedYear, submissions]);
+
   // Ribbon for all Data/Institute Contributors: show on dashboard, persist until they complete submission (submit for approval or later)
   const contributorRibbon = useMemo(() => {
     if (!user || !['Data Contributor', 'Institute Data Contributor'].includes(user.role)) return null;
-    const years = getAllAssessmentYears();
+    const years = getActiveAssessmentYearsForContributor(user);
     const hasDeadline = (y) => y.endDate && (isDeadlineSoon(y) || getAssessmentYearTimeRemaining(y)?.isOverdue);
     const yearToShow = selectedYear?.endDate && hasDeadline(selectedYear)
       ? selectedYear
-      : years.find(y => y.status === 'Active' && hasDeadline(y)) || years.find(hasDeadline);
+      : years.find((y) => y.status === ASSESSMENT_STATUS.ACTIVE && hasDeadline(y)) || years.find(hasDeadline);
     if (!yearToShow?.endDate) return null;
     const remaining = getAssessmentYearTimeRemaining(yearToShow);
     const showSoon = isDeadlineSoon(yearToShow);
     const showClosed = remaining?.isOverdue;
     if (!showSoon && !showClosed) return null;
-    const submissionForYear = user ? getSubmissionsByUser(user.userId).find(s => s.assessmentYearId === yearToShow.assessmentYearId) : null;
+    const submissionForYear =
+      user.userId != null &&
+      user.officialUnitId != null &&
+      user.officialUnitId !== ''
+        ? getContributorSubmissionForUnitAndYear(user.userId, user.officialUnitId, yearToShow.assessmentYearId)
+        : null;
     const completed = submissionForYear && [
       SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL,
       SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION,
@@ -284,7 +365,9 @@ export default function Dashboard() {
     const allUnits = getAllUnits();
     const pending = getSubmissionsByStatus(SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION);
     const validated = getSubmissionsByStatus(SUBMISSION_STATUS.VALIDATED);
-    const allSubmissions = [...pending, ...validated];
+    const allSubmissions = [...pending, ...validated].filter(
+      (s) => !isAssessmentYearArchived(s.assessmentYearId)
+    );
     
     // Group by region/unit type
     const regionMap = new Map();
@@ -1247,14 +1330,55 @@ export default function Dashboard() {
         );
 
       case 'Data Contributor':
-      case 'Institute Data Contributor':
-        // Get current submission for selected year
-        let currentSubmission = stats.totalSubmissions > 0 
-          ? (user ? getSubmissionsByUser(user.userId).find(s => 
-              selectedYear ? s.assessmentYearId === selectedYear.assessmentYearId : true
-            ) : null)
-          : null;
-        
+      case 'Institute Data Contributor': {
+        const noOpenAssessment = assessmentYears.length === 0;
+        // Match submission for selected year (do not gate on stats.totalSubmissions — that hid in-progress drafts)
+        const currentSubmission = contributorSubmissionForSelectedYear;
+        const contributorUnitId =
+          user?.officialUnitId != null && user.officialUnitId !== '' ? Number(user.officialUnitId) : NaN;
+        const contributorUnit = !Number.isNaN(contributorUnitId) ? getUnitById(contributorUnitId) : null;
+        const canCreateSubmission = Boolean(selectedYear) && Boolean(contributorUnit);
+        const submissionPrimaryCta = (() => {
+          if (!currentSubmission) return 'Start submission →';
+          if (
+            [
+              SUBMISSION_STATUS.DRAFT,
+              SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER,
+              SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE
+            ].includes(currentSubmission.submissionStatus)
+          ) {
+            return 'Continue submission →';
+          }
+          return 'View submission →';
+        })();
+
+        const scopeLabel =
+          userRole === 'Institute Data Contributor'
+            ? 'federal institutes'
+            : 'regional organizations';
+
+        if (noOpenAssessment) {
+          return (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                <h2 className="text-2xl font-bold text-mint-primary-blue">Data Submission Dashboard</h2>
+                <div className="flex items-center gap-2 text-sm text-mint-dark-text/60">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
+                <h3 className="text-lg font-semibold text-mint-dark-text mb-2">No open assessment</h3>
+                <p className="text-sm text-mint-dark-text/70 max-w-2xl">
+                  There is no active assessment period for {scopeLabel} right now. When the next cycle opens, it will
+                  appear here and you can submit your data. You do not need to take any action until then.
+                </p>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
@@ -1264,14 +1388,20 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-semibold text-mint-dark-text">Assessment Year:</label>
                   <select
-                    value={selectedYear?.assessmentYearId || ''}
+                    value={selectedYear?.assessmentYearId ?? ''}
                     onChange={(e) => {
-                      const year = assessmentYears.find(y => y.assessmentYearId === parseInt(e.target.value));
-                      setSelectedYear(year);
+                      const v = parseInt(e.target.value, 10);
+                      const year = assessmentYears.find((y) => Number(y.assessmentYearId) === v);
+                      setSelectedYear(year || null);
+                      if (user?.userId != null && year && typeof window !== 'undefined') {
+                        sessionStorage.setItem(
+                          `egirs_dashboard_contributor_year_${Number(user.userId)}`,
+                          String(year.assessmentYearId)
+                        );
+                      }
                     }}
                     className="px-3 py-2 border border-mint-medium-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue bg-white text-sm"
                   >
-                    <option value="">All Years</option>
                     {assessmentYears.map((year) => (
                       <option key={year.assessmentYearId} value={year.assessmentYearId}>
                         {year.yearName} ({year.status})
@@ -1297,6 +1427,11 @@ export default function Dashboard() {
                     <p className="text-sm text-mint-dark-text/70 mt-1">
                       {selectedYear.yearName} Assessment
                     </p>
+                    {currentSubmission.submissionStatus === SUBMISSION_STATUS.DRAFT && (
+                      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+                        You have a <span className="font-semibold">saved draft</span> for this year. Continue editing or submit for approval when all questions are complete.
+                      </p>
+                    )}
                   </div>
                   <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
                     currentSubmission.submissionStatus === SUBMISSION_STATUS.DRAFT
@@ -1358,7 +1493,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            ) : selectedYear ? (
+            ) : selectedYear && canCreateSubmission ? (
               <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-dashed border-mint-medium-gray text-center">
                 <svg className="w-16 h-16 text-mint-dark-text/30 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1374,6 +1509,13 @@ export default function Dashboard() {
                   Start Submission →
                 </a>
               </div>
+            ) : selectedYear ? (
+              <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
+                <h3 className="text-lg font-semibold text-mint-dark-text mb-2">Unit not assigned yet</h3>
+                <p className="text-sm text-mint-dark-text/70 max-w-2xl">
+                  Your account is not linked to an official unit yet, so you can’t start a submission. Please contact your administrator to assign your unit.
+                </p>
+              </div>
             ) : null}
             
 
@@ -1383,12 +1525,14 @@ export default function Dashboard() {
                   <h3 className="text-lg font-semibold text-mint-dark-text">Your Submissions</h3>
                   <p className="text-sm text-mint-dark-text/70 mt-1">Manage your data submissions for your assigned unit</p>
                 </div>
-                <a
-                  href={selectedYear ? `/data/submission?year=${selectedYear.assessmentYearId}` : '/data/submission'}
-                  className="bg-mint-secondary-blue hover:bg-mint-primary-blue text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg"
-                >
-                  {currentSubmission ? 'Edit Submission →' : 'Start Submission →'}
-                </a>
+                {(currentSubmission || canCreateSubmission) && (
+                  <a
+                    href={selectedYear ? `/data/submission?year=${selectedYear.assessmentYearId}` : '/data/submission'}
+                    className="bg-mint-secondary-blue hover:bg-mint-primary-blue text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg"
+                  >
+                    {submissionPrimaryCta}
+                  </a>
+                )}
               </div>
 
               {selectedYear && (
@@ -1454,27 +1598,19 @@ export default function Dashboard() {
                     </>
                   ) : (
                     <div className="col-span-2 text-center py-8">
-                      <p className="text-mint-dark-text/70">Select an assessment year to view submission details</p>
+                      <p className="text-mint-dark-text/70">
+                        {canCreateSubmission
+                          ? 'Select an assessment year to view submission details'
+                          : 'Your unit must be assigned before you can create a submission.'}
+                      </p>
                     </div>
                   )}
                 </div>
               )}
             </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-mint-medium-gray">
-              <h3 className="text-lg font-semibold text-mint-dark-text mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a
-                  href={selectedYear ? `/data/submission?year=${selectedYear.assessmentYearId}` : '/data/submission'}
-                  className="group p-5 border-2 border-mint-medium-gray rounded-xl hover:border-mint-primary-blue hover:shadow-md transition-all duration-200 hover:bg-mint-light-gray"
-                >
-                  <h4 className="font-semibold text-mint-primary-blue mb-2 group-hover:text-mint-secondary-blue transition-colors">Submit Data</h4>
-                  <p className="text-sm text-mint-dark-text/70">Create or edit your data submission</p>
-                </a>
-              </div>
-            </div>
           </div>
         );
+      }
 
       default:
         return (

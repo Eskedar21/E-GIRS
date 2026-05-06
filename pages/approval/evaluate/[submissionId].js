@@ -30,7 +30,9 @@ export default function EvaluateSubmission() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectToContributorModal, setShowRejectToContributorModal] = useState(false);
   const [rejectToContributorComment, setRejectToContributorComment] = useState('');
+  const [approvalComment, setApprovalComment] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [approveError, setApproveError] = useState('');
   const [openCommentSections, setOpenCommentSections] = useState({});
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
@@ -116,8 +118,14 @@ export default function EvaluateSubmission() {
   };
 
   const handleApproveSubmission = () => {
+    setApproveError('');
     if (!user || !submissionDetails?.submission) {
       alert('Submission details are not loaded. Please refresh the page.');
+      return;
+    }
+    const trimmedApprovalComment = String(approvalComment || '').trim();
+    if (!trimmedApprovalComment) {
+      setApproveError('Approval comment is required.');
       return;
     }
     if (!canPerformAction(user, 'approve_submission')) {
@@ -141,9 +149,10 @@ export default function EvaluateSubmission() {
           approveResponseByRegionalApprover(r.responseId, user.userId, null);
         }
       });
-      const result = submitRegionalApproval(sid, user.userId);
+      const result = submitRegionalApproval(sid, user.userId, trimmedApprovalComment);
       if (result) {
         setShowApproveModal(false);
+        setApprovalComment('');
         loadSubmissionDetails(sid);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('submissionUpdated', { detail: { submissionId: result.submissionId } }));
@@ -159,8 +168,7 @@ export default function EvaluateSubmission() {
       }
     } catch (error) {
       console.error('Approve submission error:', error);
-      setShowApproveModal(false);
-      alert(error.message || 'Error submitting approval. Please try again.');
+      setApproveError(error?.message || 'Error submitting approval. Please try again.');
       loadSubmissionDetails(sid);
     }
   };
@@ -833,7 +841,11 @@ export default function EvaluateSubmission() {
                   ) : canInitialApproverAct ? (
                     <div className="space-y-3">
                       <button
-                        onClick={() => setShowApproveModal(true)}
+                        onClick={() => {
+                          setApproveError('');
+                          setApprovalComment('');
+                          setShowApproveModal(true);
+                        }}
                         className="w-full px-6 py-3 bg-white border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 font-semibold rounded-lg transition-colors"
                       >
                         Approve
@@ -874,9 +886,25 @@ export default function EvaluateSubmission() {
                 <p className="text-base leading-relaxed text-gray-700 mb-4">
                   Are you sure you want to approve this submission? Once approved, it will be sent to the Central Committee.
                 </p>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Approval Comment <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={approvalComment}
+                  onChange={(e) => setApprovalComment(e.target.value)}
+                  rows="4"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue"
+                  placeholder="Add a general comment for the Central Committee..."
+                  required
+                />
                 <p className="text-sm text-gray-600 mb-4">
                   <strong>Next step:</strong> Central Committee members will review each question and submit their approvals. When all have completed, the Chairman will see the list of actions per question and provide final approval or rejection.
                 </p>
+                {approveError && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700 font-semibold">{approveError}</p>
+                  </div>
+                )}
               </div>
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
                 <button

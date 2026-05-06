@@ -4,9 +4,24 @@ import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAllUnits } from '../../data/administrativeUnits';
+import { getAllUnits, getUnitById, UNIT_TYPES } from '../../data/administrativeUnits';
 import { getAllUsers, deleteUser } from '../../data/users';
-import { filterUsersByScope, canPerformAction } from '../../utils/permissions';
+import { filterUsersByScope, canPerformAction, getAccessibleUnitIds, canManageUserAccount } from '../../utils/permissions';
+
+/** Admin-unit filter dropdown options by role (full list only for top-level admins). */
+function getAdminUnitFilterOptions(allUnits, currentUser) {
+  if (!currentUser) return allUnits;
+  if (currentUser.role === 'Regional Admin') {
+    const allowed = new Set(getAccessibleUnitIds(currentUser, allUnits));
+    return allUnits.filter(
+      (u) => allowed.has(u.unitId) && u.unitType !== UNIT_TYPES.FEDERAL_INSTITUTE
+    );
+  }
+  if (currentUser.role === 'Federal Admin' || currentUser.role === 'Institutional Admin') {
+    return allUnits.filter((u) => u.unitType === UNIT_TYPES.FEDERAL_INSTITUTE);
+  }
+  return allUnits;
+}
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
@@ -29,7 +44,7 @@ export default function UserManagement() {
 
   const loadUsersData = () => {
     const allUnits = getAllUnits();
-    setUnits(() => allUnits);
+    setUnits(() => getAdminUnitFilterOptions(allUnits, user));
     const allUsers = getAllUsers();
     const filtered = user ? filterUsersByScope(user, allUsers, allUnits) : allUsers;
     setUsers(() => filtered);
@@ -101,13 +116,34 @@ export default function UserManagement() {
     }
   }, [router.isReady, router.asPath]);
 
-  const handleDeleteClick = (user) => {
-    setUserToDelete(user);
+  // Clear admin-unit filter if it is no longer a valid option for this role
+  useEffect(() => {
+    if (filterAdminUnit === '' || filterAdminUnit === 'central') return;
+    const id = parseInt(filterAdminUnit, 10);
+    if (!Number.isNaN(id) && !units.some((u) => u.unitId === id)) {
+      setFilterAdminUnit('');
+    }
+  }, [units, filterAdminUnit]);
+
+  const handleDeleteClick = (targetUser) => {
+    if (!canManageUserAccount(user, targetUser, getAllUnits())) {
+      setErrorMessage('You do not have permission to delete this user.');
+      setTimeout(() => setErrorMessage(''), 5000);
+      return;
+    }
+    setUserToDelete(targetUser);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = () => {
     if (userToDelete) {
+      if (!canManageUserAccount(user, userToDelete, getAllUnits())) {
+        setErrorMessage('You do not have permission to delete this user.');
+        setDeleteDialogOpen(false);
+        setUserToDelete(null);
+        setTimeout(() => setErrorMessage(''), 5000);
+        return;
+      }
       try {
         const deleted = deleteUser(userToDelete.userId);
         if (deleted) {
@@ -127,13 +163,20 @@ export default function UserManagement() {
     }
   };
 
-  const handleEditClick = (user) => {
-    router.push(`/admin/users/edit/${user.userId}`);
+  const handleEditClick = (targetUser) => {
+    if (!canManageUserAccount(user, targetUser, getAllUnits())) {
+      setErrorMessage('You do not have permission to edit this user.');
+      setTimeout(() => setErrorMessage(''), 5000);
+      return;
+    }
+    router.push(`/admin/users/edit/${targetUser.userId}`);
   };
 
   const getUnitName = (unitId) => {
     if (!unitId) return 'N/A (Central Role)';
-    const unit = units.find(u => u.unitId === unitId);
+    const fromFilter = units.find((u) => u.unitId === unitId);
+    if (fromFilter) return fromFilter.officialUnitName;
+    const unit = getUnitById(unitId);
     return unit ? unit.officialUnitName : 'Unknown';
   };
 
@@ -185,6 +228,10 @@ export default function UserManagement() {
     return { displayedUsers: list, totalScopeCount };
   }, [user, searchQuery, filterAdminUnit, filterStatus, sortBy, sortOrder, listVersion]);
 
+  const showCentralRoleFilter =
+    user &&
+    ['Super Admin', 'MInT Admin', 'Chairman (CC)'].includes(user.role);
+
   return (
     <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin', 'Chairman (CC)', 'Regional Admin', 'Federal Admin', 'Institutional Admin']}>
       <Layout title="User Management">
@@ -235,7 +282,9 @@ export default function UserManagement() {
                       className="px-3 py-2 border border-mint-medium-gray rounded-lg text-sm text-mint-dark-text bg-white focus:outline-none focus:ring-2 focus:ring-mint-primary-blue focus:border-transparent"
                     >
                       <option value="">All admin units</option>
-                      <option value="central">N/A (Central Role)</option>
+                      {showCentralRoleFilter && (
+                        <option value="central">N/A (Central Role)</option>
+                      )}
                       {units.map((unit) => (
                         <option key={unit.unitId} value={unit.unitId}>
                           {unit.officialUnitName}
@@ -298,7 +347,9 @@ export default function UserManagement() {
                         </tr>
                       </thead>
                       <tbody key={listKey} className="bg-white divide-y divide-mint-medium-gray">
-                        {displayedUsers.map((u) => (
+                        {displayedUsers.map((u) => {
+                          const canManageThisUser = canManageUserAccount(user, u, getAllUnits());
+                          return (
                           <tr key={u.userId} className="hover:bg-mint-light-gray">
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-mint-dark-text">
                               {u.userId}
@@ -331,27 +382,32 @@ export default function UserManagement() {
                               {formatDateTime(u.lastLoginAt)}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  onClick={() => handleEditClick(u)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-mint-primary-blue border-mint-primary-blue hover:bg-mint-primary-blue hover:text-white"
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  onClick={() => handleDeleteClick(u)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
-                                >
-                                  Delete
-                                </Button>
-                              </div>
+                              {canManageThisUser ? (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    onClick={() => handleEditClick(u)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-mint-primary-blue border-mint-primary-blue hover:bg-mint-primary-blue hover:text-white"
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleDeleteClick(u)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-mint-dark-text/50">View only</span>
+                              )}
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -417,4 +473,3 @@ export default function UserManagement() {
     </ProtectedRoute>
   );
 }
-

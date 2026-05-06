@@ -3,15 +3,11 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const SidebarContext = createContext();
 
 export function SidebarProvider({ children }) {
-  const [isCollapsed, setIsCollapsed] = useState(true); // Default to collapsed
-
-  // Load state from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
-    if (saved !== null) {
-      setIsCollapsed(JSON.parse(saved));
-    }
-  }, []);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = window.localStorage.getItem('sidebarCollapsed');
+    return saved === null ? true : JSON.parse(saved);
+  }); // Default to collapsed
 
   // Save state to localStorage when it changes
   useEffect(() => {
@@ -40,4 +36,3 @@ export function useSidebar() {
   }
   return context;
 }
-

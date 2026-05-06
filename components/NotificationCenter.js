@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -17,6 +17,13 @@ export default function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
 
+  const refreshNotifications = useCallback(() => {
+    if (!user) return;
+    const userNotifications = getNotificationsByUser(user.userId);
+    setNotifications(userNotifications);
+    setUnreadCount(getUnreadNotificationCount(user.userId));
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -25,9 +32,7 @@ export default function NotificationCenter() {
       initializeRealNotifications();
       
       // Reload from storage to ensure we have the latest data
-      const userNotifications = getNotificationsByUser(user.userId);
-      setNotifications(userNotifications);
-      setUnreadCount(getUnreadNotificationCount(user.userId));
+      refreshNotifications();
     };
 
     loadNotifications();
@@ -60,7 +65,7 @@ export default function NotificationCenter() {
         clearInterval(interval);
       };
     }
-  }, [user]);
+  }, [user, refreshNotifications]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,7 +84,10 @@ export default function NotificationCenter() {
   }, [isOpen]);
 
   const handleNotificationClick = (notification) => {
-    // Navigate to link if available (don't mark as read automatically)
+    if (!notification.isRead) {
+      markNotificationAsRead(notification.inAppNotificationId);
+      refreshNotifications();
+    }
     if (notification.linkURL) {
       setIsOpen(false);
       router.push(notification.linkURL);
@@ -91,20 +99,14 @@ export default function NotificationCenter() {
     
     if (!notification.isRead) {
       markNotificationAsRead(notification.inAppNotificationId);
-      // Reload notifications to update UI
-      const userNotifications = getNotificationsByUser(user.userId);
-      setNotifications(userNotifications);
-      setUnreadCount(getUnreadNotificationCount(user.userId));
+      refreshNotifications();
     }
   };
 
   const handleMarkAllAsRead = () => {
     if (user) {
       markAllNotificationsAsRead(user.userId);
-      // Reload notifications to update UI
-      const userNotifications = getNotificationsByUser(user.userId);
-      setNotifications(userNotifications);
-      setUnreadCount(getUnreadNotificationCount(user.userId));
+      refreshNotifications();
     }
   };
 
@@ -185,16 +187,17 @@ export default function NotificationCenter() {
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-gray-500">No notifications</p>
-                <p className="text-xs text-gray-400 mt-1">You're all caught up!</p>
+                <p className="text-xs text-gray-400 mt-1">You&apos;re all caught up!</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
                 {notifications.map((notification) => (
                   <div
                     key={notification.inAppNotificationId}
+                    onClick={() => handleNotificationClick(notification)}
                     className={`group relative px-4 py-4 hover:bg-white transition-all duration-200 ${
                       !notification.isRead ? 'bg-blue-50/70 border-l-4 border-mint-primary-blue' : 'bg-white'
-                    }`}
+                    } ${notification.linkURL ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     <div className="flex items-start space-x-3">
                       {/* Status Indicator */}
@@ -229,14 +232,6 @@ export default function NotificationCenter() {
                       </div>
                     </div>
                     
-                    {/* Clickable overlay for navigation */}
-                    {notification.linkURL && (
-                      <button
-                        onClick={() => handleNotificationClick(notification)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        aria-label="View notification"
-                      />
-                    )}
                   </div>
                 ))}
               </div>
@@ -247,4 +242,3 @@ export default function NotificationCenter() {
     </div>
   );
 }
-

@@ -1,7 +1,9 @@
 // Notifications Data Store
 // This will be replaced with a database in production
 
-import { getUsersByRole } from './users';
+import { getUsersByRole, getUserById } from './users';
+import { ASSESSMENT_FRAMEWORK_SCOPE } from './assessmentFramework';
+import { getAllContributorUserIdsAssignedForAssessmentYear } from './frameworkContributorAssignments';
 
 // Load notifications from localStorage or initialize empty array
 const loadNotificationsFromStorage = () => {
@@ -62,7 +64,7 @@ export const getNotificationsByUser = (userId) => {
     inAppNotifications = loadNotificationsFromStorage();
   }
   return inAppNotifications
-    .filter(n => n.userId === userId)
+    .filter(n => Number(n.userId) === Number(userId))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
 
@@ -72,16 +74,27 @@ export const getUnreadNotificationCount = (userId) => {
   if (typeof window !== 'undefined') {
     inAppNotifications = loadNotificationsFromStorage();
   }
-  return inAppNotifications.filter(n => n.userId === userId && !n.isRead).length;
+  return inAppNotifications.filter(n => Number(n.userId) === Number(userId) && !n.isRead).length;
 };
 
 // Create a new in-app notification
 export const createInAppNotification = (userId, message, linkURL = null) => {
+  if (typeof window !== 'undefined') {
+    inAppNotifications = loadNotificationsFromStorage();
+  }
+  const uid = Number(userId);
+  if (Number.isNaN(uid)) return null;
+  const existing = inAppNotifications.find(n =>
+    Number(n.userId) === uid &&
+    n.message === message &&
+    (n.linkURL || null) === (linkURL || null)
+  );
+  if (existing) return existing;
   const notification = {
     inAppNotificationId: inAppNotifications.length > 0 
       ? Math.max(...inAppNotifications.map(n => n.inAppNotificationId)) + 1 
       : 1,
-    userId: userId,
+    userId: uid,
     message: message,
     linkURL: linkURL,
     isRead: false,
@@ -102,7 +115,10 @@ export const createInAppNotification = (userId, message, linkURL = null) => {
 
 // Mark notification as read
 export const markNotificationAsRead = (notificationId) => {
-  const notification = inAppNotifications.find(n => n.inAppNotificationId === notificationId);
+  if (typeof window !== 'undefined') {
+    inAppNotifications = loadNotificationsFromStorage();
+  }
+  const notification = inAppNotifications.find(n => Number(n.inAppNotificationId) === Number(notificationId));
   if (notification) {
     notification.isRead = true;
     notification.updatedAt = new Date().toISOString();
@@ -122,8 +138,11 @@ export const markNotificationAsRead = (notificationId) => {
 
 // Mark all notifications as read for a user
 export const markAllNotificationsAsRead = (userId) => {
+  if (typeof window !== 'undefined') {
+    inAppNotifications = loadNotificationsFromStorage();
+  }
   const updated = inAppNotifications
-    .filter(n => n.userId === userId && !n.isRead)
+    .filter(n => Number(n.userId) === Number(userId) && !n.isRead)
     .map(n => {
       n.isRead = true;
       n.updatedAt = new Date().toISOString();
@@ -178,22 +197,91 @@ export const sendEmailNotification = async (recipientEmail, subject, message, li
   return { success: true };
 };
 
-/** Notify all Data Contributors and Institute Data Contributors that an assessment is now active and when it ends. */
-export const notifyDataContributorsAssessmentActivated = (yearName, endDateIso) => {
+/**
+ * Notify contributors for the activated framework scope only (regional vs federal institute).
+ * If frameworkScope is omitted, both contributor types are notified (legacy behaviour).
+ * When assessmentYearId is set and at least one contributor is saved on Active Frameworks for that year,
+ * only those assigned contributors are notified (plus role filter); otherwise all users in scope roles are notified.
+ */
+export const notifyDataContributorsAssessmentActivated = (
+  yearName,
+  endDateIso,
+  frameworkScope = null,
+  assessmentYearId = null
+) => {
   const endDateStr = endDateIso ? new Date(endDateIso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'TBD';
   const message = `Assessment "${yearName}" is now active. Please complete your submission before the deadline: ${endDateStr}.`;
   const linkURL = '/data/submission';
-  const contributors = [
-    ...(getUsersByRole('Data Contributor') || []),
-    ...(getUsersByRole('Institute Data Contributor') || [])
-  ];
+  let roles;
+  if (frameworkScope === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE) {
+    roles = ['Institute Data Contributor'];
+  } else if (frameworkScope === ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL) {
+    roles = ['Data Contributor'];
+  } else {
+    roles = ['Data Contributor', 'Institute Data Contributor'];
+  }
+  const roleSet = new Set(roles);
+  const assignedIds =
+    assessmentYearId != null
+      ? getAllContributorUserIdsAssignedForAssessmentYear(assessmentYearId)
+      : [];
+  let recipients = [];
+  if (assignedIds.length > 0) {
+    recipients = assignedIds
+      .map((id) => getUserById(Number(id)))
+      .filter((u) => u && u.userId && roleSet.has(u.role));
+  }
+  if (recipients.length === 0) {
+    recipients = roles.flatMap((r) => getUsersByRole(r) || []);
+  }
   const seen = new Set();
-  contributors.forEach(u => {
+  recipients.forEach((u) => {
+    const uid = u.userId != null ? Number(u.userId) : NaN;
+    if (!Number.isNaN(uid) && !seen.has(uid)) {
+      seen.add(uid);
+      createInAppNotification(uid, message, linkURL);
+    }
+  });
+};
+
+/** Notify Regional Admins or Federal/Institutional Admins that an active framework applies to their scope. */
+export const notifyScopedAdminsAssessmentActivated = (yearName, endDateIso, frameworkScope) => {
+  const endDateStr = endDateIso ? new Date(endDateIso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'TBD';
+  const linkURL = '/admin/active-frameworks';
+  const scopeLabel = frameworkScope === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE ? 'Federal Institute' : 'Regional';
+  const message = `Active assessment "${yearName}" (${scopeLabel} scope). Review the framework, assign Data Contributors under your units, or send feedback to MInT if you disagree. Deadline: ${endDateStr}.`;
+  let admins = [];
+  if (frameworkScope === ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL) {
+    admins = getUsersByRole('Regional Admin') || [];
+  } else if (frameworkScope === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE) {
+    admins = [...(getUsersByRole('Federal Admin') || []), ...(getUsersByRole('Institutional Admin') || [])];
+  }
+  const seen = new Set();
+  admins.forEach((u) => {
     if (u.userId && !seen.has(u.userId)) {
       seen.add(u.userId);
       createInAppNotification(u.userId, message, linkURL);
     }
   });
+};
+
+/** When an admin assigns/creates a Data or Institute Data Contributor account linked to a unit. */
+export const notifyContributorUserAssignedToUnit = (contributorUserId, unitName) => {
+  const uid = contributorUserId != null ? Number(contributorUserId) : NaN;
+  if (Number.isNaN(uid)) return;
+  const name = unitName && String(unitName).trim() ? String(unitName).trim() : 'your assigned unit';
+  const message = `You have been assigned to submit assessment data for "${name}". After you sign in (and complete email verification if required), open Data Submission to start.`;
+  createInAppNotification(uid, message, '/data/submission');
+};
+
+/** When a scoped admin ties a contributor to an active assessment year (Active Frameworks → Assign contributors). */
+export const notifyContributorTiedToAssessmentYear = (contributorUserId, yearName, unitName) => {
+  const uid = contributorUserId != null ? Number(contributorUserId) : NaN;
+  if (Number.isNaN(uid)) return;
+  const y = yearName && String(yearName).trim() ? String(yearName).trim() : 'the active assessment';
+  const u = unitName && String(unitName).trim() ? String(unitName).trim() : 'your unit';
+  const message = `Your administrator has assigned you to "${y}" for ${u}. Start your submission when ready.`;
+  createInAppNotification(uid, message, '/data/submission');
 };
 
 // Notification helper functions for workflow events
@@ -254,10 +342,52 @@ export const notifySubmissionApproved = (submissionId, contributorUserId, unitNa
   createInAppNotification(contributorUserId, message, linkURL);
 };
 
+/** Notify Central Committee that a submission is ready for per-question validation. */
+export const notifySubmissionPendingCentralValidation = (submissionId, unitName) => {
+  const name = unitName && String(unitName).trim() ? String(unitName).trim() : 'a unit';
+  const linkURL = `/validation/evaluate/${submissionId}`;
+  const message = `Submission for ${name} is pending Central Committee validation.`;
+  const recipients = [
+    ...(getUsersByRole('Central Committee Member') || []),
+    ...(getUsersByRole('Chairman (CC)') || []),
+    ...(getUsersByRole('Secretary (CC)') || [])
+  ];
+  const seen = new Set();
+  recipients.forEach((u) => {
+    const uid = u?.userId != null ? Number(u.userId) : NaN;
+    if (!Number.isNaN(uid) && !seen.has(uid)) {
+      seen.add(uid);
+      createInAppNotification(uid, message, linkURL);
+    }
+  });
+};
+
 export const notifySubmissionValidated = (submissionId, approverUserId, unitName) => {
   const message = `Submission for ${unitName} has been validated by the Central Committee.`;
   const linkURL = `/approval/validated-submissions`;
   createInAppNotification(approverUserId, message, linkURL);
+};
+
+/** Notify committee scorers that validated text-explanation answers need subjective scoring. */
+export const notifySubjectiveScoringAvailable = (submissionId, unitName, subjectiveCount = null) => {
+  const name = unitName && String(unitName).trim() ? String(unitName).trim() : 'a unit';
+  const countText = subjectiveCount != null && Number(subjectiveCount) > 0
+    ? ` (${Number(subjectiveCount)} answer${Number(subjectiveCount) === 1 ? '' : 's'})`
+    : '';
+  const message = `Subjective scoring is waiting for ${name}${countText}.`;
+  const linkURL = `/scoring/evaluate/${submissionId}`;
+  const recipients = [
+    ...(getUsersByRole('Central Committee Member') || []),
+    ...(getUsersByRole('Secretary (CC)') || [])
+  ];
+  const seen = new Set();
+  recipients.forEach((u) => {
+    const uid = u?.userId != null ? Number(u.userId) : NaN;
+    if (!Number.isNaN(uid) && !seen.has(uid)) {
+      seen.add(uid);
+      createInAppNotification(uid, message, linkURL);
+    }
+  });
 };
 
 export const notifyNewSubmissionsInQueue = (approverUserId, count) => {
@@ -271,9 +401,44 @@ export const getAllEmailNotificationLogs = () => {
   return [...emailNotificationLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
 
+const syncCurrentWorkflowNotifications = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const { getAllSubmissions, SUBMISSION_STATUS, getSubjectiveResponsesForSubmission } = require('./submissions');
+    const { getUnitById } = require('./administrativeUnits');
+    const submissions = getAllSubmissions();
+
+    submissions
+      .filter(s => s.submissionStatus === SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION)
+      .forEach((submission) => {
+        const unit = getUnitById(submission.unitId);
+        notifySubmissionPendingCentralValidation(
+          submission.submissionId,
+          unit?.officialUnitName || 'Unknown Unit'
+        );
+      });
+
+    submissions
+      .filter(s => s.submissionStatus === SUBMISSION_STATUS.VALIDATED)
+      .forEach((submission) => {
+        const subjective = getSubjectiveResponsesForSubmission(submission.submissionId);
+        if (subjective.length === 0) return;
+        const unit = getUnitById(submission.unitId);
+        notifySubjectiveScoringAvailable(
+          submission.submissionId,
+          unit?.officialUnitName || 'Unknown Unit',
+          subjective.length
+        );
+      });
+  } catch (error) {
+    console.error('Error syncing workflow notifications:', error);
+  }
+};
+
 // Initialize real notifications based on existing submissions
 export const initializeRealNotifications = () => {
   if (typeof window === 'undefined') return;
+  syncCurrentWorkflowNotifications();
   
   // Check if notifications have already been initialized
   const initialized = localStorage.getItem('egirs_notifications_initialized');
@@ -354,6 +519,41 @@ export const initializeRealNotifications = () => {
           };
           inAppNotifications.push(notification);
         });
+        if (user.role === 'Central Committee Member' || user.role === 'Secretary (CC)') {
+          const subjectiveReady = allSubmissions.filter(s => {
+            if (s.submissionStatus !== SUBMISSION_STATUS.VALIDATED) return false;
+            try {
+              const { getSubjectiveResponsesForSubmission } = require('./submissions');
+              return getSubjectiveResponsesForSubmission(s.submissionId).length > 0;
+            } catch {
+              return false;
+            }
+          });
+
+          subjectiveReady.forEach((submission, index) => {
+            const unit = getUnitById(submission.unitId);
+            const unitName = unit ? unit.officialUnitName : 'Unknown Unit';
+            const count = (() => {
+              try {
+                const { getSubjectiveResponsesForSubmission } = require('./submissions');
+                return getSubjectiveResponsesForSubmission(submission.submissionId).length;
+              } catch {
+                return null;
+              }
+            })();
+            const notification = {
+              inAppNotificationId: inAppNotifications.length > 0
+                ? Math.max(...inAppNotifications.map(n => n.inAppNotificationId)) + 1
+                : 1,
+              userId: user.userId,
+              message: `Subjective scoring is waiting for ${unitName}${count ? ` (${count} answer${count === 1 ? '' : 's'})` : ''}.`,
+              linkURL: `/scoring/evaluate/${submission.submissionId}`,
+              isRead: false,
+              timestamp: new Date(Date.now() - (index + 1) * 1200000).toISOString()
+            };
+            inAppNotifications.push(notification);
+          });
+        }
       } else if (user.role === 'Data Contributor' || user.role === 'Institute Data Contributor') {
         // Notifications for approved submissions
         const approvedSubmissions = allSubmissions.filter(s => 
@@ -388,4 +588,3 @@ export const initializeRealNotifications = () => {
     console.error('Error initializing real notifications:', error);
   }
 };
-

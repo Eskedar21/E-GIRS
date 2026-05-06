@@ -68,3 +68,18 @@
   }
 }
 
+@layer components {
+  .egirs-sidebar + main {
+    transition-property: margin-left;
+    transition-duration: 300ms;
+    transition-timing-function: ease;
+  }
+
+  .egirs-sidebar[data-collapsed="true"] + main {
+    margin-left: 4rem;
+  }
+
+  .egirs-sidebar[data-collapsed="false"] + main {
+    margin-left: 16rem;
+  }
+}

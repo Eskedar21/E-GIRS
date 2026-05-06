@@ -117,6 +117,15 @@ export const ASSESSMENT_STATUS = {
   ARCHIVED: 'Archived'
 };
 
+/** Which admin hierarchy and contributor roles this assessment applies to. */
+export const ASSESSMENT_FRAMEWORK_SCOPE = {
+  REGIONAL: 'Regional',
+  FEDERAL_INSTITUTE: 'Federal Institute'
+};
+
+export const getFrameworkScopeForYear = (year) =>
+  year?.frameworkScope || ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL;
+
 // Response Types
 export const RESPONSE_TYPES = {
   YES_NO: 'Yes/No',
@@ -145,7 +154,58 @@ export const getActiveAssessmentYears = () => {
   return assessmentYears.filter(y => y.status === ASSESSMENT_STATUS.ACTIVE);
 };
 
-/** Returns assessment years whose submission deadline has passed (status Archived). Visible to admins, central committee, chairman, approvers; not to contributors. */
+/** Active years visible to Data Contributor vs Institute Data Contributor by framework scope. */
+export const getActiveAssessmentYearsForContributor = (user) => {
+  const actives = getActiveAssessmentYears();
+  if (!user) return [];
+  if (user.role === 'Data Contributor') {
+    return actives.filter((y) => getFrameworkScopeForYear(y) === ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL);
+  }
+  if (user.role === 'Institute Data Contributor') {
+    return actives.filter((y) => getFrameworkScopeForYear(y) === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE);
+  }
+  return actives;
+};
+
+/** Active years for Regional Admin (regional scope) or Federal / Institutional Admin (institute scope). */
+export const getActiveAssessmentYearsForScopedAdmin = (user) => {
+  const actives = getActiveAssessmentYears();
+  if (!user) return [];
+  if (user.role === 'Regional Admin') {
+    return actives.filter((y) => getFrameworkScopeForYear(y) === ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL);
+  }
+  if (user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
+    return actives.filter((y) => getFrameworkScopeForYear(y) === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE);
+  }
+  return [];
+};
+
+/**
+ * Draft + Active years in the admin's framework scope (not Archived).
+ * Lets scoped admins see newly created years before MInT activates them and pre-assign contributors.
+ */
+export const getWorkbenchAssessmentYearsForScopedAdmin = (user) => {
+  assessmentYears = loadAssessmentYears();
+  if (!user) return [];
+  const inScope = (y) => {
+    if (y.status === ASSESSMENT_STATUS.ARCHIVED) return false;
+    const scope = getFrameworkScopeForYear(y);
+    if (user.role === 'Regional Admin') return scope === ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL;
+    if (user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
+      return scope === ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE;
+    }
+    return false;
+  };
+  const list = assessmentYears.filter(inScope);
+  const rank = (y) => (y.status === ASSESSMENT_STATUS.ACTIVE ? 0 : 1);
+  return [...list].sort((a, b) => {
+    const d = rank(a) - rank(b);
+    if (d !== 0) return d;
+    return Number(b.assessmentYearId) - Number(a.assessmentYearId);
+  });
+};
+
+/** Returns assessment years whose submission deadline has passed (status Archived). Used for admin flows and the Archived Frameworks read-only view (regional/federal admins, Chairman). */
 export const getArchivedAssessmentYears = () => {
   assessmentYears = loadAssessmentYears();
   const now = new Date().toISOString();
@@ -153,9 +213,25 @@ export const getArchivedAssessmentYears = () => {
     y => y.status === ASSESSMENT_STATUS.ARCHIVED || (y.endDate && y.endDate < now)
   );
 };
+
+/** True if the year is closed (explicitly Archived or past end date). Central Committee work queues should not list submissions for these years. */
+export const isAssessmentYearArchived = (assessmentYearId) => {
+  if (assessmentYearId == null) return false;
+  const y = getAssessmentYearById(assessmentYearId);
+  if (!y) return false;
+  if (y.status === ASSESSMENT_STATUS.ARCHIVED) return true;
+  const now = new Date().toISOString();
+  return Boolean(y.endDate && y.endDate < now);
+};
+
 export const getAssessmentYearById = (id) => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
-  return assessmentYears.find(y => y.assessmentYearId === id);
+  if (id === null || id === undefined || id === '') return undefined;
+  const n = Number(id);
+  if (!Number.isNaN(n)) {
+    return assessmentYears.find((y) => Number(y.assessmentYearId) === n);
+  }
+  return assessmentYears.find((y) => y.assessmentYearId === id);
 };
 export const createAssessmentYear = (yearData) => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
@@ -165,6 +241,7 @@ export const createAssessmentYear = (yearData) => {
       : 1,
     yearName: yearData.yearName,
     status: yearData.status || ASSESSMENT_STATUS.DRAFT,
+    frameworkScope: yearData.frameworkScope || ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL,
     startDate: yearData.startDate || null,
     endDate: yearData.endDate || null,
     createdAt: new Date().toISOString(),
@@ -176,7 +253,10 @@ export const createAssessmentYear = (yearData) => {
 };
 export const updateAssessmentYear = (id, yearData) => {
   assessmentYears = loadAssessmentYears(); // Reload to ensure latest data
-  const index = assessmentYears.findIndex(y => y.assessmentYearId === id);
+  const nid = Number(id);
+  const index = Number.isNaN(nid)
+    ? assessmentYears.findIndex((y) => y.assessmentYearId === id)
+    : assessmentYears.findIndex((y) => Number(y.assessmentYearId) === nid);
   if (index !== -1) {
     assessmentYears[index] = {
       ...assessmentYears[index],

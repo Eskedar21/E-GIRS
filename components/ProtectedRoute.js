@@ -21,7 +21,7 @@ export default function ProtectedRoute({ children, allowedRoles = ['all'] }) {
         return;
       }
     }
-  }, [user, isLoading, allowedRoles, router, logoutIfExpired]);
+  }, [user, isLoading, allowedRoles, router, logoutIfExpired, hasRole]);
 
   if (isLoading) {
     return (
@@ -43,7 +43,7 @@ export default function ProtectedRoute({ children, allowedRoles = ['all'] }) {
       <div className="min-h-screen flex items-center justify-center bg-mint-light-gray">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
-          <p className="text-mint-dark-text">You don't have permission to access this page.</p>
+          <p className="text-mint-dark-text">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );
@@ -51,4 +51,3 @@ export default function ProtectedRoute({ children, allowedRoles = ['all'] }) {
 
   return children;
 }
-

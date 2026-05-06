@@ -49,6 +49,8 @@ export default function EvaluateCentralSubmission() {
   const [activeSection, setActiveSection] = useState(null);
   const [chairmanRejectionReasons, setChairmanRejectionReasons] = useState({});
   const [showChairmanRejectModal, setShowChairmanRejectModal] = useState(false);
+  const [showChairmanApproveModal, setShowChairmanApproveModal] = useState(false);
+  const [chairmanApproveComment, setChairmanApproveComment] = useState('');
   const [submittingChairman, setSubmittingChairman] = useState(false);
 
   const allCommitteeMembers = useMemo(() => getUsersByRole('Central Committee Member') || [], []);
@@ -138,7 +140,7 @@ export default function EvaluateCentralSubmission() {
             return {
               indicator,
               subQuestions: subQuestions.map(sq => {
-                const response = responses.find(r => r.subQuestionId === sq.subQuestionId);
+                const response = responses.find(r => Number(r.subQuestionId) === Number(sq.subQuestionId));
                 // Only show questions that have answers
                 if (response && response.responseValue && response.responseValue.trim() !== '') {
                   return {
@@ -175,9 +177,9 @@ export default function EvaluateCentralSubmission() {
     try {
       // Approve all answered questions
       const responses = submissionDetails?.responses || [];
-      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
+      const answeredResponses = responses.filter(r => r && r.responseId != null && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        if (response && response.responseId && (!response.validationStatus || response.validationStatus === VALIDATION_STATUS.PENDING)) {
+        if (response && response.responseId != null && (!response.validationStatus || response.validationStatus === VALIDATION_STATUS.PENDING)) {
           const notes = validationNotes || {};
           const note = notes[response.responseId] || '';
           validateResponse(response.responseId, VALIDATION_STATUS.APPROVED, null, note);
@@ -194,12 +196,12 @@ export default function EvaluateCentralSubmission() {
         if (result.submissionStatus === SUBMISSION_STATUS.VALIDATED) {
           setSuccessMessage('✅ Validation submitted successfully! The submission has been validated and will proceed to the calculation engine. You will be redirected to the validation queue.');
           setTimeout(() => {
-            router.push('/approval/queue');
+            router.push('/validation/central');
           }, 3000);
         } else {
           setSuccessMessage('⚠️ Validation submitted. The submission has been sent back to the Regional Approver with rejection reasons. You will be redirected to the validation queue.');
           setTimeout(() => {
-            router.push('/approval/queue');
+            router.push('/validation/central');
           }, 3000);
         }
         setTimeout(() => setSuccessMessage(''), 8000);
@@ -230,9 +232,9 @@ export default function EvaluateCentralSubmission() {
     try {
       // Reject all answered questions with the same reason and their notes
       const responses = submissionDetails?.responses || [];
-      const answeredResponses = responses.filter(r => r && r.responseId && r.responseValue && r.responseValue.trim() !== '');
+      const answeredResponses = responses.filter(r => r && r.responseId != null && r.responseValue && r.responseValue.trim() !== '');
       answeredResponses.forEach(response => {
-        if (response && response.responseId) {
+        if (response && response.responseId != null) {
           const notes = validationNotes || {};
           const note = notes[response.responseId] || (response.generalNote || null);
           validateResponse(response.responseId, VALIDATION_STATUS.REJECTED, reason, note);
@@ -248,7 +250,7 @@ export default function EvaluateCentralSubmission() {
         setRejectionReasons(prev => ({ ...prev, ['submission']: '' }));
         setSuccessMessage('⚠️ Submission rejected. The submission has been sent back to the Regional Approver for revision. You will be redirected to the validation queue.');
         setTimeout(() => {
-          router.push('/approval/queue');
+          router.push('/validation/central');
         }, 3000);
         setTimeout(() => setSuccessMessage(''), 8000);
       }
@@ -307,7 +309,7 @@ export default function EvaluateCentralSubmission() {
       submitCommitteeValidation(submissionDetails.submission.submissionId, user.userId);
       loadSubmissionDetails(parseInt(submissionId));
       setSuccessMessage('✅ Your validations have been submitted. The assessment will be forwarded to the Chairman once all committee members have completed their approvals.');
-      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 4000);
+      setTimeout(() => { setSuccessMessage(''); router.push('/validation/central'); }, 4000);
     } catch (e) {
       alert(e.message || 'Failed to submit.');
     }
@@ -317,10 +319,11 @@ export default function EvaluateCentralSubmission() {
     if (!user || !submissionDetails?.submission) return;
     setSubmittingChairman(true);
     try {
-      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, true);
+      const comment = String(chairmanApproveComment || '').trim();
+      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, true, null, comment);
       loadSubmissionDetails(parseInt(submissionId));
       setSuccessMessage('✅ Final approval submitted. The submission has been validated.');
-      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 3000);
+      setTimeout(() => { setSuccessMessage(''); router.push('/validation/central'); }, 3000);
     } catch (e) {
       alert(e.message || 'Failed to submit.');
     } finally {
@@ -337,12 +340,13 @@ export default function EvaluateCentralSubmission() {
         const reason = chairmanRejectionReasons[r.responseId] || chairmanRejectionReasons['submission'] || 'Rejected by Chairman.';
         reasons[r.responseId] = reason;
       });
-      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, false, reasons);
+      const comment = String(chairmanRejectionReasons['submission'] || '').trim();
+      submitChairmanFinalValidation(submissionDetails.submission.submissionId, user.userId, false, reasons, comment);
       loadSubmissionDetails(parseInt(submissionId));
       setShowChairmanRejectModal(false);
       setChairmanRejectionReasons({});
       setSuccessMessage('⚠️ Final rejection submitted. The submission has been sent back.');
-      setTimeout(() => { setSuccessMessage(''); router.push('/approval/queue'); }, 3000);
+      setTimeout(() => { setSuccessMessage(''); router.push('/validation/central'); }, 3000);
     } catch (e) {
       alert(e.message || 'Failed to submit.');
     } finally {
@@ -517,9 +521,15 @@ export default function EvaluateCentralSubmission() {
                           {getUnitName(submissionDetails.submission.unitId)}
                         </p>
                       )}
+                      {submissionDetails.submission.initialApprovalComment && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Initial approver comment</p>
+                          <p className="text-sm text-blue-800 whitespace-pre-wrap">{submissionDetails.submission.initialApprovalComment}</p>
+                        </div>
+                      )}
                     </div>
                     <button
-                      onClick={() => router.push('/approval/queue')}
+                      onClick={() => router.push('/validation/central')}
                       className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
                     >
                       ← Back to Queue
@@ -565,7 +575,8 @@ export default function EvaluateCentralSubmission() {
                             <div className="space-y-4">
                               {indicatorSubQuestions.map(({ subQuestion, response }, sqIdx) => {
                                 const globalQuestionNumber = questionNumberMap[subQuestion.subQuestionId] || 0;
-                                const hasAnswer = response && response.responseValue && response.responseValue.trim() !== '';
+                                const value = response?.responseValue;
+                                const hasAnswer = value != null && String(value).trim() !== '';
                                 const isApproved = response && response.validationStatus === VALIDATION_STATUS.APPROVED;
                                 const isRejected = response && response.validationStatus === VALIDATION_STATUS.REJECTED;
                                 
@@ -626,7 +637,7 @@ export default function EvaluateCentralSubmission() {
                                             {!isReadOnly && (
                                               <button
                                                 onClick={() => {
-                                                  if (response && response.responseId) {
+                                                  if (response && response.responseId != null) {
                                                     setOpenCommentSections(prev => ({ 
                                                       ...prev, 
                                                       [response.responseId]: !prev[response.responseId] 
@@ -668,7 +679,7 @@ export default function EvaluateCentralSubmission() {
                                         )}
 
                                         {/* Inline committee approval per question */}
-                                        {isPending && hasAnswer && useInlineFlow && response.responseId && (
+                                        {isPending && hasAnswer && useInlineFlow && response.responseId != null && (
                                           <div className="mt-4 p-4 rounded-lg border-2 border-mint-medium-gray bg-gray-50">
                                             {isCommitteeMember && (
                                               <>
@@ -781,7 +792,7 @@ export default function EvaluateCentralSubmission() {
                                                 <h4 className="text-sm font-bold text-gray-900">Comments</h4>
                                                 <button
                                                   onClick={() => {
-                                                    if (response && response.responseId) {
+                                                    if (response && response.responseId != null) {
                                                       setOpenCommentSections(prev => ({ 
                                                         ...prev, 
                                                         [response.responseId]: !prev[response.responseId] 
@@ -819,12 +830,12 @@ export default function EvaluateCentralSubmission() {
                                               )}
                                               
                                               {/* Comment Input - Toggleable */}
-                                              {response && response.responseId && openCommentSections[response.responseId] && (
+                                              {response && response.responseId != null && openCommentSections[response.responseId] && (
                                                 <div className="space-y-2">
                                                   <textarea
                                                     value={validationNotes[response.responseId] || ''}
                                                     onChange={(e) => {
-                                                      if (response && response.responseId) {
+                                                      if (response && response.responseId != null) {
                                                         setValidationNotes(prev => ({ ...prev, [response.responseId]: e.target.value }));
                                                       }
                                                     }}
@@ -835,7 +846,7 @@ export default function EvaluateCentralSubmission() {
                                                   <div className="flex justify-end space-x-2">
                                                     <button
                                                       onClick={() => {
-                                                        if (response && response.responseId) {
+                                                        if (response && response.responseId != null) {
                                                           setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
                                                         }
                                                       }}
@@ -845,12 +856,12 @@ export default function EvaluateCentralSubmission() {
                                                     </button>
                                                     <button
                                                       onClick={() => {
-                                                        if (response && response.responseId) {
+                                                        if (response && response.responseId != null) {
                                                           handleSaveComment(response.responseId);
                                                           setOpenCommentSections(prev => ({ ...prev, [response.responseId]: false }));
                                                         }
                                                       }}
-                                                      disabled={!response || !response.responseId || !validationNotes[response.responseId]?.trim()}
+                                                      disabled={!response || response.responseId == null || !validationNotes[response.responseId]?.trim()}
                                                       className="px-3 py-1.5 bg-mint-primary-blue hover:bg-[#0a4f57] text-white font-semibold rounded-lg transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                       Add Comment
@@ -1013,7 +1024,10 @@ export default function EvaluateCentralSubmission() {
                   {!isReadOnly && useInlineFlow && isChairman && allMembersSubmitted && (
                     <div className="mt-3 space-y-3">
                       <button
-                        onClick={handleChairmanFinalApprove}
+                        onClick={() => {
+                          setChairmanApproveComment('');
+                          setShowChairmanApproveModal(true);
+                        }}
                         disabled={submittingChairman}
                         className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
                       >
@@ -1183,8 +1197,48 @@ export default function EvaluateCentralSubmission() {
             </div>
           </div>
         )}
+
+        {/* Chairman Final Approve Modal */}
+        {showChairmanApproveModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowChairmanApproveModal(false)} />
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900">Final Approve — Chairman</h3>
+              </div>
+              <div className="px-6 py-4 overflow-y-auto flex-1">
+                <p className="text-sm text-gray-700 mb-3">Optional: add a final approval comment for audit trail.</p>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Final approval comment (optional)</label>
+                <textarea
+                  value={chairmanApproveComment}
+                  onChange={(e) => setChairmanApproveComment(e.target.value)}
+                  rows={4}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-primary-blue"
+                  placeholder="Enter a final approval comment (optional)..."
+                />
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowChairmanApproveModal(false)}
+                  className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowChairmanApproveModal(false);
+                    handleChairmanFinalApprove();
+                  }}
+                  disabled={submittingChairman}
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50"
+                >
+                  Confirm Final Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Layout>
     </ProtectedRoute>
   );
 }
-

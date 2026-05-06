@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import {
   getAllAssessmentYears,
-  getActiveAssessmentYears,
+  getActiveAssessmentYearsForContributor,
   getAssessmentYearById,
   getDimensionsByYear,
   getIndicatorsByDimension,
@@ -21,6 +21,7 @@ import {
   createSubmission,
   getSubmissionById,
   getSubmissionsByUnit,
+  getContributorSubmissionForUnitAndYear,
   getResponsesBySubmission,
   saveResponse,
   submitForApproval,
@@ -28,6 +29,15 @@ import {
   SUBMISSION_STATUS
 } from '../../data/submissions';
 import { getSubQuestionById } from '../../data/assessmentFramework';
+
+/** Consistent read for maps keyed by numeric subQuestionId (avoids string vs number mismatch). */
+function lookupAnswerMap(map, subQuestionId) {
+  if (map == null) return undefined;
+  const n = Number(subQuestionId);
+  if (!Number.isNaN(n) && map[n] !== undefined) return map[n];
+  return map[subQuestionId];
+}
+
 export default function DataSubmission() {
   const { user } = useAuth();
   const { isCollapsed, setCollapsed } = useSidebar();
@@ -53,7 +63,7 @@ export default function DataSubmission() {
 
   // Memoize loadSubmission to avoid infinite loops - must be defined before conditional returns
   const loadSubmission = useCallback(() => {
-    if (!user || !user.officialUnitId) return;
+    if (!router.isReady || !user || !user.officialUnitId) return;
     
     // Check if there's a submissionId in the query parameters (for backward compatibility)
     const submissionIdParam = router.query.submissionId;
@@ -64,7 +74,7 @@ export default function DataSubmission() {
       
       if (specificSubmission) {
         // Verify user owns this submission
-        if (specificSubmission.contributorUserId !== user.userId) {
+        if (Number(specificSubmission.contributorUserId) !== Number(user.userId)) {
           alert('You do not have permission to access this submission.');
           router.replace('/data/submission');
           return;
@@ -83,11 +93,11 @@ export default function DataSubmission() {
         const existingResponses = getResponsesBySubmission(specificSubmission.submissionId);
         const responseMap = {};
         const evidenceMap = {};
-        existingResponses.forEach(r => {
-          responseMap[r.subQuestionId] = r.responseValue;
-          if (r.evidenceLink) {
-            evidenceMap[r.subQuestionId] = r.evidenceLink;
-          }
+        existingResponses.forEach((r) => {
+          const sqid = Number(r.subQuestionId);
+          if (Number.isNaN(sqid)) return;
+          responseMap[sqid] = r.responseValue;
+          if (r.evidenceLink) evidenceMap[sqid] = r.evidenceLink;
         });
         setResponses(responseMap);
         setEvidenceLinks(evidenceMap);
@@ -108,15 +118,15 @@ export default function DataSubmission() {
       return;
     }
     
-    // Find existing submission for this year and user
-    const allSubmissions = getSubmissionsByUnit(user.officialUnitId);
-    let existingSubmission = allSubmissions.find(s => 
-      s.assessmentYearId === selectedYear.assessmentYearId &&
-      s.contributorUserId === user.userId
+    // One logical submission per (contributor, unit, year) — disambiguate duplicate demo rows by recency
+    let existingSubmission = getContributorSubmissionForUnitAndYear(
+      user.userId,
+      user.officialUnitId,
+      selectedYear.assessmentYearId
     );
     
     if (existingSubmission) {
-      // Load existing submission (real status, no demo rotation)
+      // Load existing submission (status and rows reflect store + any persisted contributor snapshot)
       setSubmission(existingSubmission);
       setSubmissionName(existingSubmission.submissionName || '');
       
@@ -124,11 +134,11 @@ export default function DataSubmission() {
       const existingResponses = getResponsesBySubmission(existingSubmission.submissionId);
       const responseMap = {};
       const evidenceMap = {};
-      existingResponses.forEach(r => {
-        responseMap[r.subQuestionId] = r.responseValue;
-        if (r.evidenceLink) {
-          evidenceMap[r.subQuestionId] = r.evidenceLink;
-        }
+      existingResponses.forEach((r) => {
+        const sqid = Number(r.subQuestionId);
+        if (Number.isNaN(sqid)) return;
+        responseMap[sqid] = r.responseValue;
+        if (r.evidenceLink) evidenceMap[sqid] = r.evidenceLink;
       });
       setResponses(responseMap);
       setEvidenceLinks(evidenceMap);
@@ -139,17 +149,19 @@ export default function DataSubmission() {
       setResponses({});
       setEvidenceLinks({});
     }
-  }, [selectedYear, user, router]);
+  }, [selectedYear, user, router.isReady, router.query.submissionId]);
 
   useEffect(() => {
-    // Only Active assessment years for data contributors
-    const years = getActiveAssessmentYears();
+    if (!router.isReady) return;
+    // Active years for this contributor type (regional vs federal institute framework scope)
+    const years = user ? getActiveAssessmentYearsForContributor(user) : [];
     setAssessmentYears(years);
 
     // Check if year is passed in query params (must be Active to appear in list)
     const yearParam = router.query.year;
     if (yearParam) {
-      const year = years.find(y => y.assessmentYearId === parseInt(yearParam));
+      const yp = Array.isArray(yearParam) ? yearParam[0] : yearParam;
+      const year = years.find((y) => Number(y.assessmentYearId) === Number(parseInt(yp, 10)));
       if (year) {
         setSelectedYear(year);
         return;
@@ -158,21 +170,25 @@ export default function DataSubmission() {
 
     // Auto-select first active year if no year is selected and no specific submission in query
     const submissionIdParam = router.query.submissionId;
-    if (!selectedYear && !submissionIdParam && years.length > 0) {
-      setSelectedYear(years[0]);
+    // Only seed default year when nothing selected yet — do not tie to `selectedYear` in deps or URL would override the in-page year dropdown after every local change.
+    if (!submissionIdParam && years.length > 0) {
+      setSelectedYear((prev) => (prev != null ? prev : years[0]));
     }
-  }, [router.query.submissionId, router.query.year]);
+  }, [router.isReady, router.query.submissionId, router.query.year, user]);
 
   // Listen for assessment framework updates
   useEffect(() => {
     const handleFrameworkUpdate = () => {
-      const years = getActiveAssessmentYears();
+      const years = user ? getActiveAssessmentYearsForContributor(user) : [];
       setAssessmentYears(years);
 
       if (selectedYear) {
-        const updatedYear = years.find(y => y.assessmentYearId === selectedYear.assessmentYearId);
+        const sid = Number(selectedYear.assessmentYearId);
+        const updatedYear = years.find((y) => Number(y.assessmentYearId) === sid);
         if (updatedYear) {
           setSelectedYear(updatedYear);
+        } else {
+          setSelectedYear(years[0] || null);
         }
       }
     };
@@ -183,22 +199,24 @@ export default function DataSubmission() {
         window.removeEventListener('assessmentFrameworkUpdated', handleFrameworkUpdate);
       };
     }
-  }, [selectedYear]);
+  }, [selectedYear, user]);
 
   // Listen for submission updates (e.g. approver rejected/approved) so submitter sees current status and rejection reasons
   useEffect(() => {
     const handleSubmissionUpdate = (e) => {
       const updatedId = e?.detail?.submissionId;
-      if (!updatedId || !submission || submission.submissionId !== updatedId) return;
+      if (!updatedId || !submission || Number(submission.submissionId) !== Number(updatedId)) return;
       const updated = getSubmissionById(updatedId);
       if (!updated) return;
       setSubmission(updated);
       const existingResponses = getResponsesBySubmission(updatedId);
       const responseMap = {};
       const evidenceMap = {};
-      existingResponses.forEach(r => {
-        responseMap[r.subQuestionId] = r.responseValue;
-        if (r.evidenceLink) evidenceMap[r.subQuestionId] = r.evidenceLink;
+      existingResponses.forEach((r) => {
+        const sqid = Number(r.subQuestionId);
+        if (Number.isNaN(sqid)) return;
+        responseMap[sqid] = r.responseValue;
+        if (r.evidenceLink) evidenceMap[sqid] = r.evidenceLink;
       });
       setResponses(responseMap);
       setEvidenceLinks(evidenceMap);
@@ -211,10 +229,11 @@ export default function DataSubmission() {
 
   // Load submission when query param or selectedYear changes
   useEffect(() => {
-    if (user && (router.query.submissionId || selectedYear)) {
+    if (!router.isReady || !user) return;
+    if (router.query.submissionId || selectedYear) {
       loadSubmission();
     }
-  }, [router.query.submissionId, selectedYear, user, loadSubmission]);
+  }, [router.isReady, router.query.submissionId, selectedYear, user, loadSubmission]);
 
   useEffect(() => {
     if (selectedYear && user?.unitType) {
@@ -305,9 +324,9 @@ export default function DataSubmission() {
   }, [selectedYear?.assessmentYearId, groupedQuestions]);
 
   // Clear incomplete dimension flags when all questions are answered (evidence link is optional)
-  const totalAnsweredQuestionsForEffect = subQuestions.filter(sq => {
-    const response = responses[sq.subQuestionId];
-    const hasAnswer = response && response !== '' && response.trim() !== '';
+  const totalAnsweredQuestionsForEffect = subQuestions.filter((sq) => {
+    const response = lookupAnswerMap(responses, sq.subQuestionId);
+    const hasAnswer = response && response !== '' && String(response).trim() !== '';
     return hasAnswer;
   }).length;
   useEffect(() => {
@@ -333,6 +352,19 @@ export default function DataSubmission() {
   };
   const userRole = user.role;
 
+  const responseKey = (subQuestionId) => {
+    const n = Number(subQuestionId);
+    return Number.isNaN(n) ? subQuestionId : n;
+  };
+  const answerFor = (subQuestionId) => {
+    const v = lookupAnswerMap(responses, subQuestionId);
+    return v == null ? '' : v;
+  };
+  const evidenceFor = (subQuestionId) => {
+    const v = lookupAnswerMap(evidenceLinks, subQuestionId);
+    return v == null ? '' : v;
+  };
+
   // Check if user has unit assigned
   if (!user.officialUnitId) {
     return (
@@ -357,9 +389,10 @@ export default function DataSubmission() {
   const currentUnit = getUnitById(currentUser.unitId);
 
   const handleResponseChange = (subQuestionId, value) => {
-    setResponses(prev => ({
+    const key = responseKey(subQuestionId);
+    setResponses((prev) => ({
       ...prev,
-      [subQuestionId]: value
+      [key]: value
     }));
     
     // Create submission if it doesn't exist yet (first interaction)
@@ -381,7 +414,7 @@ export default function DataSubmission() {
     
     // Auto-save to database in real-time
     if (currentSubmission) {
-      const evidenceLink = evidenceLinks[subQuestionId] || null;
+      const evidenceLink = evidenceFor(subQuestionId) || null;
       saveResponse({
         submissionId: currentSubmission.submissionId,
         subQuestionId: subQuestionId,
@@ -399,9 +432,10 @@ export default function DataSubmission() {
   };
 
   const handleEvidenceChange = (subQuestionId, link) => {
-    setEvidenceLinks(prev => ({
+    const key = responseKey(subQuestionId);
+    setEvidenceLinks((prev) => ({
       ...prev,
-      [subQuestionId]: link
+      [key]: link
     }));
     
     // Create submission if it doesn't exist yet (first interaction)
@@ -423,7 +457,7 @@ export default function DataSubmission() {
     
     // Auto-save to database in real-time
     if (currentSubmission) {
-      const responseValue = responses[subQuestionId] || '';
+      const responseValue = answerFor(subQuestionId) || '';
       saveResponse({
         submissionId: currentSubmission.submissionId,
         subQuestionId: subQuestionId,
@@ -473,33 +507,33 @@ export default function DataSubmission() {
       
       // Save all responses (including empty ones to clear previous answers)
       if (subQuestions && subQuestions.length > 0) {
-        subQuestions.forEach(sq => {
+        subQuestions.forEach((sq) => {
           saveResponse({
             submissionId: currentSubmission.submissionId,
             subQuestionId: sq.subQuestionId,
-            responseValue: responses[sq.subQuestionId] || '',
-            evidenceLink: evidenceLinks[sq.subQuestionId] || null
+            responseValue: answerFor(sq.subQuestionId) || '',
+            evidenceLink: evidenceFor(sq.subQuestionId) || null
           });
         });
       } else {
         // Fallback: save any responses that exist
-        Object.keys(responses).forEach(subQuestionId => {
+        Object.keys(responses).forEach((subQuestionId) => {
           saveResponse({
             submissionId: currentSubmission.submissionId,
-            subQuestionId: parseInt(subQuestionId),
-            responseValue: responses[subQuestionId] || '',
-            evidenceLink: evidenceLinks[subQuestionId] || null
+            subQuestionId: parseInt(subQuestionId, 10),
+            responseValue: lookupAnswerMap(responses, subQuestionId) || '',
+            evidenceLink: lookupAnswerMap(evidenceLinks, subQuestionId) || null
           });
         });
         
         // Also save any evidence links that don't have responses yet
-        Object.keys(evidenceLinks).forEach(subQuestionId => {
-          if (!responses[subQuestionId] && evidenceLinks[subQuestionId]) {
+        Object.keys(evidenceLinks).forEach((subQuestionId) => {
+          if (!lookupAnswerMap(responses, subQuestionId) && lookupAnswerMap(evidenceLinks, subQuestionId)) {
             saveResponse({
               submissionId: currentSubmission.submissionId,
-              subQuestionId: parseInt(subQuestionId),
+              subQuestionId: parseInt(subQuestionId, 10),
               responseValue: '',
-              evidenceLink: evidenceLinks[subQuestionId]
+              evidenceLink: lookupAnswerMap(evidenceLinks, subQuestionId)
             });
           }
         });
@@ -510,10 +544,21 @@ export default function DataSubmission() {
         updateSubmission(currentSubmission.submissionId, { submissionName: submissionName.trim() });
       }
       
-      // Reload submission to get updated state
+      // Reload submission + answers from store (matches localStorage snapshot and numeric keys)
       const updatedSubmission = getSubmissionById(currentSubmission.submissionId);
       if (updatedSubmission) {
         setSubmission(updatedSubmission);
+        const refreshed = getResponsesBySubmission(updatedSubmission.submissionId);
+        const responseMap = {};
+        const evidenceMap = {};
+        refreshed.forEach((r) => {
+          const sqid = Number(r.subQuestionId);
+          if (Number.isNaN(sqid)) return;
+          responseMap[sqid] = r.responseValue;
+          if (r.evidenceLink) evidenceMap[sqid] = r.evidenceLink;
+        });
+        setResponses(responseMap);
+        setEvidenceLinks(evidenceMap);
       }
       
       setSuccessMessage('✅ Draft saved successfully! Your progress has been saved. You can continue editing and submit when ready.');
@@ -561,9 +606,9 @@ export default function DataSubmission() {
     setSuccessMessage('');
     
     // Validate that all required questions are answered (evidence link is optional)
-    const unanswered = subQuestions.filter(sq => {
-      const response = responses[sq.subQuestionId];
-      const hasAnswer = response && response !== '' && response.trim() !== '';
+    const unanswered = subQuestions.filter((sq) => {
+      const response = lookupAnswerMap(responses, sq.subQuestionId);
+      const hasAnswer = response && response !== '' && String(response).trim() !== '';
       return !hasAnswer;
     });
     
@@ -641,9 +686,9 @@ export default function DataSubmission() {
       }
       
       // Final validation - ensure ALL required questions are answered (evidence link is optional)
-      const unanswered = subQuestions.filter(sq => {
-        const response = responses[sq.subQuestionId];
-        const hasAnswer = response && response !== '' && response.trim() !== '';
+      const unanswered = subQuestions.filter((sq) => {
+        const response = lookupAnswerMap(responses, sq.subQuestionId);
+        const hasAnswer = response && response !== '' && String(response).trim() !== '';
         return !hasAnswer;
       });
       
@@ -657,12 +702,12 @@ export default function DataSubmission() {
       }
       
       // Save all responses first
-      subQuestions.forEach(sq => {
+      subQuestions.forEach((sq) => {
         saveResponse({
           submissionId: currentSubmission.submissionId,
           subQuestionId: sq.subQuestionId,
-          responseValue: responses[sq.subQuestionId] || '',
-          evidenceLink: evidenceLinks[sq.subQuestionId] || null
+          responseValue: answerFor(sq.subQuestionId) || '',
+          evidenceLink: evidenceFor(sq.subQuestionId) || null
         });
       });
       
@@ -704,12 +749,14 @@ export default function DataSubmission() {
   };
 
   const renderQuestionInput = (subQuestion) => {
-    const responseValue = responses[subQuestion.subQuestionId] || '';
-    const evidenceLink = evidenceLinks[subQuestion.subQuestionId] || '';
+    const responseValue = answerFor(subQuestion.subQuestionId) || '';
+    const evidenceLink = evidenceFor(subQuestion.subQuestionId) || '';
     
     // Get the response object to access comments
     const existingResponses = submission ? getResponsesBySubmission(submission.submissionId) : [];
-    const responseObj = existingResponses.find(r => r.subQuestionId === subQuestion.subQuestionId);
+    const responseObj = existingResponses.find(
+      (r) => Number(r.subQuestionId) === Number(subQuestion.subQuestionId)
+    );
     
     // Determine if submission is locked (read-only)
     const isReadOnly = submission && (
@@ -1056,9 +1103,9 @@ export default function DataSubmission() {
   };
 
   // Calculate progress - count questions with answer (evidence link is optional)
-  const totalAnsweredQuestions = subQuestions.filter(sq => {
-    const response = responses[sq.subQuestionId];
-    const hasAnswer = response && response !== '' && response.trim() !== '';
+  const totalAnsweredQuestions = subQuestions.filter((sq) => {
+    const response = lookupAnswerMap(responses, sq.subQuestionId);
+    const hasAnswer = response && response !== '' && String(response).trim() !== '';
     return hasAnswer;
   }).length;
   const totalQuestions = subQuestions.length;
@@ -1170,10 +1217,12 @@ export default function DataSubmission() {
                 </div>
               )}
 
-              {/* Action Button */}
-              {submission && (submission.submissionStatus === SUBMISSION_STATUS.DRAFT || 
-                submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
-                submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) && (
+              {/* Action Button: same as main area — include "new submission" (no row yet) so draft save works from the nav column */}
+              {selectedYear && canPerformAction(user, 'submit_data') &&
+                ((!submission) ||
+                  submission.submissionStatus === SUBMISSION_STATUS.DRAFT ||
+                  submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_REGIONAL_APPROVER ||
+                  submission.submissionStatus === SUBMISSION_STATUS.REJECTED_BY_CENTRAL_COMMITTEE) && (
                 <div className="pt-4 mt-4">
                   {totalAnsweredQuestions === totalQuestions && totalQuestions > 0 ? (
                     <button
@@ -1262,7 +1311,7 @@ export default function DataSubmission() {
                   <select
                     value={selectedYear?.assessmentYearId || ''}
                     onChange={(e) => {
-                      const year = getActiveAssessmentYears().find(y => y.assessmentYearId === parseInt(e.target.value));
+                      const year = assessmentYears.find(y => y.assessmentYearId === parseInt(e.target.value));
                       setSelectedYear(year);
                     }}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0d6670] focus:border-[#0d6670] bg-white"
@@ -1578,7 +1627,8 @@ export default function DataSubmission() {
 
                         <div className="space-y-6">
                           {indicatorSubQuestions.map((subQuestion) => {
-                            const hasResponse = responses[subQuestion.subQuestionId] && responses[subQuestion.subQuestionId] !== '';
+                            const ans = answerFor(subQuestion.subQuestionId);
+                            const hasResponse = ans != null && String(ans).trim() !== '';
                             const depth = subQuestion.depth ?? (subQuestion.parentSubQuestionId != null ? 2 : 1);
                             const indentClass = depth === 2 ? 'ml-6 border-l-2 border-mint-primary-blue/30' : depth === 3 ? 'ml-10 border-l-2 border-mint-primary-blue/20' : '';
                             return (

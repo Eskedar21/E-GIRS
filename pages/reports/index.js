@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -29,6 +29,7 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  LabelList,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
@@ -47,6 +48,8 @@ export default function ReportsIndex() {
   const [selectedYearId, setSelectedYearId] = useState(assessmentYears[assessmentYears.length - 1]?.id || '2024');
   const [unitTypeFilter, setUnitTypeFilter] = useState('all'); // 'all', 'Region', 'City Administration', 'Federal Institute'
   const [regionFilter, setRegionFilter] = useState('all');
+  const [rankFrom, setRankFrom] = useState(''); // inclusive national rank; empty = no min
+  const [rankTo, setRankTo] = useState(''); // inclusive national rank; empty = no max
   const [activeView, setActiveView] = useState('units'); // 'units' or 'federal'
 
   // Get available regions for filter
@@ -55,7 +58,7 @@ export default function ReportsIndex() {
   }, [allUnits]);
 
   // Helper function to map mockData unit to administrativeUnit
-  const findAdminUnit = (mockUnit) => {
+  const findAdminUnit = useCallback((mockUnit) => {
     return allUnits.find(u => {
       // Direct name match
       if (u.officialUnitName === mockUnit.name) return true;
@@ -78,10 +81,10 @@ export default function ReportsIndex() {
       const mappedId = idMap[mockUnit.id];
       return mappedId && u.unitId === mappedId;
     });
-  };
+  }, [allUnits]);
 
-  // Get ranked units based on filters and scope
-  const rankedUnits = useMemo(() => {
+  // Units after year / role / type / region filters (national rank preserved)
+  const baseRankedUnits = useMemo(() => {
     let units = getRankedUnits(selectedYearId);
     
     // Apply role-based scoping
@@ -129,7 +132,32 @@ export default function ReportsIndex() {
     }
     
     return units;
-  }, [selectedYearId, unitTypeFilter, regionFilter, user, userRole, allUnits]);
+  }, [selectedYearId, unitTypeFilter, regionFilter, user, userRole, allUnits, findAdminUnit]);
+
+  const rankedUnits = useMemo(() => {
+    let from = rankFrom.trim() === '' ? null : parseInt(rankFrom, 10);
+    let to = rankTo.trim() === '' ? null : parseInt(rankTo, 10);
+    if (from != null && Number.isNaN(from)) from = null;
+    if (to != null && Number.isNaN(to)) to = null;
+    if (from != null && to != null && from > to) {
+      const t = from;
+      from = to;
+      to = t;
+    }
+    let list = baseRankedUnits;
+    if (from != null) list = list.filter((u) => (u.rank || 0) >= from);
+    if (to != null) list = list.filter((u) => (u.rank || 0) <= to);
+    return list;
+  }, [baseRankedUnits, rankFrom, rankTo]);
+
+  const maxRankInScope = useMemo(() => {
+    if (baseRankedUnits.length === 0) return 0;
+    return Math.max(...baseRankedUnits.map((u) => u.rank || 0));
+  }, [baseRankedUnits]);
+
+  const rankFilterActive =
+    (rankFrom.trim() !== '' && !Number.isNaN(parseInt(rankFrom, 10))) ||
+    (rankTo.trim() !== '' && !Number.isNaN(parseInt(rankTo, 10)));
 
   // Calculate National Index
   const nationalIndex = useMemo(() => {
@@ -378,13 +406,15 @@ export default function ReportsIndex() {
                       </div>
                       <p className="text-4xl font-bold text-yellow-600 mb-1">{rankedUnits.length}</p>
                       <p className="text-xs text-mint-dark-text/60">
-                        Units assessed
+                        {rankFilterActive
+                          ? `${rankedUnits.length} of ${baseRankedUnits.length} in scope (rank filter)`
+                          : 'Units assessed'}
                       </p>
                     </div>
                   </div>
 
                   {/* Filters */}
-                  <div className="mb-6 flex gap-4">
+                  <div className="mb-6 flex flex-wrap items-end gap-4">
                     <select
                       value={unitTypeFilter}
                       onChange={(e) => setUnitTypeFilter(e.target.value)}
@@ -406,6 +436,46 @@ export default function ReportsIndex() {
                         </option>
                       ))}
                     </select>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-mint-dark-text/70">National rank range</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={maxRankInScope || undefined}
+                          placeholder="From"
+                          value={rankFrom}
+                          onChange={(e) => setRankFrom(e.target.value)}
+                          className="w-24 px-3 py-2 border border-mint-medium-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue text-sm"
+                          aria-label="Minimum national rank"
+                        />
+                        <span className="text-mint-dark-text/50">–</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={maxRankInScope || undefined}
+                          placeholder="To"
+                          value={rankTo}
+                          onChange={(e) => setRankTo(e.target.value)}
+                          className="w-24 px-3 py-2 border border-mint-medium-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-primary-blue text-sm"
+                          aria-label="Maximum national rank"
+                        />
+                        {(rankFrom || rankTo) ? (
+                          <button
+                            type="button"
+                            onClick={() => { setRankFrom(''); setRankTo(''); }}
+                            className="text-sm text-mint-primary-blue hover:underline px-1"
+                          >
+                            Clear
+                          </button>
+                        ) : null}
+                      </div>
+                      {maxRankInScope > 0 ? (
+                        <span className="text-xs text-mint-dark-text/50">
+                          Applies to map, maturity chart, top units bar, and table (ranks 1–{maxRankInScope} in current scope). National trend and dimension radar stay full-national.
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   {/* Charts Row 1 */}
@@ -415,7 +485,10 @@ export default function ReportsIndex() {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-semibold text-mint-dark-text">Unit Maturity Distribution</h3>
-                          <p className="text-sm text-mint-dark-text/60">Breakdown by maturity level</p>
+                          <p className="text-sm text-mint-dark-text/60">
+                            Breakdown by maturity level
+                            {rankFilterActive ? ' (filtered by rank)' : ''}
+                          </p>
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
@@ -465,7 +538,22 @@ export default function ReportsIndex() {
                               <XAxis dataKey="year" />
                               <YAxis domain={[0, 100]} />
                               <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
-                              <Line type="monotone" dataKey="index" stroke="#0d6670" strokeWidth={3} name="National Index %" />
+                              <Line
+                                type="monotone"
+                                dataKey="index"
+                                stroke="#0d6670"
+                                strokeWidth={3}
+                                name="National Index %"
+                                dot={{ r: 5, strokeWidth: 3, fill: '#ffffff' }}
+                                activeDot={{ r: 7 }}
+                              >
+                                <LabelList
+                                  dataKey="index"
+                                  position="top"
+                                  formatter={(value) => `${value.toFixed(1)}%`}
+                                  className="fill-mint-dark-text text-xs font-semibold"
+                                />
+                              </Line>
                             </LineChart>
                           </ResponsiveContainer>
                         ) : (
@@ -484,7 +572,9 @@ export default function ReportsIndex() {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-semibold text-mint-dark-text">Top Units by E-GIRS Score</h3>
-                          <p className="text-sm text-mint-dark-text/60">Top 5 performing units</p>
+                          <p className="text-sm text-mint-dark-text/60">
+                            Top 5 by score{rankFilterActive ? ' within rank range' : ''}
+                          </p>
                         </div>
                         <span className="text-mint-dark-text/40">...</span>
                       </div>
@@ -541,7 +631,10 @@ export default function ReportsIndex() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-mint-dark-text">National Maturity Map</h3>
-                        <p className="text-sm text-mint-dark-text/60">Regions colored by maturity level. Hover for details; click to open Unit Scorecard.</p>
+                        <p className="text-sm text-mint-dark-text/60">
+                          Regions colored by maturity level. Hover for details; click to open Unit Scorecard.
+                          {rankFilterActive ? ' Regions outside the rank range appear neutral.' : ''}
+                        </p>
                       </div>
                       <span className="text-mint-dark-text/40">...</span>
                     </div>
@@ -557,7 +650,9 @@ export default function ReportsIndex() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-mint-dark-text">All Units Index Results</h3>
-                        <p className="text-sm text-mint-dark-text/60">Complete list of units with scores and maturity levels</p>
+                        <p className="text-sm text-mint-dark-text/60">
+                          {rankFilterActive ? 'Units matching rank range' : 'Complete list of units with scores and maturity levels'}
+                        </p>
                       </div>
                       <span className="text-mint-dark-text/40">...</span>
                     </div>

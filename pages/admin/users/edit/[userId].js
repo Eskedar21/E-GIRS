@@ -14,7 +14,9 @@ import {
   getRolesForUnitType,
   USER_ROLES
 } from '../../../../data/users';
-import { getAccessibleUnitIds } from '../../../../utils/permissions';
+import { getAccessibleUnitIds, canManageUserAccount } from '../../../../utils/permissions';
+import { getUnitById } from '../../../../data/administrativeUnits';
+import { notifyContributorUserAssignedToUnit } from '../../../../data/notifications';
 import { Button } from '../../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { Input } from '../../../../components/ui/input';
@@ -53,6 +55,10 @@ export default function EditUser() {
       const allUnits = getAllUnits();
       const userData = getUserById(parseInt(userId));
       if (userData) {
+        if (!canManageUserAccount(user, userData, allUnits)) {
+          router.push('/admin/users');
+          return;
+        }
         // Scoped admins can only edit users in their scope (unit-scoped users)
         if (user.role === 'Regional Admin' || user.role === 'Federal Admin' || user.role === 'Institutional Admin') {
           const accessibleIds = getAccessibleUnitIds(user, allUnits);
@@ -183,6 +189,13 @@ export default function EditUser() {
       return;
     }
 
+    const before = getUserById(parseInt(userId, 10));
+    const allUnits = getAllUnits();
+    if (!canManageUserAccount(user, before, allUnits)) {
+      setErrors({ general: 'You do not have permission to edit this user.' });
+      return;
+    }
+
     const updateData = {
       username: formData.username.trim(),
       email: formData.email.trim(),
@@ -201,6 +214,28 @@ export default function EditUser() {
     const updatedUser = updateUser(parseInt(userId), updateData);
 
     if (updatedUser) {
+      const isContributor = [USER_ROLES.DATA_CONTRIBUTOR, USER_ROLES.INSTITUTE_DATA_CONTRIBUTOR].includes(
+        updatedUser.role
+      );
+      const wasContributor =
+        before && [USER_ROLES.DATA_CONTRIBUTOR, USER_ROLES.INSTITUTE_DATA_CONTRIBUTOR].includes(before.role);
+      const unitNow = updatedUser.officialUnitId != null ? Number(updatedUser.officialUnitId) : null;
+      const unitBefore = before?.officialUnitId != null ? Number(before.officialUnitId) : null;
+      const becameContributor = isContributor && !wasContributor;
+      const unitChangedForContributor =
+        isContributor && unitNow != null && unitBefore !== unitNow;
+      if (
+        before &&
+        updatedUser.userId &&
+        unitNow != null &&
+        isContributor &&
+        (becameContributor || unitChangedForContributor) &&
+        ['Super Admin', 'MInT Admin', 'Regional Admin', 'Federal Admin', 'Institutional Admin'].includes(user?.role)
+      ) {
+        const unit = getUnitById(unitNow);
+        notifyContributorUserAssignedToUnit(updatedUser.userId, unit?.officialUnitName || 'your assigned unit');
+      }
+
       setSuccessMessage(`User "${updatedUser.username}" has been updated successfully!`);
       
       // Redirect to users list after 2 seconds
@@ -519,4 +554,3 @@ export default function EditUser() {
     </ProtectedRoute>
   );
 }
-

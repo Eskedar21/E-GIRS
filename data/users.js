@@ -253,6 +253,7 @@ const loadUsers = () => {
         isTwoFactorEnabled: user.isTwoFactorEnabled !== undefined ? user.isTwoFactorEnabled : false,
         createdAt: user.createdAt || null,
         lastLoginAt: user.lastLoginAt || null,
+        createdByUserId: user.createdByUserId || null,
       }));
       
       // Merge with default users - update existing users from defaults and add new ones
@@ -491,7 +492,8 @@ export const createUser = (userData) => {
     passwordResetExpires: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    lastLoginAt: null
+    lastLoginAt: null,
+    createdByUserId: userData.createdByUserId || null
   };
   
   users.push(newUser);
@@ -906,4 +908,3 @@ export const ensureInstituteContributorExists = () => {
   console.log('Institute Contributor account created successfully:', newUser);
   return newUser;
 };
-

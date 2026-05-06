@@ -103,7 +103,7 @@ export const filterSubmissionsByAccess = (submissions, user, allUnits) => {
 
   // Data Contributors can only see their own unit's submissions
   if (['Data Contributor', 'Institute Data Contributor'].includes(user.role)) {
-    return submissions.filter(s => s.unitId === user.officialUnitId);
+    return submissions.filter(s => Number(s.unitId) === Number(user.officialUnitId));
   }
 
   // Approvers can see submissions from units in their hierarchy
@@ -148,7 +148,11 @@ export const canPerformAction = (user, action, resource = null) => {
     case 'edit_submission':
       if (['Data Contributor', 'Institute Data Contributor'].includes(role)) {
         // Can only edit their own unit's submissions in Draft or Rejected status
-        if (resource && resource.unitId === user.officialUnitId && resource.contributorUserId === user.userId) {
+        if (
+          resource &&
+          Number(resource.unitId) === Number(user.officialUnitId) &&
+          Number(resource.contributorUserId) === Number(user.userId)
+        ) {
           return ['Draft', 'Rejected by Regional Approver', 'Rejected by Central Committee'].includes(resource.submissionStatus);
         }
       }
@@ -157,7 +161,7 @@ export const canPerformAction = (user, action, resource = null) => {
     case 'delete_submission':
       // Only Data Contributors can delete their own draft submissions
       if (['Data Contributor', 'Institute Data Contributor'].includes(role)) {
-        if (resource && resource.unitId === user.officialUnitId) {
+        if (resource && Number(resource.unitId) === Number(user.officialUnitId)) {
           return resource.submissionStatus === 'Draft';
         }
       }
@@ -270,6 +274,7 @@ export const canCreateUnit = (user, parentUnitId, allUnits) => {
 export const canEditUnit = (user, unitId, allUnits) => {
   if (!user || !allUnits) return false;
   if (user.role === 'Super Admin' || user.role === 'MInT Admin') return true;
+  if (['Central Committee Member', 'Chairman (CC)', 'Secretary (CC)'].includes(user.role)) return false;
   const accessible = getAccessibleUnitIds(user, allUnits);
   return accessible.includes(unitId);
 };
@@ -287,6 +292,31 @@ export const filterUsersByScope = (adminUser, users, allUnits) => {
     return users;
   }
   const accessibleUnitIds = getAccessibleUnitIds(adminUser, allUnits);
-  return users.filter(u => u.officialUnitId != null && accessibleUnitIds.includes(u.officialUnitId));
+  const accessibleN = new Set(
+    accessibleUnitIds.map((x) => Number(x)).filter((n) => !Number.isNaN(n))
+  );
+  return users.filter((u) => {
+    if (u.officialUnitId == null) return false;
+    const uid = Number(u.officialUnitId);
+    return !Number.isNaN(uid) && accessibleN.has(uid);
+  });
 };
 
+/**
+ * Check if an admin can edit/delete a target user account.
+ * Chairman can manage only users they created.
+ */
+export const canManageUserAccount = (adminUser, targetUser, allUnits = []) => {
+  if (!adminUser || !targetUser) return false;
+  if (adminUser.role === 'Super Admin' || adminUser.role === 'MInT Admin') return true;
+  if (adminUser.role === 'Chairman (CC)') {
+    return targetUser.createdByUserId != null &&
+      Number(targetUser.createdByUserId) === Number(adminUser.userId);
+  }
+  if (['Regional Admin', 'Federal Admin', 'Institutional Admin'].includes(adminUser.role)) {
+    if (targetUser.officialUnitId == null) return false;
+    const accessibleIds = getAccessibleUnitIds(adminUser, allUnits || []);
+    return accessibleIds.some((id) => Number(id) === Number(targetUser.officialUnitId));
+  }
+  return false;
+};

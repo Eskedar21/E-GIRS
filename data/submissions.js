@@ -31740,6 +31740,139 @@ let responses = [
   // For Sub-city/Woreda: questions 15-25, 29-32, 35-37, 38-41, 45-47, 50-52, 70-75.
   ];
 
+// --- Persist contributor work to localStorage (merges on load; survives refresh & navigation) ---
+const CONTRIBUTOR_SUBMISSIONS_STORAGE_KEY = 'egirs_contributor_submission_snapshots_v1';
+
+function loadContributorSnapshots() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CONTRIBUTOR_SUBMISSIONS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function getNextResponseId() {
+  const ids = responses
+    .map((r) => Number(r?.responseId))
+    .filter((id) => Number.isFinite(id));
+  return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+}
+
+function ensureResponseIdentity(response) {
+  if (!response) return null;
+  const rid = Number(response.responseId);
+  if (!Number.isFinite(rid)) {
+    response.responseId = getNextResponseId();
+  } else {
+    response.responseId = rid;
+  }
+  if (response.submissionId != null && response.submissionId !== '') {
+    const sid = Number(response.submissionId);
+    if (Number.isFinite(sid)) response.submissionId = sid;
+  }
+  if (response.subQuestionId != null && response.subQuestionId !== '') {
+    const sqid = Number(response.subQuestionId);
+    if (Number.isFinite(sqid)) response.subQuestionId = sqid;
+  }
+  return response;
+}
+
+function ensureResponseIdentitiesForSubmission(submissionId) {
+  const sid = Number(submissionId);
+  if (!Number.isFinite(sid)) return [];
+  const submissionResponses = responses
+    .filter((r) => r && Number(r.submissionId) === sid)
+    .map((r) => ensureResponseIdentity(r));
+  const seen = new Set();
+  let changed = false;
+  submissionResponses.forEach((response) => {
+    if (!response) return;
+    const rid = Number(response.responseId);
+    if (!Number.isFinite(rid) || seen.has(rid)) {
+      response.responseId = getNextResponseId();
+      changed = true;
+    }
+    seen.add(Number(response.responseId));
+  });
+  if (changed) persistContributorSubmissionSnapshot(sid);
+  return submissionResponses;
+}
+
+function mergeContributorSnapshotsIntoMemory() {
+  const snapshots = loadContributorSnapshots();
+  for (const snap of snapshots) {
+    if (!snap || !snap.submission || snap.submission.submissionId == null) continue;
+    const sid = Number(snap.submission.submissionId);
+    if (Number.isNaN(sid)) continue;
+    const si = submissions.findIndex((s) => s && Number(s.submissionId) === sid);
+    if (si >= 0) {
+      submissions[si] = { ...submissions[si], ...snap.submission };
+    } else {
+      submissions.push(snap.submission);
+    }
+    const resps = Array.isArray(snap.responses) ? snap.responses : [];
+    for (const r of resps) {
+      if (!r || r.submissionId == null || r.subQuestionId == null) continue;
+      const rid = r.responseId != null ? Number(r.responseId) : NaN;
+      let ri = -1;
+      if (!Number.isNaN(rid)) {
+        ri = responses.findIndex((x) => x && Number(x.responseId) === rid);
+      }
+      if (ri < 0) {
+        ri = responses.findIndex(
+          (x) =>
+            x &&
+            Number(x.submissionId) === Number(r.submissionId) &&
+            Number(x.subQuestionId) === Number(r.subQuestionId)
+        );
+      }
+      if (ri >= 0) {
+        responses[ri] = ensureResponseIdentity({ ...responses[ri], ...r });
+      } else {
+        responses.push(ensureResponseIdentity(r));
+      }
+    }
+  }
+}
+
+export function persistContributorSubmissionSnapshot(submissionId) {
+  if (typeof window === 'undefined') return;
+  const sid = Number(submissionId);
+  if (Number.isNaN(sid)) return;
+  const sub = submissions.find((s) => s && Number(s.submissionId) === sid);
+  if (!sub) return;
+  const resps = responses.filter((r) => r && Number(r.submissionId) === sid);
+  const all = loadContributorSnapshots();
+  const idx = all.findIndex((entry) => entry.submission && Number(entry.submission.submissionId) === sid);
+  const entry = {
+    submission: { ...sub },
+    responses: resps.map((r) => ({ ...r }))
+  };
+  if (idx >= 0) all[idx] = entry;
+  else all.push(entry);
+  try {
+    localStorage.setItem(CONTRIBUTOR_SUBMISSIONS_STORAGE_KEY, JSON.stringify(all));
+  } catch (e) {
+    console.warn('[E-GIRS] Could not persist submission snapshot (quota or privacy mode)', e);
+  }
+}
+
+/** Clears persisted contributor snapshots (browser devtools or call from console to reset local draft state). */
+export function clearContributorSubmissionSnapshots() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(CONTRIBUTOR_SUBMISSIONS_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[E-GIRS] Could not clear submission snapshots', e);
+  }
+}
+
+mergeContributorSnapshotsIntoMemory();
+
 // Get all submissions
 export const getAllSubmissions = () => [...submissions];
 
@@ -31752,7 +31885,10 @@ export const getSubmissionById = (submissionId) => {
 
 // Get submissions by unit
 export const getSubmissionsByUnit = (unitId) => {
-  return submissions.filter(s => s.unitId === unitId);
+  if (unitId === null || unitId === undefined || unitId === '') return [];
+  const id = Number(unitId);
+  if (Number.isNaN(id)) return [];
+  return submissions.filter(s => s && Number(s.unitId) === id);
 };
 
 // Get submissions by status
@@ -31762,18 +31898,67 @@ export const getSubmissionsByStatus = (status) => {
 
 // Get submissions by user (for Data Contributors)
 export const getSubmissionsByUser = (userId) => {
-  return submissions.filter(s => s.contributorUserId === userId);
+  if (userId === null || userId === undefined || userId === '') return [];
+  const id = Number(userId);
+  if (Number.isNaN(id)) return [];
+  return submissions.filter(s => s && Number(s.contributorUserId) === id);
+};
+
+/** Activity timestamp for picking the canonical row when demo/legacy data has duplicates per (contributor, unit, year). */
+function submissionRecencyMs(s) {
+  if (!s) return 0;
+  const iso = s.updatedAt || s.submittedDate || s.createdAt;
+  const t = iso ? new Date(iso).getTime() : 0;
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Single submission for a contributor’s unit and assessment year.
+ * Seed data may contain multiple rows for the same triple; use the most recently updated, then highest submissionId.
+ */
+export const getContributorSubmissionForUnitAndYear = (contributorUserId, officialUnitId, assessmentYearId) => {
+  const cid = Number(contributorUserId);
+  const uid = officialUnitId != null && officialUnitId !== '' ? Number(officialUnitId) : NaN;
+  const yid = Number(assessmentYearId);
+  if (Number.isNaN(cid) || Number.isNaN(uid) || Number.isNaN(yid)) return undefined;
+  const candidates = submissions.filter(
+    (s) =>
+      s &&
+      Number(s.contributorUserId) === cid &&
+      Number(s.unitId) === uid &&
+      Number(s.assessmentYearId) === yid
+  );
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0];
+  return candidates.reduce((best, cur) => {
+    const tb = submissionRecencyMs(best);
+    const tc = submissionRecencyMs(cur);
+    if (tc !== tb) return tc > tb ? cur : best;
+    return Number(cur.submissionId) > Number(best.submissionId) ? cur : best;
+  });
 };
 
 // Create a new submission
 export const createSubmission = (submissionData) => {
+  const unitId =
+    submissionData.unitId != null && submissionData.unitId !== ''
+      ? Number(submissionData.unitId)
+      : null;
+  const assessmentYearId =
+    submissionData.assessmentYearId != null && submissionData.assessmentYearId !== ''
+      ? Number(submissionData.assessmentYearId)
+      : null;
+  const contributorUserId =
+    submissionData.contributorUserId != null && submissionData.contributorUserId !== ''
+      ? Number(submissionData.contributorUserId)
+      : null;
   const newSubmission = {
     submissionId: submissions.length > 0 
       ? Math.max(...submissions.map(s => s.submissionId)) + 1 
       : 1,
-    unitId: submissionData.unitId,
-    assessmentYearId: submissionData.assessmentYearId,
-    contributorUserId: submissionData.contributorUserId,
+    unitId,
+    assessmentYearId,
+    contributorUserId,
     submissionName: submissionData.submissionName || null,
     submissionStatus: SUBMISSION_STATUS.DRAFT,
     submittedDate: null,
@@ -31784,18 +31969,20 @@ export const createSubmission = (submissionData) => {
     updatedAt: new Date().toISOString()
   };
   submissions.push(newSubmission);
+  persistContributorSubmissionSnapshot(newSubmission.submissionId);
   return newSubmission;
 };
 
 // Update submission
 export const updateSubmission = (submissionId, submissionData) => {
-  const index = submissions.findIndex(s => s.submissionId === submissionId);
+  const index = submissions.findIndex((s) => s && Number(s.submissionId) === Number(submissionId));
   if (index !== -1) {
     submissions[index] = {
       ...submissions[index],
       ...submissionData,
       updatedAt: new Date().toISOString()
     };
+    persistContributorSubmissionSnapshot(submissionId);
     return submissions[index];
   }
   return null;
@@ -31805,13 +31992,16 @@ export const updateSubmission = (submissionId, submissionData) => {
 export const getResponsesBySubmission = (submissionId) => {
   const sid = submissionId != null ? Number(submissionId) : NaN;
   if (Number.isNaN(sid)) return [];
-  return responses.filter(r => r && Number(r.submissionId) === sid);
+  return ensureResponseIdentitiesForSubmission(sid);
 };
 
 // Get response by sub-question
 export const getResponseBySubQuestion = (submissionId, subQuestionId) => {
-  return responses.find(r =>
-    r && r.submissionId === submissionId && r.subQuestionId === subQuestionId
+  return responses.find(
+    (r) =>
+      r &&
+      Number(r.submissionId) === Number(submissionId) &&
+      Number(r.subQuestionId) === Number(subQuestionId)
   );
 };
 
@@ -32008,9 +32198,10 @@ export const saveResponse = (responseData) => {
     return null;
   }
   
-  const existing = responses.find(r => 
-    r && r.submissionId === responseData.submissionId && 
-    r.subQuestionId === responseData.subQuestionId
+  const existing = responses.find(r =>
+    r &&
+    Number(r.submissionId) === Number(responseData.submissionId) &&
+    Number(r.subQuestionId) === Number(responseData.subQuestionId)
   );
   
   if (existing) {
@@ -32026,15 +32217,14 @@ export const saveResponse = (responseData) => {
       submission.updatedAt = new Date().toISOString();
     }
     
+    persistContributorSubmissionSnapshot(responseData.submissionId);
     return existing;
   } else {
     // Create new response in database
     const newResponse = {
-      responseId: responses.length > 0 
-        ? Math.max(...responses.map(r => r.responseId)) + 1 
-        : 1,
-      submissionId: responseData.submissionId,
-      subQuestionId: responseData.subQuestionId,
+      responseId: getNextResponseId(),
+      submissionId: Number(responseData.submissionId),
+      subQuestionId: Number(responseData.subQuestionId),
       responseValue: responseData.responseValue,
       evidenceLink: responseData.evidenceLink || null,
       evidenceFilePath: responseData.evidenceFilePath || null,
@@ -32055,6 +32245,7 @@ export const saveResponse = (responseData) => {
       submission.updatedAt = new Date().toISOString();
     }
     
+    persistContributorSubmissionSnapshot(responseData.submissionId);
     return newResponse;
   }
 };
@@ -32114,6 +32305,7 @@ export const submitForApproval = (submissionId) => {
       console.error('Error sending notification:', error);
     }
     
+    persistContributorSubmissionSnapshot(submissionId);
     return submission;
   }
   return null;
@@ -32184,7 +32376,7 @@ export const rejectResponseByRegionalApprover = (responseId, approverUserId, rej
 };
 
 // Submit regional approval - sends to central or back to contributor
-export const submitRegionalApproval = (submissionId, approverUserId) => {
+export const submitRegionalApproval = (submissionId, approverUserId, initialApprovalComment = null) => {
   const sid = submissionId != null ? Number(submissionId) : NaN;
   if (Number.isNaN(sid)) return null;
   const submission = getSubmissionById(sid);
@@ -32193,6 +32385,24 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
   const allResponses = submissionResponses.filter(r =>
     r.responseValue != null && String(r.responseValue).trim() !== ''
   );
+  const comment = initialApprovalComment == null ? '' : String(initialApprovalComment).trim();
+
+  // Initial approver approval is a general submission-level action. When an
+  // approval comment is provided, approve every answered response regardless of
+  // older per-question state left by previous screens.
+  if (submission.submissionStatus === SUBMISSION_STATUS.PENDING_INITIAL_APPROVAL) {
+    const now = new Date().toISOString();
+    allResponses.forEach(r => {
+      const status = r?.regionalApprovalStatus;
+      const reviewed = status === VALIDATION_STATUS.APPROVED || status === VALIDATION_STATUS.REJECTED;
+      if (comment || !reviewed) {
+        r.regionalApprovalStatus = VALIDATION_STATUS.APPROVED;
+        r.regionalRejectionReason = null;
+        r.updatedAt = now;
+      }
+    });
+  }
+
   const reviewedResponses = allResponses.filter(r =>
     r.regionalApprovalStatus === VALIDATION_STATUS.APPROVED || r.regionalApprovalStatus === VALIDATION_STATUS.REJECTED
   );
@@ -32237,10 +32447,14 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
       console.error('Error sending notification:', error);
     }
   } else {
+    if (!comment) {
+      throw new Error('Please provide an approval comment before submitting.');
+    }
     // All responses approved - send to Central Committee (flow: contributor → initial approver → central committee → chairman)
     submission.submissionStatus = SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION;
     submission.approverUserId = approverUserId;
     submission.approvalDate = new Date().toISOString();
+    submission.initialApprovalComment = comment;
     submission.rejectionReason = null;
     submission.updatedAt = new Date().toISOString();
     
@@ -32254,9 +32468,9 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
     committeeMemberValidations = committeeMemberValidations.filter(v => v.submissionId !== Number(submissionId));
     committeeValidationSubmissions = committeeValidationSubmissions.filter(e => e.submissionId !== Number(submissionId));
     
-    // Send notification to contributor
+    // Send notification to contributor + Central Committee
     try {
-      const { notifySubmissionApproved } = require('./notifications');
+      const { notifySubmissionApproved, notifySubmissionPendingCentralValidation } = require('./notifications');
       const { getUnitById } = require('./administrativeUnits');
       const { getUserById } = require('./users');
       const unit = getUnitById(submission.unitId);
@@ -32264,6 +32478,7 @@ export const submitRegionalApproval = (submissionId, approverUserId) => {
       const approver = getUserById(approverUserId);
       const approverName = approver ? (approver.fullName || approver.username) : 'Regional Approver';
       notifySubmissionApproved(submissionId, submission.contributorUserId, unitName, approverName);
+      notifySubmissionPendingCentralValidation(submissionId, unitName);
     } catch (error) {
       console.error('Error sending notification:', error);
     }
@@ -32301,7 +32516,7 @@ export const rejectByInitialApprover = (submissionId, approverUserId, rejectionR
 
 // Central Validation actions (does NOT auto-submit)
 export const validateResponse = (responseId, validationStatus, rejectionReason = null, generalNote = null) => {
-  if (!responseId) {
+  if (responseId == null) {
     console.error('validateResponse called with undefined or null responseId');
     return null;
   }
@@ -32311,7 +32526,12 @@ export const validateResponse = (responseId, validationStatus, rejectionReason =
     return null;
   }
   
-  const response = responses.find(r => r && r.responseId === responseId);
+  const rid = Number(responseId);
+  if (!Number.isFinite(rid)) {
+    console.error('validateResponse called with invalid responseId');
+    return null;
+  }
+  const response = responses.find(r => r && Number(r.responseId) === rid);
   if (response) {
     response.validationStatus = validationStatus;
     response.centralRejectionReason = rejectionReason;
@@ -32359,6 +32579,9 @@ export const saveCommitteeMemberValidation = (submissionId, responseId, committe
   const sid = Number(submissionId);
   const rid = Number(responseId);
   const mid = Number(committeeMemberId);
+  if (!Number.isFinite(sid) || !Number.isFinite(rid) || !Number.isFinite(mid)) {
+    throw new Error('Cannot save committee validation because the submission, response, or member id is invalid.');
+  }
   const existing = committeeMemberValidations.find(
     v => v.submissionId === sid && v.responseId === rid && v.committeeMemberId === mid
   );
@@ -32408,7 +32631,9 @@ export const haveAllCommitteeMembersSubmittedValidation = (submissionId) => {
   const members = getUsersByRole('Central Committee Member') || [];
   if (members.length === 0) return false;
   const submitted = getCommitteeValidationSubmissions(submissionId);
-  return submitted.length >= members.length;
+  return members.every(member =>
+    submitted.some(entry => Number(entry.committeeMemberId) === Number(member.userId))
+  );
 };
 
 /** Submissions in PENDING_CENTRAL_VALIDATION where all committee members have submitted (ready for chairman final decision). */
@@ -32418,7 +32643,7 @@ export const getSubmissionsReadyForChairmanValidation = () => {
 };
 
 /** Chairman final validation: approve (VALIDATED) or reject (REJECTED_BY_CENTRAL_COMMITTEE). rejectionReasonsByResponse = { responseId: string }. */
-export const submitChairmanFinalValidation = (submissionId, chairmanUserId, approved, rejectionReasonsByResponse = null) => {
+export const submitChairmanFinalValidation = (submissionId, chairmanUserId, approved, rejectionReasonsByResponse = null, chairmanFinalComment = null) => {
   const submission = getSubmissionById(submissionId);
   if (!submission) return null;
   if (submission.submissionStatus !== SUBMISSION_STATUS.PENDING_CENTRAL_VALIDATION) {
@@ -32431,6 +32656,13 @@ export const submitChairmanFinalValidation = (submissionId, chairmanUserId, appr
   const submissionResponses = getResponsesBySubmission(submissionId);
   const answered = submissionResponses.filter(r => r.responseValue != null && String(r.responseValue).trim() !== '');
 
+  const finalComment = chairmanFinalComment == null ? '' : String(chairmanFinalComment).trim();
+  if (finalComment) {
+    submission.chairmanFinalComment = finalComment;
+  }
+  submission.chairmanFinalUserId = chairmanUserId;
+  submission.chairmanFinalDecisionAt = new Date().toISOString();
+
   if (approved) {
     answered.forEach(r => {
       r.validationStatus = VALIDATION_STATUS.APPROVED;
@@ -32440,11 +32672,15 @@ export const submitChairmanFinalValidation = (submissionId, chairmanUserId, appr
     submission.submissionStatus = SUBMISSION_STATUS.VALIDATED;
     submission.updatedAt = new Date().toISOString();
     try {
-      const { notifySubmissionValidated } = require('./notifications');
+      const { notifySubmissionValidated, notifySubjectiveScoringAvailable } = require('./notifications');
       const { getUnitById } = require('./administrativeUnits');
       const unit = getUnitById(submission.unitId);
       const unitName = unit ? unit.officialUnitName : 'Unknown Unit';
       if (submission.approverUserId) notifySubmissionValidated(submissionId, submission.approverUserId, unitName);
+      const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
+      if (subjectiveResponses.length > 0) {
+        notifySubjectiveScoringAvailable(submissionId, unitName, subjectiveResponses.length);
+      }
     } catch (e) { console.error(e); }
     return submission;
   }
@@ -32481,9 +32717,10 @@ export const submitCentralValidation = (submissionId, validatorUserId) => {
   const { getSubQuestionById } = require('./assessmentFramework');
   const { getUsersByRole } = require('./users');
   const committeeMembers = getUsersByRole('Central Committee Member') || [];
-  // If we have committee members and this submission uses inline flow (at least one member has submitted), only chairman can finalize via submitChairmanFinalValidation
-  if (committeeMembers.length > 0 && getCommitteeValidationSubmissions(submissionId).length > 0) {
-    throw new Error('This submission uses committee inline approvals. Only the Chairman can provide final approval after all members have submitted.');
+  // When the committee workflow exists, central review must stay per-member/per-question,
+  // and the Chairman is the only role that can make the final general decision.
+  if (committeeMembers.length > 0) {
+    throw new Error('This submission uses committee per-question approvals. Committee members must submit their actions first, then the Chairman provides the final general decision.');
   }
   
   const submissionResponses = getResponsesBySubmission(submissionId);
@@ -32542,12 +32779,16 @@ export const submitCentralValidation = (submissionId, validatorUserId) => {
     
     // Send notification to regional approver
     try {
-      const { notifySubmissionValidated } = require('./notifications');
+      const { notifySubmissionValidated, notifySubjectiveScoringAvailable } = require('./notifications');
       const { getUnitById } = require('./administrativeUnits');
       const unit = getUnitById(submission.unitId);
       const unitName = unit ? unit.officialUnitName : 'Unknown Unit';
       if (submission.approverUserId) {
         notifySubmissionValidated(submissionId, submission.approverUserId, unitName);
+      }
+      const subjectiveResponses = getSubjectiveResponsesForSubmission(submissionId);
+      if (subjectiveResponses.length > 0) {
+        notifySubjectiveScoringAvailable(submissionId, unitName, subjectiveResponses.length);
       }
     } catch (error) {
       console.error('Error sending notification:', error);
@@ -32630,6 +32871,7 @@ export const rejectToContributor = (submissionId, additionalComment) => {
       console.error('Error sending notification:', error);
     }
     
+    persistContributorSubmissionSnapshot(submissionId);
     return submission;
   }
   return null;
@@ -32669,4 +32911,3 @@ export const rejectToContributor = (submissionId, additionalComment) => {
     console.error('seedCommitteeValidationForTest:', e);
   }
 })();
-

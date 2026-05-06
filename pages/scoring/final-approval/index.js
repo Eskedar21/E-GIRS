@@ -15,7 +15,7 @@ import {
 import { getUnitById, getAllUnits } from '../../../data/administrativeUnits';
 import { getUsersByRole } from '../../../data/users';
 import { filterSubmissionsByAccess } from '../../../utils/permissions';
-import { getAssessmentYearById } from '../../../data/assessmentFramework';
+import { getAssessmentYearById, isAssessmentYearArchived } from '../../../data/assessmentFramework';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,6 +37,7 @@ export default function ChairmanFinalApprovalQueue() {
     const allUnits = getAllUnits();
     let list = getSubmissionsPendingChairmanScoringApproval();
     list = filterSubmissionsByAccess(list, user, allUnits);
+    list = list.filter((s) => !isAssessmentYearArchived(s.assessmentYearId));
     setSubmissions(list);
   }, [user, userRole]);
 

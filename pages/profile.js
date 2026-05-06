@@ -4,7 +4,15 @@ import Layout from '../components/Layout';
 import Sidebar from '../components/Sidebar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserById, enable2FA, disable2FA, updateUser } from '../data/users';
+import {
+  getUserById,
+  enable2FA,
+  disable2FA,
+  updateUser,
+  checkPassword,
+  isUsernameUnique,
+  validatePassword
+} from '../data/users';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -13,7 +21,7 @@ import { Badge } from '../components/ui/badge';
 
 export default function Profile() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateSessionUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isEnabling, setIsEnabling] = useState(false);
@@ -21,15 +29,28 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [newUsername, setNewUsername] = useState('');
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => {
-    if (user) {
-      const fullUserData = getUserById(user.userId);
-      setUserData(fullUserData);
-      if (fullUserData) {
-        setPhoneNumber(fullUserData.phoneNumber || '');
-      }
+    if (!user?.userId) return;
+    const fullUserData = getUserById(user.userId);
+    setUserData(fullUserData);
+    if (fullUserData) {
+      setPhoneNumber(fullUserData.phoneNumber || '');
+      setNewUsername(fullUserData.username);
     }
-  }, [user]);
+  }, [user?.userId]);
 
 
   const handleEnable2FA = async () => {
@@ -111,6 +132,93 @@ export default function Profile() {
     }
   };
 
+  const handleSaveUsername = (e) => {
+    e?.preventDefault();
+    setUsernameError('');
+    setError('');
+    setSuccess('');
+
+    const trimmed = newUsername.trim();
+    if (!trimmed) {
+      setUsernameError('Username is required');
+      return;
+    }
+    if (trimmed.length > 50) {
+      setUsernameError('Username must be 50 characters or less');
+      return;
+    }
+    if (!userData || trimmed === userData.username) {
+      setUsernameError('Enter a new username to save');
+      return;
+    }
+    if (!isUsernameUnique(trimmed, user.userId)) {
+      setUsernameError('This username is already taken');
+      return;
+    }
+
+    setIsSavingUsername(true);
+    try {
+      const updated = updateUser(user.userId, { username: trimmed });
+      if (updated) {
+        updateSessionUser({ username: trimmed });
+        setUserData(getUserById(user.userId));
+        setSuccess('Username updated. Use this username the next time you sign in (including on other devices).');
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setUsernameError('Could not update username. Please try again.');
+      }
+    } finally {
+      setIsSavingUsername(false);
+    }
+  };
+
+  const handleSavePassword = (e) => {
+    e?.preventDefault();
+    setPasswordError('');
+    setError('');
+    setSuccess('');
+
+    if (!userData) return;
+    if (!checkPassword(currentPassword, userData.password)) {
+      setPasswordError('Current password is incorrect');
+      return;
+    }
+    if (!newPassword) {
+      setPasswordError('Enter a new password');
+      return;
+    }
+    const pw = validatePassword(newPassword);
+    if (!pw.isValid) {
+      setPasswordError(pw.errors[0]);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('New password must be different from your current password');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    try {
+      const updated = updateUser(user.userId, { password: newPassword });
+      if (updated) {
+        setUserData(getUserById(user.userId));
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setSuccess('Password updated successfully.');
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setPasswordError('Could not update password. Please try again.');
+      }
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
   if (!user || !userData) {
     return (
       <ProtectedRoute>
@@ -161,10 +269,6 @@ export default function Profile() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-sm font-semibold text-mint-dark-text/70">Username</Label>
-                    <p className="text-mint-dark-text font-medium">{userData.username}</p>
-                  </div>
-                  <div>
                     <Label className="text-sm font-semibold text-mint-dark-text/70">Email</Label>
                     <p className="text-mint-dark-text font-medium">{userData.email}</p>
                     <div className="mt-1">
@@ -182,6 +286,126 @@ export default function Profile() {
                   <div>
                     <Label className="text-sm font-semibold text-mint-dark-text/70">Role</Label>
                     <p className="text-mint-dark-text font-medium">{userData.role}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-6 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl text-mint-primary-blue">Username and password</CardTitle>
+                  <CardDescription>
+                    Update your sign-in name or password. After changing your username, use the new name to log in everywhere.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  <form onSubmit={handleSaveUsername} className="space-y-4">
+                    <div>
+                      <Label htmlFor="new-username" className="mb-2">Username</Label>
+                      <Input
+                        id="new-username"
+                        value={newUsername}
+                        onChange={(e) => {
+                          setNewUsername(e.target.value);
+                          setUsernameError('');
+                        }}
+                        maxLength={50}
+                        className={usernameError ? 'border-red-500' : ''}
+                        autoComplete="username"
+                      />
+                      {usernameError && <p className="mt-1 text-sm text-red-600">{usernameError}</p>}
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={isSavingUsername}
+                      className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
+                    >
+                      {isSavingUsername ? 'Saving...' : 'Save username'}
+                    </Button>
+                  </form>
+
+                  <div className="border-t border-gray-200 pt-6">
+                    <form onSubmit={handleSavePassword} className="space-y-4">
+                      <div>
+                        <Label htmlFor="current-password" className="mb-2">Current password</Label>
+                        <div className="relative">
+                          <Input
+                            id="current-password"
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => {
+                              setCurrentPassword(e.target.value);
+                              setPasswordError('');
+                            }}
+                            className={passwordError ? 'border-red-500 pr-10' : 'pr-10'}
+                            autoComplete="current-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-mint-dark-text/70 hover:text-mint-dark-text"
+                          >
+                            {showCurrentPassword ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="new-password" className="mb-2">New password</Label>
+                        <div className="relative">
+                          <Input
+                            id="new-password"
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => {
+                              setNewPassword(e.target.value);
+                              setPasswordError('');
+                            }}
+                            className="pr-10"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-mint-dark-text/70 hover:text-mint-dark-text"
+                          >
+                            {showNewPassword ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                        <p className="mt-1 text-xs text-mint-dark-text/60">
+                          At least 8 characters with uppercase, lowercase, number, and special character
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-password" className="mb-2">Confirm new password</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirm-password"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => {
+                              setConfirmPassword(e.target.value);
+                              setPasswordError('');
+                            }}
+                            className="pr-10"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-mint-dark-text/70 hover:text-mint-dark-text"
+                          >
+                            {showConfirmPassword ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                      </div>
+                      {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
+                      <Button
+                        type="submit"
+                        disabled={isSavingPassword}
+                        className="bg-mint-primary-blue hover:bg-mint-secondary-blue"
+                      >
+                        {isSavingPassword ? 'Saving...' : 'Save password'}
+                      </Button>
+                    </form>
                   </div>
                 </CardContent>
               </Card>

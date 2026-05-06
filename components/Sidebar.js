@@ -32,7 +32,12 @@ export default function Sidebar() {
     {
       title: 'Archived Frameworks',
       path: '/admin/archived-frameworks',
-      roles: ['Chairman (CC)', 'Secretary (CC)', 'Central Committee Member', 'Regional Approver', 'Federal Approver']
+      roles: ['Regional Admin', 'Federal Admin', 'Chairman (CC)']
+    },
+    {
+      title: 'Active Frameworks',
+      path: '/admin/active-frameworks',
+      roles: ['Regional Admin', 'Federal Admin', 'Institutional Admin']
     },
     {
       title: 'User Management',
@@ -104,6 +109,12 @@ export default function Sidebar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
           </svg>
         );
+      case 'Active Frameworks':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
       case 'User Management':
         return (
           <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +161,10 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white text-mint-dark-text min-h-screen fixed left-0 top-16 shadow-lg border-r border-mint-medium-gray transition-all duration-300 z-40`}>
+    <aside
+      data-collapsed={isCollapsed ? 'true' : 'false'}
+      className={`egirs-sidebar ${isCollapsed ? 'w-16' : 'w-64'} bg-white text-mint-dark-text min-h-screen fixed left-0 top-16 shadow-lg border-r border-mint-medium-gray transition-all duration-300 z-40`}
+    >
       <nav className="p-4">
         {/* Toggle Button */}
         <div className="mb-4 flex items-center justify-between">
@@ -198,4 +212,3 @@ export default function Sidebar() {
     </aside>
   );
 }
-

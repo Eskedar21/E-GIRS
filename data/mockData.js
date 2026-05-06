@@ -1,4 +1,7 @@
 export const assessmentYears = [
+  { id: '2021', name: '2021 Assessment' },
+  { id: '2022', name: '2022 Assessment' },
+  { id: '2023', name: '2023 Assessment' },
   { id: '2024', name: '2024 Assessment' },
   { id: '2025', name: '2025 Assessment' },
 ];
@@ -402,4 +405,3 @@ export const getMaturityLevel = (score) => {
   if (score >= maturityLevelThresholds.low) return 'Medium';
   return 'Low';
 };
-

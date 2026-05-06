@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -9,6 +9,7 @@ import { Label } from '../../components/ui/label';
 import { Select } from '../../components/ui/select';
 import {
   getAllAssessmentYears,
+  getAssessmentYearById,
   createAssessmentYear,
   updateAssessmentYear,
   getDimensionsByYear,
@@ -33,10 +34,20 @@ import {
   closeAssessmentYearsPastDeadline,
   getAssessmentYearTimeRemaining,
   ASSESSMENT_STATUS,
+  ASSESSMENT_FRAMEWORK_SCOPE,
+  getFrameworkScopeForYear,
   RESPONSE_TYPES,
   APPLICABLE_UNIT_TYPES
 } from '../../data/assessmentFramework';
-import { notifyDataContributorsAssessmentActivated } from '../../data/notifications';
+import {
+  notifyDataContributorsAssessmentActivated,
+  notifyScopedAdminsAssessmentActivated
+} from '../../data/notifications';
+import {
+  getOpenFrameworkFeedback,
+  acknowledgeFrameworkFeedback,
+  notifyOpenFeedbackAuthorsYearRevertedToDraft
+} from '../../data/frameworkAdminFeedback';
 
 export default function AssessmentFramework() {
   const [selectedYear, setSelectedYear] = useState(null);
@@ -45,6 +56,7 @@ export default function AssessmentFramework() {
   
   const [years, setYears] = useState([]);
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Draft' | 'Active' | 'Archived'
+  const [yearFilter, setYearFilter] = useState('All');
   const [dimensions, setDimensions] = useState([]);
   const [indicators, setIndicators] = useState([]);
   const [subQuestions, setSubQuestions] = useState([]);
@@ -61,9 +73,7 @@ export default function AssessmentFramework() {
   
   const [yearForm, setYearForm] = useState({
     yearName: '',
-    status: ASSESSMENT_STATUS.DRAFT,
-    startDate: '',
-    endDate: ''
+    frameworkScope: ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL
   });
   const [dimensionForm, setDimensionForm] = useState({ dimensionName: '', dimensionWeight: '' });
   const [indicatorForm, setIndicatorForm] = useState({ indicatorName: '', indicatorWeight: '', applicableUnitType: '' });
@@ -91,10 +101,36 @@ export default function AssessmentFramework() {
     return d.toISOString().slice(0, 10);
   });
   const [activationDateError, setActivationDateError] = useState('');
+  /** When set, show confirm modal before archiving. { assessmentYearId, yearName, isActive } */
+  const [pendingArchive, setPendingArchive] = useState(null);
+  /** When set, show confirm modal before reverting Active year to Draft from admin feedback. { assessmentYearId, yearName } */
+  const [pendingRevertToDraft, setPendingRevertToDraft] = useState(null);
+  const [openFrameworkFeedback, setOpenFrameworkFeedback] = useState([]);
 
   useEffect(() => {
     refreshData();
   }, [selectedYear, selectedDimension, selectedIndicator]);
+
+  useEffect(() => {
+    const syncFrameworkAndFeedback = () => {
+      setOpenFrameworkFeedback(getOpenFrameworkFeedback());
+      setYears(getAllAssessmentYears());
+      setSelectedYear((prev) => {
+        if (!prev) return null;
+        const next = getAssessmentYearById(prev.assessmentYearId);
+        return next ?? null;
+      });
+    };
+    syncFrameworkAndFeedback();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frameworkAdminFeedbackUpdated', syncFrameworkAndFeedback);
+      window.addEventListener('assessmentFrameworkUpdated', syncFrameworkAndFeedback);
+      return () => {
+        window.removeEventListener('frameworkAdminFeedbackUpdated', syncFrameworkAndFeedback);
+        window.removeEventListener('assessmentFrameworkUpdated', syncFrameworkAndFeedback);
+      };
+    }
+  }, []);
 
   // Auto-close assessment years past their deadline on load and every minute
   useEffect(() => {
@@ -132,60 +168,75 @@ export default function AssessmentFramework() {
     }
   };
 
-  // Assessment Year Management
-  const toDateIso = (dateStr) => (dateStr ? new Date(dateStr + 'T12:00:00').toISOString() : null);
+  const handleBackNavigation = () => {
+    if (selectedIndicator) {
+      setSelectedIndicator(null);
+      return;
+    }
+    if (selectedDimension) {
+      setSelectedDimension(null);
+      return;
+    }
+    if (selectedYear) {
+      setSelectedYear(null);
+      return;
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    }
+  };
 
+  // Assessment Year Management
   const handleYearSubmit = (e) => {
     e.preventDefault();
     const newErrors = {};
-    
+
     if (!yearForm.yearName.trim()) {
       newErrors.yearName = 'Year Name is required';
     }
-    if (yearForm.status === ASSESSMENT_STATUS.ACTIVE && !yearForm.endDate) {
-      newErrors.endDate = 'End date is required when status is Active.';
-    }
-    if (yearForm.startDate && yearForm.endDate && yearForm.endDate <= yearForm.startDate) {
-      newErrors.endDate = newErrors.endDate || 'End date must be after start date.';
-    }
-    
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    const payload = {
-      yearName: yearForm.yearName,
-      status: yearForm.status,
-      startDate: toDateIso(yearForm.startDate),
-      endDate: toDateIso(yearForm.endDate)
-    };
+    const scope = yearForm.frameworkScope || ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL;
 
     if (editingYearId) {
-      if (yearForm.status === ASSESSMENT_STATUS.ACTIVE) {
-        const { valid, errors: validationErrors } = validateAssessmentYearForActivation(editingYearId);
-        if (!valid) {
-          setActivationBlocked({ yearId: editingYearId, yearName: yearForm.yearName, errors: validationErrors });
-          return;
-        }
-        setShowYearForm(false);
-        setEditingYearId(null);
-        setPendingActivation({ yearId: editingYearId, yearName: yearForm.yearName });
-        setActivationStartDate(yearForm.startDate || new Date().toISOString().slice(0, 10));
-        setActivationEndDate(yearForm.endDate || '');
-        setActivationDateError('');
+      const existing = getAssessmentYearById(editingYearId);
+      if (!existing) {
+        setErrors({ yearName: 'Assessment year not found.' });
         return;
       }
-      updateAssessmentYear(editingYearId, payload);
+      updateAssessmentYear(editingYearId, {
+        yearName: yearForm.yearName.trim(),
+        frameworkScope: scope,
+        ...(existing.status === ASSESSMENT_STATUS.ACTIVE
+          ? {}
+          : {
+              status: existing.status,
+              startDate: existing.startDate ?? null,
+              endDate: existing.endDate ?? null
+            })
+      });
       setSuccessMessage('Assessment Year updated successfully!');
       setEditingYearId(null);
     } else {
-      createAssessmentYear(payload);
-      setSuccessMessage('Assessment Year created successfully!');
+      createAssessmentYear({
+        yearName: yearForm.yearName.trim(),
+        status: ASSESSMENT_STATUS.DRAFT,
+        frameworkScope: scope,
+        startDate: null,
+        endDate: null
+      });
+      setSuccessMessage('Assessment year created as Draft. Add dimensions and indicators, then use Activate when weights are valid.');
     }
     refreshData();
     setShowYearForm(false);
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: '', endDate: '' });
+    setYearForm({
+      yearName: '',
+      frameworkScope: ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL
+    });
     setTimeout(() => setSuccessMessage(''), 5000);
     // Dispatch event to notify other pages
     if (typeof window !== 'undefined') {
@@ -197,9 +248,7 @@ export default function AssessmentFramework() {
     setEditingYearId(year.assessmentYearId);
     setYearForm({
       yearName: year.yearName,
-      status: year.status,
-      startDate: year.startDate ? year.startDate.slice(0, 10) : '',
-      endDate: year.endDate ? year.endDate.slice(0, 10) : ''
+      frameworkScope: getFrameworkScopeForYear(year)
     });
     setShowYearForm(true);
     setShowDimensionForm(false);
@@ -214,38 +263,72 @@ export default function AssessmentFramework() {
   const handleCancelYearEdit = () => {
     setEditingYearId(null);
     setShowYearForm(false);
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: '', endDate: '' });
+    setYearForm({
+      yearName: '',
+      frameworkScope: ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL
+    });
     setErrors({});
   };
 
   const handleCreateYear = () => {
     setEditingYearId(null);
-    const today = typeof window !== 'undefined' ? new Date().toISOString().slice(0, 10) : '';
-    setYearForm({ yearName: '', status: ASSESSMENT_STATUS.DRAFT, startDate: today, endDate: '' });
+    setYearForm({
+      yearName: '',
+      frameworkScope: ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL
+    });
     setShowYearForm(true);
     setErrors({});
   };
 
-  const handleStatusChange = (yearId, newStatus) => {
-    if (newStatus === ASSESSMENT_STATUS.ACTIVE) {
-      const { valid, errors: validationErrors } = validateAssessmentYearForActivation(yearId);
-      if (!valid) {
-        setActivationBlocked({ yearId, yearName: years.find(y => y.assessmentYearId === yearId)?.yearName || 'This year', errors: validationErrors });
-        return;
-      }
-      const year = years.find(y => y.assessmentYearId === yearId);
-      setPendingActivation({ yearId, yearName: year?.yearName || 'This year' });
-      const today = new Date().toISOString().slice(0, 10);
-      setActivationStartDate(year?.startDate ? year.startDate.slice(0, 10) : today);
-      setActivationEndDate(year?.endDate ? year.endDate.slice(0, 10) : '');
-      setActivationDateError('');
+  /** Opens activation modal only if dimensions, indicators, and weights pass validation. */
+  const openActivationModalForYear = (yearId) => {
+    const { valid, errors: validationErrors } = validateAssessmentYearForActivation(yearId);
+    if (!valid) {
+      setActivationBlocked({
+        yearId,
+        yearName: years.find((y) => y.assessmentYearId === yearId)?.yearName || 'This year',
+        errors: validationErrors
+      });
       return;
     }
-    setActivationBlocked(null);
-    updateAssessmentYear(yearId, { status: newStatus });
+    const year = years.find((y) => y.assessmentYearId === yearId);
+    setPendingActivation({ yearId, yearName: year?.yearName || 'This year' });
+    const today = new Date().toISOString().slice(0, 10);
+    setActivationStartDate(today);
+    setActivationEndDate('');
+    setActivationDateError('');
+  };
+
+  const openArchiveModal = (year) => {
+    const isActive = year.status === ASSESSMENT_STATUS.ACTIVE;
+    setPendingArchive({
+      assessmentYearId: year.assessmentYearId,
+      yearName: year.yearName,
+      isActive
+    });
+  };
+
+  const handleArchiveCancel = () => {
+    setPendingArchive(null);
+  };
+
+  const handleArchiveConfirm = () => {
+    if (!pendingArchive) return;
+    const year = getAssessmentYearById(pendingArchive.assessmentYearId);
+    if (!year) {
+      setPendingArchive(null);
+      return;
+    }
+    updateAssessmentYear(year.assessmentYearId, { status: ASSESSMENT_STATUS.ARCHIVED });
+    if (selectedYear?.assessmentYearId === year.assessmentYearId) {
+      setSelectedYear(null);
+      setSelectedDimension(null);
+      setSelectedIndicator(null);
+    }
     refreshData();
-    setSuccessMessage('Assessment Year status updated successfully!');
+    setSuccessMessage(`"${year.yearName}" has been archived.`);
     setTimeout(() => setSuccessMessage(''), 5000);
+    setPendingArchive(null);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
     }
@@ -271,12 +354,20 @@ export default function AssessmentFramework() {
       return;
     }
     setActivationDateError('');
+    const yearBefore = getAssessmentYearById(pendingActivation.yearId);
+    const frameworkScope = getFrameworkScopeForYear(yearBefore);
     updateAssessmentYear(pendingActivation.yearId, {
       status: ASSESSMENT_STATUS.ACTIVE,
       startDate: startDateIso,
       endDate: endDateIso
     });
-    notifyDataContributorsAssessmentActivated(pendingActivation.yearName, endDateIso);
+    notifyDataContributorsAssessmentActivated(
+      pendingActivation.yearName,
+      endDateIso,
+      frameworkScope,
+      pendingActivation.yearId
+    );
+    notifyScopedAdminsAssessmentActivated(pendingActivation.yearName, endDateIso, frameworkScope);
     setPendingActivation(null);
     refreshData();
     setSuccessMessage('Assessment activated. Data contributors have been notified.');
@@ -289,6 +380,50 @@ export default function AssessmentFramework() {
   const handleActivationCancel = () => {
     setPendingActivation(null);
     setActivationDateError('');
+  };
+
+  const openRevertToDraftModal = (fb) => {
+    const y = getAssessmentYearById(fb.assessmentYearId);
+    if (!y) return;
+    if (y.status !== ASSESSMENT_STATUS.ACTIVE) {
+      setSuccessMessage('This assessment is already not Active; you can edit it from the year list.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+      return;
+    }
+    setPendingRevertToDraft({
+      assessmentYearId: fb.assessmentYearId,
+      yearName: y.yearName
+    });
+  };
+
+  const handleRevertToDraftCancel = () => {
+    setPendingRevertToDraft(null);
+  };
+
+  const handleRevertToDraftConfirm = () => {
+    if (!pendingRevertToDraft) return;
+    const y = getAssessmentYearById(pendingRevertToDraft.assessmentYearId);
+    if (!y || y.status !== ASSESSMENT_STATUS.ACTIVE) {
+      setPendingRevertToDraft(null);
+      return;
+    }
+    updateAssessmentYear(pendingRevertToDraft.assessmentYearId, {
+      status: ASSESSMENT_STATUS.DRAFT,
+      startDate: null,
+      endDate: null
+    });
+    notifyOpenFeedbackAuthorsYearRevertedToDraft(
+      pendingRevertToDraft.assessmentYearId,
+      pendingRevertToDraft.yearName
+    );
+    setPendingRevertToDraft(null);
+    setOpenFrameworkFeedback(getOpenFrameworkFeedback());
+    refreshData();
+    setSuccessMessage('Framework set to Draft. Edit dimensions and indicators, then activate again when finalized.');
+    setTimeout(() => setSuccessMessage(''), 6000);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assessmentFrameworkUpdated'));
+    }
   };
 
   // Dimension Management
@@ -605,6 +740,20 @@ export default function AssessmentFramework() {
   const indicatorTotalWeight = selectedDimension ? getTotalIndicatorWeight(selectedDimension.dimensionId) : 0;
   const subQuestionTotalWeight = selectedIndicator ? getTotalSubQuestionWeight(selectedIndicator.indicatorId) : 0;
   const isFrameworkLocked = selectedYear?.status === ASSESSMENT_STATUS.ACTIVE;
+  const yearFilterOptions = useMemo(() => {
+    return [...years].sort((a, b) => String(b.yearName || '').localeCompare(String(a.yearName || '')));
+  }, [years]);
+  const filteredYears = useMemo(() => {
+    return years.filter((year) => {
+      const matchesStatus = statusFilter === 'All' || year.status === statusFilter;
+      const matchesYear = yearFilter === 'All' || Number(year.assessmentYearId) === Number(yearFilter);
+      return matchesStatus && matchesYear;
+    });
+  }, [years, statusFilter, yearFilter]);
+  const selectedDraftActivationCheck =
+    selectedYear && selectedYear.status === ASSESSMENT_STATUS.DRAFT
+      ? validateAssessmentYearForActivation(selectedYear.assessmentYearId)
+      : { valid: false, errors: [] };
 
   return (
     <ProtectedRoute allowedRoles={['Super Admin', 'MInT Admin']}>
@@ -624,6 +773,74 @@ export default function AssessmentFramework() {
               <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
                 {successMessage}
               </div>
+            )}
+
+            {openFrameworkFeedback.length > 0 && (
+              <Card className="mb-6 border-amber-200 bg-amber-50/40 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg text-mint-primary-blue">Feedback from regional / institute admins</CardTitle>
+                  <CardDescription>
+                    Use <strong>Revert to draft</strong> while the year is still Active so you can change the framework.
+                    After edits (and re-activation if needed), use <strong>Acknowledge update</strong> to close the loop with the admin who wrote in.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {openFrameworkFeedback.map((fb) => {
+                    const fbYear = getAssessmentYearById(fb.assessmentYearId);
+                    const yearStatus = fbYear?.status || '—';
+                    const isActiveYear = fbYear?.status === ASSESSMENT_STATUS.ACTIVE;
+                    const isDraftYear = fbYear?.status === ASSESSMENT_STATUS.DRAFT;
+                    return (
+                    <div
+                      key={fb.frameworkFeedbackId}
+                      className="p-4 bg-white rounded-lg border border-amber-100 text-mint-dark-text"
+                    >
+                      <p className="font-semibold text-mint-primary-blue">{fb.yearName}</p>
+                      <p className="text-xs text-mint-dark-text/70 mt-1">
+                        Current status: <span className="font-medium">{yearStatus}</span>
+                        {' · '}
+                        {fb.fromUsername} · {fb.fromRole} ·{' '}
+                        {new Date(fb.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                      <p className="text-sm mt-3 whitespace-pre-wrap">{fb.comment}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {isActiveYear && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-mint-secondary-blue hover:bg-mint-primary-blue"
+                            onClick={() => openRevertToDraftModal(fb)}
+                          >
+                            Revert to draft to edit
+                          </Button>
+                        )}
+                        {isDraftYear && (
+                          <span className="text-xs text-green-800 bg-green-50 border border-green-100 rounded px-2 py-1 self-center">
+                            Draft — edit the framework from this assessment year below, then activate when ready.
+                          </span>
+                        )}
+                        {!isActiveYear && !isDraftYear && fbYear && (
+                          <span className="text-xs text-mint-dark-text/70 bg-gray-50 border border-gray-200 rounded px-2 py-1 self-center">
+                            Status {yearStatus} — open feedback remains until you acknowledge.
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            acknowledgeFrameworkFeedback(fb.frameworkFeedbackId);
+                            setOpenFrameworkFeedback(getOpenFrameworkFeedback());
+                          }}
+                        >
+                          Acknowledge update
+                        </Button>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
             )}
 
             {/* Modal: Activation blocked when weights don't total 100% */}
@@ -664,7 +881,7 @@ export default function AssessmentFramework() {
                 <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
                   <h2 className="text-xl font-bold text-mint-primary-blue mb-2">Set assessment period</h2>
                   <p className="text-sm text-mint-dark-text/80 mb-4">
-                    &quot;{pendingActivation.yearName}&quot; will become active. Set the period so the system can count down and auto-close when the deadline is reached. Data contributors will be notified.
+                    &quot;{pendingActivation.yearName}&quot; will become active. Set the period so the system can count down and auto-close when the deadline is reached. Contributors and the matching scoped admins (Regional or Federal/Institutional) will be notified so they can assign users and review the framework.
                   </p>
                   <div className="space-y-4">
                     <div>
@@ -697,51 +914,120 @@ export default function AssessmentFramework() {
               </div>
             )}
 
-            {/* Breadcrumb Navigation */}
-            <div className="mb-6 flex items-center gap-2 text-sm">
-              <button
-                onClick={() => {
-                  setSelectedYear(null);
-                  setSelectedDimension(null);
-                  setSelectedIndicator(null);
-                }}
-                className="text-mint-primary-blue hover:underline"
+            {/* Modal: Confirm archive assessment year */}
+            {pendingArchive && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={handleArchiveCancel}>
+                <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                  <h2 className="text-xl font-bold text-mint-primary-blue mb-2">Archive assessment</h2>
+                  <p className="text-sm text-mint-dark-text/80 mb-4">
+                    {pendingArchive.isActive ? (
+                      <>
+                        Archive &quot;{pendingArchive.yearName}&quot;? It will stop accepting new submissions. You can still view it under Archived Assessment Frameworks.
+                      </>
+                    ) : (
+                      <>
+                        Archive the draft &quot;{pendingArchive.yearName}&quot;? You can still view it under Archived Assessment Frameworks.
+                      </>
+                    )}
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={handleArchiveCancel}>
+                      Cancel
+                    </Button>
+                    <Button className="bg-mint-secondary-blue hover:bg-mint-primary-blue" onClick={handleArchiveConfirm}>
+                      Archive
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Revert to draft (from admin feedback) */}
+            {pendingRevertToDraft && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                onClick={handleRevertToDraftCancel}
               >
-                Assessment Years
-              </button>
-              {selectedYear && (
-                <>
-                  <span className="text-mint-dark-text/50">/</span>
-                  <button
-                    onClick={() => {
-                      setSelectedDimension(null);
-                      setSelectedIndicator(null);
-                    }}
-                    className="text-mint-primary-blue hover:underline"
-                  >
-                    {selectedYear.yearName}
-                  </button>
-                </>
-              )}
-              {selectedDimension && (
-                <>
-                  <span className="text-mint-dark-text/50">/</span>
-                  <button
-                    onClick={() => {
-                      setSelectedIndicator(null);
-                    }}
-                    className="text-mint-primary-blue hover:underline"
-                  >
-                    {selectedDimension.dimensionName}
-                  </button>
-                </>
-              )}
-              {selectedIndicator && (
-                <>
-                  <span className="text-mint-dark-text/50">/</span>
-                  <span className="text-mint-dark-text">{selectedIndicator.indicatorName}</span>
-                </>
-              )}
+                <div
+                  className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2 className="text-xl font-bold text-mint-primary-blue mb-2">Revert to draft</h2>
+                  <p className="text-sm text-mint-dark-text/80 mb-4">
+                    Move &quot;{pendingRevertToDraft.yearName}&quot; back to Draft? Contributors will no longer see it as
+                    active until you activate again after edits. Scoped admins with open feedback will be notified.
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={handleRevertToDraftCancel}>
+                      Cancel
+                    </Button>
+                    <Button className="bg-mint-secondary-blue hover:bg-mint-primary-blue" onClick={handleRevertToDraftConfirm}>
+                      Revert to draft
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Breadcrumb Navigation */}
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleBackNavigation}
+                className="shrink-0"
+              >
+                ← Back
+              </Button>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedYear(null);
+                    setSelectedDimension(null);
+                    setSelectedIndicator(null);
+                  }}
+                  className="text-mint-primary-blue hover:underline"
+                >
+                  Assessment Years
+                </button>
+                {selectedYear && (
+                  <>
+                    <span className="text-mint-dark-text/50">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDimension(null);
+                        setSelectedIndicator(null);
+                      }}
+                      className="text-mint-primary-blue hover:underline"
+                    >
+                      {selectedYear.yearName}
+                    </button>
+                  </>
+                )}
+                {selectedDimension && (
+                  <>
+                    <span className="text-mint-dark-text/50">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedIndicator(null);
+                      }}
+                      className="text-mint-primary-blue hover:underline"
+                    >
+                      {selectedDimension.dimensionName}
+                    </button>
+                  </>
+                )}
+                {selectedIndicator && (
+                  <>
+                    <span className="text-mint-dark-text/50">/</span>
+                    <span className="text-mint-dark-text">{selectedIndicator.indicatorName}</span>
+                  </>
+                )}
+              </div>
             </div>
 
             {isFrameworkLocked && (
@@ -753,7 +1039,7 @@ export default function AssessmentFramework() {
                 </span>
                 <div>
                   <p className="font-semibold text-amber-800">Framework locked</p>
-                  <p className="text-sm text-amber-700">This assessment year is Active. Editing is disabled. Change its status to Draft or Archived to edit dimensions, indicators, or questions.</p>
+                  <p className="text-sm text-amber-700">This assessment year is Active. Editing is disabled. Archive it from the year list to allow structural edits again.</p>
                 </div>
               </div>
             )}
@@ -787,11 +1073,16 @@ export default function AssessmentFramework() {
 
                     {showYearForm && (
                       <form onSubmit={handleYearSubmit} className="mb-6 p-4 bg-mint-light-gray rounded-lg">
-                        <h3 className="text-lg font-semibold text-mint-primary-blue mb-4">
+                        <h3 className="text-lg font-semibold text-mint-primary-blue mb-2">
                           {editingYearId ? 'Edit Assessment Year' : 'Create New Assessment Year'}
                         </h3>
+                        <p className="text-sm text-mint-dark-text/70 mb-4">
+                          {editingYearId
+                            ? 'Update the display name and scope. Status and assessment dates are changed with Activate or Archive on the year card or dimensions screen.'
+                            : 'New years are saved as Draft. After dimensions, indicators, and question weights are complete (100% each level), use Activate to set the period and go live.'}
+                        </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+                          <div className="md:col-span-2">
                             <Label htmlFor="yearName" className="mb-2">
                               Year Name <span className="text-red-500">*</span>
                             </Label>
@@ -805,46 +1096,32 @@ export default function AssessmentFramework() {
                             />
                             {errors.yearName && <p className="mt-1 text-sm text-red-500">{errors.yearName}</p>}
                           </div>
-                          <div>
-                            <Label htmlFor="status" className="mb-2">
-                              Status <span className="text-red-500">*</span>
+                          <div className="md:col-span-2">
+                            <Label htmlFor="frameworkScope" className="mb-2">
+                              Framework scope <span className="text-red-500">*</span>
                             </Label>
                             <Select
-                              id="status"
-                              value={yearForm.status}
-                              onChange={(e) => setYearForm({ ...yearForm, status: e.target.value })}
+                              id="frameworkScope"
+                              value={yearForm.frameworkScope || ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL}
+                              disabled={
+                                Boolean(
+                                  editingYearId &&
+                                    years.find((y) => y.assessmentYearId === editingYearId)?.status ===
+                                      ASSESSMENT_STATUS.ACTIVE
+                                )
+                              }
+                              onChange={(e) => setYearForm({ ...yearForm, frameworkScope: e.target.value })}
                             >
-                              <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
-                              <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
-                              <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
+                              <option value={ASSESSMENT_FRAMEWORK_SCOPE.REGIONAL}>
+                                Regional (Woreda hierarchy — Regional Admins assign Data Contributors)
+                              </option>
+                              <option value={ASSESSMENT_FRAMEWORK_SCOPE.FEDERAL_INSTITUTE}>
+                                Federal Institute (Federal / Institutional Admins assign Institute Data Contributors)
+                              </option>
                             </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="startDate" className="mb-2">
-                              Submission start date
-                            </Label>
-                            <Input
-                              type="date"
-                              id="startDate"
-                              value={yearForm.startDate}
-                              onChange={(e) => setYearForm({ ...yearForm, startDate: e.target.value })}
-                              className={errors.startDate ? 'border-red-500' : ''}
-                            />
-                            <p className="text-xs text-mint-dark-text/60 mt-1">When contributors can start submitting</p>
-                          </div>
-                          <div>
-                            <Label htmlFor="endDate" className="mb-2">
-                              Submission end date (deadline)
-                            </Label>
-                            <Input
-                              type="date"
-                              id="endDate"
-                              value={yearForm.endDate}
-                              onChange={(e) => setYearForm({ ...yearForm, endDate: e.target.value })}
-                              className={errors.endDate ? 'border-red-500' : ''}
-                            />
-                            {errors.endDate && <p className="mt-1 text-sm text-red-500">{errors.endDate}</p>}
-                            <p className="text-xs text-mint-dark-text/60 mt-1">Deadline for submissions; used for ribbon and auto-close</p>
+                            <p className="text-xs text-mint-dark-text/60 mt-1">
+                              When this framework is activated, only the matching contributor type and scoped admins are notified.
+                            </p>
                           </div>
                         </div>
                         <Button
@@ -857,28 +1134,51 @@ export default function AssessmentFramework() {
                     )}
 
                     <div className="mb-4 flex flex-wrap items-center gap-4">
-                      <Label htmlFor="statusFilter" className="font-medium">Filter by status</Label>
-                      <Select
-                        id="statusFilter"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-40"
-                      >
-                        <option value="All">All</option>
-                        <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
-                        <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
-                        <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
-                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="yearFilter" className="font-medium">Filter by year</Label>
+                        <Select
+                          id="yearFilter"
+                          value={yearFilter}
+                          onChange={(e) => setYearFilter(e.target.value)}
+                          className="w-56"
+                        >
+                          <option value="All">All years</option>
+                          {yearFilterOptions.map((year) => (
+                            <option key={year.assessmentYearId} value={year.assessmentYearId}>
+                              {year.yearName}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="statusFilter" className="font-medium">Filter by status</Label>
+                        <Select
+                          id="statusFilter"
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="w-40"
+                        >
+                          <option value="All">All</option>
+                          <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
+                          <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
+                          <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
+                        </Select>
+                      </div>
                     </div>
 
-                    {(statusFilter === 'All' ? years : years.filter(y => y.status === statusFilter)).length === 0 ? (
+                    {filteredYears.length === 0 ? (
                       <p className="text-mint-dark-text/70 py-6">
-                        {years.length === 0 ? 'No assessment years yet. Create one above.' : `No frameworks with status "${statusFilter}".`}
+                        {years.length === 0
+                          ? 'No assessment years yet. Create one above.'
+                          : 'No assessment frameworks match the selected filters.'}
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {(statusFilter === 'All' ? years : years.filter(y => y.status === statusFilter)).map((year) => {
+                        {filteredYears.map((year) => {
                           const remaining = year.endDate ? getAssessmentYearTimeRemaining(year) : null;
+                          const draftActivationReady =
+                            year.status === ASSESSMENT_STATUS.DRAFT &&
+                            validateAssessmentYearForActivation(year.assessmentYearId).valid;
                           return (
                             <Card
                               key={year.assessmentYearId}
@@ -891,7 +1191,11 @@ export default function AssessmentFramework() {
                                     onClick={() => setSelectedYear(year)}
                                   >
                                     <h3 className="font-semibold text-mint-dark-text mb-1">{year.yearName}</h3>
-                                    <p className="text-sm text-mint-dark-text/70">Status: {year.status}</p>
+                                    <p className="text-sm text-mint-dark-text/70">
+                                      Status: {year.status}
+                                      <span className="mx-1.5 text-mint-dark-text/40">·</span>
+                                      Scope: {getFrameworkScopeForYear(year)}
+                                    </p>
                                     {year.status === ASSESSMENT_STATUS.ACTIVE && year.endDate && remaining && (
                                       <p className="text-xs mt-1 text-mint-dark-text/70">
                                         {remaining.isOverdue ? 'Deadline passed (will auto-close)' : `Ends in ${remaining.days}d ${remaining.hours}h`}
@@ -908,31 +1212,68 @@ export default function AssessmentFramework() {
                                     {year.status}
                                   </span>
                                 </div>
-                                <div className="flex gap-2 flex-wrap">
-                                  <Select
-                                    value={year.status}
-                                    onChange={(e) => handleStatusChange(year.assessmentYearId, e.target.value)}
-                                    className="flex-1 min-w-0 text-sm"
-                                  >
-                                    <option value={ASSESSMENT_STATUS.DRAFT}>Draft</option>
-                                    <option value={ASSESSMENT_STATUS.ACTIVE}>Active</option>
-                                    <option value={ASSESSMENT_STATUS.ARCHIVED}>Archived</option>
-                                  </Select>
-                                  <Button
-                                    onClick={(e) => { e.preventDefault(); handleEditYear(year); }}
-                                    variant="outline"
-                                    className="text-xs px-3"
-                                    title="Edit year details and status"
-                                  >
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    onClick={(e) => { e.preventDefault(); setSelectedYear(year); }}
-                                    variant="outline"
-                                    className="text-xs px-3"
-                                  >
-                                    Manage
-                                  </Button>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex gap-2 flex-wrap">
+                                    {year.status === ASSESSMENT_STATUS.DRAFT && (
+                                      <>
+                                        {draftActivationReady ? (
+                                          <Button
+                                            type="button"
+                                            className="text-xs px-3 bg-mint-secondary-blue hover:bg-mint-primary-blue flex-1 min-w-[8rem]"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              openActivationModalForYear(year.assessmentYearId);
+                                            }}
+                                          >
+                                            Activate…
+                                          </Button>
+                                        ) : (
+                                          <span className="text-xs text-mint-dark-text/60 flex-1 min-w-0 py-2 px-1">
+                                            Complete framework (100% weights) to enable activation.
+                                          </span>
+                                        )}
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          className="text-xs px-3"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            openArchiveModal(year);
+                                          }}
+                                        >
+                                          Archive
+                                        </Button>
+                                      </>
+                                    )}
+                                    {year.status === ASSESSMENT_STATUS.ACTIVE && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="text-xs px-3"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          openArchiveModal(year);
+                                        }}
+                                      >
+                                        Archive
+                                      </Button>
+                                    )}
+                                    <Button
+                                      onClick={(e) => { e.preventDefault(); handleEditYear(year); }}
+                                      variant="outline"
+                                      className="text-xs px-3"
+                                      title="Edit year name and scope"
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => { e.preventDefault(); setSelectedYear(year); }}
+                                      variant="outline"
+                                      className="text-xs px-3"
+                                    >
+                                      Manage
+                                    </Button>
+                                  </div>
                                 </div>
                               </CardContent>
                             </Card>
@@ -950,33 +1291,67 @@ export default function AssessmentFramework() {
               <div className="space-y-6">
                 <Card className="shadow-lg">
                   <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <CardTitle className="text-xl text-mint-primary-blue">Assessment Dimensions</CardTitle>
-                        <CardDescription>
-                          Year: {selectedYear.yearName} | 
-                          Total Weight: <span className={`font-bold ${dimensionTotalWeight === 100 ? 'text-green-600' : 'text-red-600'}`}>
-                            {dimensionTotalWeight.toFixed(2)} / 100%
-                          </span>
-                        </CardDescription>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-xl text-mint-primary-blue">Assessment Dimensions</CardTitle>
+                          <CardDescription>
+                            Year: {selectedYear.yearName} · Scope: {getFrameworkScopeForYear(selectedYear)} |
+                            Total Weight: <span className={`font-bold ${dimensionTotalWeight === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                              {dimensionTotalWeight.toFixed(2)} / 100%
+                            </span>
+                          </CardDescription>
+                        </div>
+                        {!isFrameworkLocked && (
+                          <Button
+                            onClick={() => {
+                              if (showDimensionForm) {
+                                handleCancelDimensionEdit();
+                              } else {
+                                setEditingDimensionId(null);
+                                setDimensionForm({ dimensionName: '', dimensionWeight: '' });
+                                setShowDimensionForm(true);
+                                setErrors({});
+                              }
+                            }}
+                            variant={showDimensionForm ? "outline" : "default"}
+                            className={showDimensionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue flex-shrink-0"}
+                          >
+                            {showDimensionForm ? 'Cancel' : '+ Add Dimension'}
+                          </Button>
+                        )}
                       </div>
-                      {!isFrameworkLocked && (
-                        <Button
-                          onClick={() => {
-                            if (showDimensionForm) {
-                              handleCancelDimensionEdit();
-                            } else {
-                              setEditingDimensionId(null);
-                              setDimensionForm({ dimensionName: '', dimensionWeight: '' });
-                              setShowDimensionForm(true);
-                              setErrors({});
-                            }
-                          }}
-                          variant={showDimensionForm ? "outline" : "default"}
-                          className={showDimensionForm ? "" : "bg-mint-secondary-blue hover:bg-mint-primary-blue"}
-                        >
-                          {showDimensionForm ? 'Cancel' : '+ Add Dimension'}
-                        </Button>
+                      {!isFrameworkLocked && selectedYear.status === ASSESSMENT_STATUS.DRAFT && (
+                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-mint-primary-blue/25 bg-mint-primary-blue/5">
+                          {selectedDraftActivationCheck.valid ? (
+                            <>
+                              <p className="text-sm text-mint-dark-text flex-1 min-w-[12rem]">
+                                This draft passes activation checks. Set start and end dates to publish the framework and notify users.
+                              </p>
+                              <Button
+                                type="button"
+                                className="bg-mint-secondary-blue hover:bg-mint-primary-blue flex-shrink-0"
+                                onClick={() => openActivationModalForYear(selectedYear.assessmentYearId)}
+                              >
+                                Activate assessment…
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm text-mint-dark-text/80 flex-1 min-w-[12rem]">
+                                Complete dimensions, indicators, and sub-questions so all weights total 100% at each level. Then activation and dates will be available.
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="flex-shrink-0"
+                                onClick={() => openActivationModalForYear(selectedYear.assessmentYearId)}
+                              >
+                                What is missing?
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   </CardHeader>
@@ -1540,4 +1915,3 @@ export default function AssessmentFramework() {
     </ProtectedRoute>
   );
 }
-

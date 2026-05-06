@@ -11,7 +11,7 @@ import {
 } from '../../data/submissions';
 import { getUnitById, getAllUnits } from '../../data/administrativeUnits';
 import { filterSubmissionsByAccess } from '../../utils/permissions';
-import { getAssessmentYearById } from '../../data/assessmentFramework';
+import { getAssessmentYearById, isAssessmentYearArchived } from '../../data/assessmentFramework';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -34,6 +34,7 @@ export default function PendingSubjectiveScoringQueue() {
     const allUnits = getAllUnits();
     let list = getSubmissionsForSubjectiveScoring();
     list = filterSubmissionsByAccess(list, user, allUnits);
+    list = list.filter((s) => !isAssessmentYearArchived(s.assessmentYearId));
     setSubmissions(list);
   }, [user, userRole]);
 
@@ -53,13 +54,21 @@ export default function PendingSubjectiveScoringQueue() {
       });
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(s => {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((s) => {
         const unit = getUnitById(s.unitId);
         const unitName = unit ? unit.officialUnitName.toLowerCase() : '';
         const year = getAssessmentYearById(s.assessmentYearId);
-        const yearName = year ? year.yearName.toLowerCase() : '';
-        return unitName.includes(q) || yearName.includes(q) || String(s.submissionId).includes(q);
+        const yearName = (year?.yearName ?? '').toLowerCase();
+        const yearIdStr = String(s.assessmentYearId ?? '');
+        if (unitName.includes(q)) return true;
+        if (yearName.includes(q)) return true;
+        if (yearIdStr.includes(q) || yearIdStr === q) return true;
+        if (String(s.submissionId).includes(q)) return true;
+        // Match year digits in labels like "E-GIRS 2024/2025" when user types "2024"
+        const digitsQ = q.replace(/\D/g, '');
+        if (digitsQ.length > 0 && yearName.replace(/\D/g, '').includes(digitsQ)) return true;
+        return false;
       });
     }
     return filtered;

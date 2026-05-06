@@ -13,13 +13,7 @@ import {
   ASSESSMENT_STATUS
 } from '../../data/assessmentFramework';
 
-const ARCHIVED_ALLOWED_ROLES = [
-  'Chairman (CC)',
-  'Secretary (CC)',
-  'Central Committee Member',
-  'Regional Approver',
-  'Federal Approver'
-];
+const ARCHIVED_ALLOWED_ROLES = ['Regional Admin', 'Federal Admin', 'Chairman (CC)'];
 
 function formatDate(iso) {
   if (!iso) return '—';

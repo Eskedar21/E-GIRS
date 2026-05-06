@@ -2,8 +2,40 @@
 // This module provides utilities for calculating scores, dimensions, and aggregations
 // as per the E-GIRS SRS requirements
 
-import { regionsAndCities } from '../data/mockData';
+import { assessmentYears, regionsAndCities } from '../data/mockData';
 import { getDimensionsByYear } from '../data/assessmentFramework';
+
+const clampScore = (score) => Math.max(0, Math.min(1, score));
+
+const getHistoricalDemoScore = (scoresByYear = {}, yearId) => {
+  if (scoresByYear[yearId] !== undefined) return scoresByYear[yearId];
+
+  const numericYear = parseInt(yearId, 10);
+  if (Number.isNaN(numericYear)) return 0;
+
+  const anchorScore = scoresByYear['2024'] ?? scoresByYear['2025'] ?? 0;
+  if (!anchorScore) return 0;
+
+  if (numericYear < 2024) {
+    return clampScore(anchorScore - ((2024 - numericYear) * 0.04));
+  }
+
+  return clampScore(anchorScore + ((numericYear - 2024) * 0.035));
+};
+
+const getHistoricalDemoDimensionScore = (unit, yearId, dimensionId) => {
+  const explicitScore = unit.dimensionsScoresByYear?.[yearId]?.find(
+    d => d.dimensionId === dimensionId
+  )?.score;
+
+  if (explicitScore !== undefined) return explicitScore;
+
+  const baseScore = unit.dimensionsScoresByYear?.['2024']?.find(
+    d => d.dimensionId === dimensionId
+  )?.score;
+
+  return getHistoricalDemoScore({ '2024': baseScore }, yearId);
+};
 
 /**
  * Calculate National Index (arithmetic mean of all top-level unit scores)
@@ -13,7 +45,7 @@ export const calculateNationalIndex = (yearId) => {
   if (topLevelUnits.length === 0) return 0;
   
   const sum = topLevelUnits.reduce((acc, unit) => {
-    return acc + (unit.scoresByYear[yearId] || 0);
+    return acc + getHistoricalDemoScore(unit.scoresByYear, yearId);
   }, 0);
   
   return sum / topLevelUnits.length;
@@ -27,9 +59,7 @@ export const calculateNationalDimensionAverage = (yearId, dimensionId) => {
   if (topLevelUnits.length === 0) return 0;
   
   const sum = topLevelUnits.reduce((acc, unit) => {
-    const dimensionScore = unit.dimensionsScoresByYear?.[yearId]?.find(
-      d => d.dimensionId === dimensionId
-    )?.score || 0;
+    const dimensionScore = getHistoricalDemoDimensionScore(unit, yearId, dimensionId);
     return acc + dimensionScore;
   }, 0);
   
@@ -106,7 +136,7 @@ export const countUnitsByMaturityLevel = (yearId) => {
  * Get trend data for national index and dimensions over time
  */
 export const getNationalTrendData = () => {
-  const years = ['2024', '2025'];
+  const years = assessmentYears.map(year => year.id);
   const dimensions = getDimensionsByYear(1); // Using 2024 dimensions as base
   
   const dimensionIdMap = {
@@ -154,8 +184,8 @@ export const getRankedUnits = (yearId) => {
   return regionsAndCities
     .map(unit => ({
       ...unit,
-      score: unit.scoresByYear[yearId] || 0,
-      dimensionScores: unit.dimensionsScoresByYear?.[yearId] || []
+      score: getHistoricalDemoScore(unit.scoresByYear, yearId),
+      dimensionScores: unit.dimensionsScoresByYear?.[yearId] || unit.dimensionsScoresByYear?.['2024'] || []
     }))
     .sort((a, b) => b.score - a.score)
     .map((unit, index) => ({
@@ -179,6 +209,9 @@ export const getUnitScore = (unitId, yearId, allUnits) => {
   // Try to get from scoresByYear (mockData structure)
   if (unit.scoresByYear && unit.scoresByYear[yearId] !== undefined) {
     return unit.scoresByYear[yearId];
+  }
+  if (unit.scoresByYear) {
+    return getHistoricalDemoScore(unit.scoresByYear, yearId);
   }
   
   // For administrative units, we might need to calculate from submissions
@@ -253,4 +286,3 @@ export const getAllUnitsForCalculations = () => {
   // This will be replaced with actual data from administrativeUnits
   return [];
 };
-
